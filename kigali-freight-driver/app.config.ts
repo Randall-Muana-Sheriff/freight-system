@@ -23,7 +23,11 @@ const config: ExpoConfig = {
       foregroundImage: './assets/icon.png',
       backgroundColor: '#07111f',
     },
-    googleServicesFile: './google-services.json',
+    // EAS Build injects GOOGLE_SERVICES_JSON as a path to the securely
+    // uploaded file (set via `eas env:create`) since the real file is
+    // gitignored and never part of the uploaded project archive. Falls
+    // back to the local file for everyday local dev builds.
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
   },
   plugins: [
     'expo-secure-store',
