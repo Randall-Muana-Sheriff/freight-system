@@ -34,6 +34,7 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-asset',
     'expo-notifications',
+    'expo-font',
     [
       'expo-image-picker',
       {

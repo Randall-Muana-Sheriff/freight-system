@@ -88,22 +88,33 @@ export async function startBackgroundLocationTracking() {
     // the app is backgrounded/killed instead of continuing.
   }
 
-  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-    accuracy: Location.Accuracy.High,
-    timeInterval: 15000, // 15s — frequent enough for a live dispatcher map without draining the battery
-    // 0, not a distance filter: a driver parked at a hub or stuck in
-    // traffic hasn't moved, but is still very much online — a nonzero
-    // value here means the OS simply never fires a callback while
-    // stationary, no matter how long the wait, which the dispatcher
-    // dashboard's "stale after 2min" check then misreads as offline.
-    distanceInterval: 0,
-    showsBackgroundLocationIndicator: true, // iOS: the blue status bar pill while tracking in background
-    foregroundService: {
-      notificationTitle: 'Kigali Freight Driver',
-      notificationBody: 'Sharing your location with dispatch during your active shift.',
-      notificationColor: '#0F6FFF',
-    },
-  });
+  try {
+    await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+      accuracy: Location.Accuracy.High,
+      timeInterval: 15000, // 15s — frequent enough for a live dispatcher map without draining the battery
+      // 0, not a distance filter: a driver parked at a hub or stuck in
+      // traffic hasn't moved, but is still very much online — a nonzero
+      // value here means the OS simply never fires a callback while
+      // stationary, no matter how long the wait, which the dispatcher
+      // dashboard's "stale after 2min" check then misreads as offline.
+      distanceInterval: 0,
+      showsBackgroundLocationIndicator: true, // iOS: the blue status bar pill while tracking in background
+      foregroundService: {
+        notificationTitle: 'Kigali Freight Driver',
+        notificationBody: 'Sharing your location with dispatch during your active shift.',
+        notificationColor: '#0F6FFF',
+      },
+    });
+  } catch (err) {
+    // Seen in practice on a freshly-installed app: the native module can
+    // throw (e.g. a NullPointerException reading its own SharedPreferences)
+    // the very first time this runs after install, before Android has
+    // finished setting up the app's private storage. This call is
+    // fire-and-forget from every caller (sign-in, hydrate) specifically so
+    // a location subsystem hiccup can never block login or crash the app —
+    // surfacing the failure here, not throwing, is what makes that true.
+    console.warn('Failed to start background location tracking:', err);
+  }
 }
 
 export async function stopBackgroundLocationTracking() {
