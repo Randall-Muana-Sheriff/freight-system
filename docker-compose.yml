@@ -1,0 +1,125 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: kigali-freight-postgres
+    environment:
+      POSTGRES_USER: freight
+      POSTGRES_PASSWORD: freight
+      POSTGRES_DB: kigali_freight
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U freight -d kigali_freight"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: kigali-freight-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: kigali-freight-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: freight-minio
+      MINIO_ROOT_PASSWORD: freight-minio-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # One-shot: creates the delivery-photos bucket and makes it publicly
+  # readable (proof-of-delivery photo URLs are plain, unsigned links), then
+  # exits. MinIO itself doesn't auto-create buckets on startup.
+  minio-init:
+    image: minio/mc:latest
+    container_name: kigali-freight-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+      mc alias set local http://minio:9000 freight-minio freight-minio-secret &&
+      mc mb --ignore-existing local/delivery-photos &&
+      mc anonymous set download local/delivery-photos
+      "
+
+  router:
+    build:
+      context: .
+      dockerfile: kigali-freight-router/Dockerfile
+    container_name: kigali-freight-router
+    command: sh -c "node bin/migrate.js && node server.js"
+    environment:
+      NODE_ENV: development
+      DB_USER: freight
+      DB_PASSWORD: freight
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: kigali_freight
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production}
+      PORT: 5000
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
+      # Bootstrapped as an admin account on first migration run (see
+      # bin/migrate.js seedAdmin) since self-signup can no longer create
+      # admin/dispatcher accounts. Change the password for anything beyond
+      # local dev.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme-admin-password}
+      METRICS_TOKEN: ${METRICS_TOKEN:-dev-metrics-token-change-in-production}
+      # Proof-of-delivery photo storage. Points at the local MinIO container
+      # by default (S3-compatible, no real cloud account needed for dev) —
+      # override R2_ENDPOINT/credentials to point at real Cloudflare R2 in
+      # production instead.
+      R2_ACCOUNT_ID: local-minio
+      R2_ENDPOINT: http://minio:9000
+      R2_ACCESS_KEY_ID: freight-minio
+      R2_SECRET_ACCESS_KEY: freight-minio-secret
+      R2_BUCKET_NAME: delivery-photos
+      R2_PUBLIC_URL_BASE: http://localhost:9000/delivery-photos
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+
+  ui:
+    build:
+      context: .
+      dockerfile: kigali-freight-ui/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:5000
+    container_name: kigali-freight-ui
+    ports:
+      - "5173:80"
+    depends_on:
+      - router
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [".env*"],
+  "globalEnv": [
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "REDIS_URL",
+    "NODE_ENV"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", "build/**", ".next/**", "!.next/cache/**"],
+      "cache": true
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "outputs": [],
+      "cache": true
+    },
+    "typecheck": {
+      "outputs": [],
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "test:integration": {
+      "dependsOn": ["^build", "db:migrate"],
+      "outputs": [],
+      "cache": false
+    },
+    "db:migrate": {
+      "outputs": [],
+      "cache": false
+    },
+    "db:seed": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": false
+    },
+    "docker:build": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "cache": false
+    }
+  }
+}

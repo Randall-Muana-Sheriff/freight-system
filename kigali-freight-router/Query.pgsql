@@ -1,0 +1,1 @@
+ALTER TABLE completed_routes DROP CONSTRAINT IF EXISTS completed_routes_vehicle_id_fkey;

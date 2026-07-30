@@ -1,0 +1,33 @@
+{
+  "name": "freight-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "kigali-freight-*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "db:migrate": "turbo run db:migrate --filter=router",
+    "docker:build": "turbo run docker:build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0",
+    "eslint": "^9.0.0",
+    "@freight/config": "*"
+  },
+  "packageManager": "npm@10.8.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

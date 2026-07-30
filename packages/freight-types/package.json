@@ -1,0 +1,35 @@
+{
+  "name": "@freight/types",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/index.d.ts",
+      "import": "./dist/schemas/index.js",
+      "require": "./dist/schemas/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@freight/config": "*",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

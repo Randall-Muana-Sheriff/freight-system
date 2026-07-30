@@ -1,0 +1,12 @@
+# Monorepo-root-level concerns — each workspace (kigali-freight-*,
+# packages/*) has its own .gitignore for its own specifics; this only
+# covers what npm workspace hoisting and Turborepo put at the root.
+node_modules/
+.turbo/
+.env
+.env.local
+*.log
+npm-debug.log*
+dist/
+build/
+.DS_Store
