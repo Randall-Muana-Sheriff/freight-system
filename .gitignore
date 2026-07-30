@@ -3,6 +3,10 @@
 # covers what npm workspace hoisting and Turborepo put at the root.
 node_modules/
 .turbo/
+# Backup of kigali-freight-driver's old standalone nested repo (renamed
+# aside, not deleted, when this root repo was initialized) — a local
+# artifact for reference, not meant to be tracked itself.
+kigali-freight-driver/.git.bak-driver-only/
 .env
 .env.local
 *.log
