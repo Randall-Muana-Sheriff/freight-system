@@ -4,7 +4,7 @@
 // equal visual weight below the constantly-used operational panels, so
 // reaching, say, vehicle registration meant scrolling past everything else.
 import { useState } from 'react';
-import { Map, Truck, ShieldCheck } from 'lucide-react';
+import { Map, Truck } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import DispatchPanel from './DispatchPanel';
 import RouteOptimizerPanel from './RouteOptimizerPanel';
@@ -13,28 +13,25 @@ import GeofenceDrawer from './GeofenceDrawer';
 import AdminControlPanel from './AdminControlPanel';
 import VehicleAssignmentPanel from './VehicleAssignmentPanel';
 import HubsPanel from './HubsPanel';
-import AdminUserManagement from './AdminUserManagement';
-import SystemAuditLogs from './SystemAuditLogs';
 
 const TABS = [
     { id: 'planning', label: 'Planning', icon: Map },
     { id: 'fleet', label: 'Fleet', icon: Truck, staffOnly: true },
-    { id: 'admin', label: 'Admin', icon: ShieldCheck, adminOnly: true },
 ];
 
 export default function SecondaryPanel({
     dispatchTargetMode, setDispatchTargetMode, dispatchRankings,
     setOptimizedRoutes, stopTargetMode, setStopTargetMode, newStopCoords,
     savedRoutes, routesLoading, playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute, loadRouteForPlayback, togglePlaybackPlay,
+    onLoadBreadcrumbs, breadcrumbsLoading,
     drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints,
     hubTargetMode, setHubTargetMode, newHubCoords, clearNewHubCoords,
 }) {
     const { userRole } = useSocket();
     const [activeTab, setActiveTab] = useState('planning');
     const isStaff = userRole === 'admin' || userRole === 'dispatcher';
-    const isAdmin = userRole === 'admin';
 
-    const visibleTabs = TABS.filter((t) => (!t.staffOnly || isStaff) && (!t.adminOnly || isAdmin));
+    const visibleTabs = TABS.filter((t) => !t.staffOnly || isStaff);
     const effectiveTab = visibleTabs.some((t) => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id ?? 'planning');
 
     return (
@@ -83,6 +80,8 @@ export default function SecondaryPanel({
                             selectedPlaybackRoute={selectedPlaybackRoute}
                             loadRouteForPlayback={loadRouteForPlayback}
                             togglePlaybackPlay={togglePlaybackPlay}
+                            onLoadBreadcrumbs={onLoadBreadcrumbs}
+                            breadcrumbsLoading={breadcrumbsLoading}
                         />
                         <GeofenceDrawer
                             drawModeActive={drawModeActive}
@@ -104,13 +103,6 @@ export default function SecondaryPanel({
                             newHubCoords={newHubCoords}
                             clearNewHubCoords={clearNewHubCoords}
                         />
-                    </>
-                )}
-
-                {effectiveTab === 'admin' && isAdmin && (
-                    <>
-                        <AdminUserManagement />
-                        <SystemAuditLogs />
                     </>
                 )}
             </div>

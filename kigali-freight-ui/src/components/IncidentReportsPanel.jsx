@@ -13,7 +13,7 @@ const STATUS_STYLES = {
 };
 
 export default function IncidentReportsPanel() {
-    const { incidentReports, jwtToken } = useSocket();
+    const { incidentReports, jwtToken, resolveDriverName } = useSocket();
     const [busyId, setBusyId] = useState(null);
 
     const handleSetStatus = async (id, status) => {
@@ -45,7 +45,7 @@ export default function IncidentReportsPanel() {
                         return (
                             <div key={incident.id} className="p-2 border border-carbon/30 bg-carbon/10 rounded text-[11px] flex flex-col space-y-1">
                                 <div className="flex justify-between items-center gap-2">
-                                    <span className="font-bold text-paper">{incident.driver_name}</span>
+                                    <span className="font-bold text-paper">{resolveDriverName(incident.driver_name)}</span>
                                     <div className="flex items-center gap-1.5 shrink-0">
                                         <span className="font-mono text-[9px] text-steel">{new Date(incident.created_at).toLocaleTimeString()}</span>
                                         <span className={`text-[8px] font-mono font-bold uppercase border rounded px-1 py-0.5 ${STATUS_STYLES[status]}`}>

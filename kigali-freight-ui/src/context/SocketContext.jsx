@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { io } from 'socket.io-client';
-import { apiFetch, API_BASE, fetchRoutes, fetchGeofences, fetchActiveOrders, fetchIncidents, fetchRecentDeliveries, fetchInFlightOrders, fetchHubs, fetchVehicleTypes, setUnauthorizedHandler } from '../utils/api';
+import { apiFetch, API_BASE, fetchRoutes, fetchGeofences, fetchActiveOrders, fetchIncidents, fetchRecentDeliveries, fetchInFlightOrders, fetchHubs, fetchVehicleTypes, fetchDrivers, setUnauthorizedHandler } from '../utils/api';
 
 const SocketContext = createContext(null);
 
@@ -8,6 +8,20 @@ export function SocketProvider({ children }) {
   const [jwtToken, setJwtToken] = useState(() => localStorage.getItem('fleet_token') || '');
   const [userRole, setUserRole] = useState(() => localStorage.getItem('fleet_role') || '');
   const [authError, setAuthError] = useState('');
+
+  // Whole-app view switch, not a socket/data concern — but this context is
+  // already the one thing every screen (including the deeply-nested Admin
+  // tab) pulls shared state from, and the Admin Control Center (statistics,
+  // user/role governance, audit log) is deliberately its own full screen
+  // rather than more cards crammed into the Admin tab's 380px sidebar, so
+  // it needs a way to swap out of Dashboard from wherever the "Open admin
+  // control center" entry point lives.
+  const [showAdminCenter, setShowAdminCenter] = useState(false);
+
+  // Any "view photo/document" link across the dashboard sets this instead
+  // of opening a new browser tab — one shared piece of state, one lightbox
+  // rendered at the app root (see ImageLightbox / App.jsx).
+  const [viewingImage, setViewingImage] = useState(null);
 
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -27,6 +41,12 @@ export function SocketProvider({ children }) {
   // Vehicle "type" options for the fleet registration form — previously a
   // hardcoded 3-option dropdown, now a real admin-managed list.
   const [savedVehicleTypes, setSavedVehicleTypes] = useState([]);
+  // A phone/PIN driver's `username` (the join key used everywhere — orders,
+  // telemetry, incidents) is literally their phone number now, not a name.
+  // Every screen that shows a driver identifier — the live map, incident
+  // feeds, order assignment — needs to resolve that back to a real name via
+  // this shared directory instead of rendering the raw username/phone.
+  const [savedDrivers, setSavedDrivers] = useState([]);
 
   // Orders still PENDING (unassigned) — the dispatch queue. Once assigned,
   // an order drops out of this list (it's no longer "active" by the
@@ -138,7 +158,33 @@ export function SocketProvider({ children }) {
       }
       setInFlightOrders([]);
     }
+    try {
+      const driversData = await fetchDrivers(token);
+      setSavedDrivers(Array.isArray(driversData) ? driversData : []);
+    } catch (error) {
+      if (error?.status === 401 || error?.status === 403) {
+        clearCachedAuth();
+      }
+      setSavedDrivers([]);
+    }
   }, [clearCachedAuth, jwtToken]);
+
+  const driverDirectory = useMemo(() => {
+    const map = {};
+    savedDrivers.forEach((d) => {
+      map[d.username] = d;
+    });
+    return map;
+  }, [savedDrivers]);
+
+  // The one place every driver-identifier display should go through —
+  // falls back to whatever string it was given (the raw username/phone) if
+  // there's no matching directory entry yet (still loading, or a legacy
+  // account) or no full_name on file for it.
+  const resolveDriverName = useCallback(
+    (identifier) => (identifier ? driverDirectory[identifier]?.fullName || identifier : identifier),
+    [driverDirectory]
+  );
 
   // Restore session's saved feeds on mount (token/role are already read
   // synchronously above via lazy useState initializers, avoiding a
@@ -267,7 +313,18 @@ export function SocketProvider({ children }) {
 
   const disconnectSocket = useCallback(() => {
     setSocket((current) => {
-      if (current) current.disconnect();
+      // removeAllListeners() before disconnecting: this "works" today
+      // without it only because connectSocket always creates a brand-new
+      // `io(...)` instance rather than reusing one across reconnects — if
+      // that ever changes to the more idiomatic socket.io-client pattern
+      // (reusing one instance via connect()/disconnect()), skipping this
+      // would silently double-register all 13 handlers above on every
+      // reconnect (duplicate order-activity entries, doubled breadcrumb
+      // points, duplicate incident entries).
+      if (current) {
+        current.removeAllListeners();
+        current.disconnect();
+      }
       return null;
     });
     setIsConnected(false);
@@ -313,6 +370,7 @@ export function SocketProvider({ children }) {
     disconnectSocket();
     setJwtToken('');
     setUserRole('');
+    setShowAdminCenter(false);
     localStorage.removeItem('fleet_token');
     localStorage.removeItem('fleet_role');
   }, [disconnectSocket]);
@@ -360,10 +418,12 @@ export function SocketProvider({ children }) {
 
   const value = {
     jwtToken, userRole, authError, login, logout,
+    showAdminCenter, setShowAdminCenter,
+    viewingImage, setViewingImage,
     isConnected, toggleNetworkStream,
     socket,
     trackedAssets, violations, activeBreachedDrivers, routeHistories,
-    savedGeofences, savedRoutesList, savedHubs, savedVehicleTypes, refreshFeeds,
+    savedGeofences, savedRoutesList, savedHubs, savedVehicleTypes, savedDrivers, resolveDriverName, refreshFeeds,
     saveDriverRouteHistory, saveGeofence, deleteGeofence, calculateRoadMatrixETA,
     activeOrders, orderActivity, incidentReports, recentDeliveries, inFlightOrders,
   };

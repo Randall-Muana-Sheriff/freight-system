@@ -1,39 +1,44 @@
-// Palette rooted in the physical artifacts of freight work — a waybill's
-// cream stock, its carbon-copy blue duplicate, route-marker orange, hazard
-// amber — rather than generic dark-dashboard neon. `paper`/`ink` are for the
-// manifest-ticket surface (auth screens); everything else is the app's
-// standard dark ground.
+// Kigali Freight driver app visual system, per the dispatcher-provided
+// design handoff: Electric Jade on a deep navy-black ground, with layered
+// surfaces for elevation instead of one flat dark background. Gold is
+// reserved for earnings/highlight metrics only, red for safety/emergency
+// only — neither should leak into general UI the way `primary` does.
 export const theme = {
   colors: {
-    bg: '#0B0F0C',
-    panel: 'rgba(20, 26, 22, 0.90)',
-    panelSoft: 'rgba(244,239,228,0.05)',
-    primary: '#FF8A3D',
-    primaryDeep: '#D96A22',
-    accent: '#5B84A6',
-    danger: '#C1442E',
-    text: '#F4EFE4',
-    muted: '#8A9188',
-    border: 'rgba(244,239,228,0.10)',
-    success: '#5B8C6E',
-    warning: '#E0A238',
-    paper: '#F4EFE4',
-    ink: '#0B0F0C',
+    bg: '#050C18',
+    surface1: '#0A1628',
+    surface2: '#0F1E35',
+    surface3: '#162440',
+    panel: 'rgba(15, 30, 53, 0.94)',
+    panelSoft: 'rgba(242, 246, 251, 0.05)',
+    primary: '#00D97C',
+    primaryDeep: '#00A85F',
+    accent: '#3B9EFF',
+    gold: '#F0C040',
+    danger: '#FF4444',
+    text: '#F2F6FB',
+    muted: '#7C8AA6',
+    border: 'rgba(242, 246, 251, 0.10)',
+    success: '#00D97C',
+    warning: '#F5A623',
+    paper: '#EDF3FA',
+    ink: '#050C18',
   },
-  // Sharper than a typical dark-app "bubbly" scale on purpose — crisp
-  // corners read as ticket/document, not glass-card.
+  fonts: {
+    heading: 'Outfit_800ExtraBold',
+    headingBlack: 'Outfit_900Black',
+    body: 'DMSans_400Regular',
+    bodyMedium: 'DMSans_500Medium',
+    bodySemiBold: 'DMSans_600SemiBold',
+    mono: 'DMMono_500Medium',
+  },
+  // 14-22px on cards, 20px on pills, 50% on avatars (set inline as
+  // borderRadius: '50%' per-component, not tokenized here).
   radius: {
-    xl: 10,
-    lg: 8,
-    md: 6,
-    sm: 4,
+    sm: 10,
+    md: 14,
+    lg: 18,
+    xl: 22,
+    pill: 20,
   },
-};
-
-export const shadow = {
-  shadowColor: '#000',
-  shadowOpacity: 0.32,
-  shadowRadius: 24,
-  shadowOffset: { width: 0, height: 12 },
-  elevation: 10,
 };

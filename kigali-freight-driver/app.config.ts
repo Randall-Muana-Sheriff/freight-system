@@ -9,7 +9,7 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   splash: {
-    backgroundColor: '#07111f',
+    backgroundColor: '#050C18',
   },
   assetBundlePatterns: ['**/*'],
   ios: {
@@ -21,7 +21,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     adaptiveIcon: {
       foregroundImage: './assets/icon.png',
-      backgroundColor: '#07111f',
+      backgroundColor: '#050C18',
     },
     // EAS Build injects GOOGLE_SERVICES_JSON as a path to the securely
     // uploaded file (set via `eas env:create`) since the real file is
@@ -36,10 +36,30 @@ const config: ExpoConfig = {
     'expo-notifications',
     'expo-font',
     [
+      'expo-local-authentication',
+      {
+        faceIDPermission: 'Kigali Freight Driver uses Face ID to quickly and securely unlock the app with your existing PIN-based session.',
+      },
+    ],
+    [
+      'expo-splash-screen',
+      {
+        backgroundColor: '#050C18',
+        image: './assets/icon.png',
+        imageWidth: 200,
+        resizeMode: 'contain',
+      },
+    ],
+    [
       'expo-image-picker',
       {
         photosPermission: 'Kigali Freight Driver needs access to your photos to attach a proof-of-delivery image.',
         cameraPermission: 'Kigali Freight Driver needs camera access to take a proof-of-delivery photo.',
+        // The app only ever picks still photos, never records video — the
+        // plugin requests microphone access by default (for video capture)
+        // regardless, which was previously an unnecessary permission with
+        // no feature behind it.
+        microphonePermission: false,
       },
     ],
     [

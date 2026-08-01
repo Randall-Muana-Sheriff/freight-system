@@ -7,6 +7,20 @@ function resolveApiBase() {
     throw new Error('Missing EXPO_PUBLIC_API_BASE_URL. Create a .env file from .env.example and set your backend URL.');
   }
 
+  // __DEV__ is false in every release build (EAS preview/production, or a
+  // local release build) — a plaintext http:// backend was previously
+  // possible to ship by accident in exactly that case, silently sending
+  // JWTs, PINs, and GPS coordinates unencrypted. A local dev backend
+  // (Expo Go / dev-client, __DEV__ true) legitimately has no HTTPS setup
+  // most of the time, so this only enforces the rule where it actually
+  // matters: real builds a driver installs.
+  if (!__DEV__ && !extra.apiBaseUrl.startsWith('https://')) {
+    throw new Error(
+      `EXPO_PUBLIC_API_BASE_URL must be HTTPS in a release build (got "${extra.apiBaseUrl}"). ` +
+      'Set a real HTTPS backend URL via `eas env:create` for this build profile — see eas.json.'
+    );
+  }
+
   return extra.apiBaseUrl;
 }
 
@@ -88,10 +102,20 @@ async function doFetch(path: string, options: { method?: string; token?: string;
 // the expiry at all. Only surfaces a real error if the refresh token
 // itself has also expired/been revoked (session genuinely needs a real
 // login again), or if the retry fails for an unrelated reason.
+//
+// The backend's authMiddleware actually returns 403 "AUTH_INVALID_TOKEN"
+// for an expired/invalid JWT, not 401 — this only checked 401 before, so
+// the refresh-and-retry here never actually fired on real expiry. It was
+// masked because every cold app launch proactively refreshes regardless
+// (see auth.tsx's hydrate()), which is exactly what every reload during
+// active development does — the bug only shows up once the app has been
+// left running past the token's lifetime without a restart. A genuine
+// role-mismatch 403 (AUTH_FORBIDDEN) just fails again identically after
+// the wasted refresh attempt, so treating both the same here is safe.
 export async function apiFetch(path: string, options: { method?: string; token?: string; body?: unknown } = {}) {
   let response = await doFetch(path, options);
 
-  if (response.status === 401 && options.token) {
+  if ((response.status === 401 || response.status === 403) && options.token) {
     const newToken = await refreshAccessToken(API_BASE);
     if (newToken) {
       response = await doFetch(path, { ...options, token: newToken });
@@ -103,32 +127,47 @@ export async function apiFetch(path: string, options: { method?: string; token?:
   return await parseResponse(response);
 }
 
-export async function loginDriver(username: string, password: string) {
-  return apiFetch('/api/auth/login', {
-    method: 'POST',
-    body: { username, password },
-  });
+// Driver auth: phone + SMS OTP + (new drivers only) dispatcher invite code +
+// 4-digit PIN. These five calls map directly onto the AuthFlow state
+// machine's steps in components/auth/AuthFlow.tsx.
+export type DriverOtpVerifyResult = {
+  returning: boolean;
+  needsPinReset: boolean;
+  otpSessionToken: string;
+};
+
+export type DriverInviteResult = {
+  otpSessionToken: string;
+  staffId: string;
+  fullName: string;
+  role: string;
+  fleet: string;
+  vehicle: { plateNumber: string; vehicleType: string; maxWeightKg: number | null; maxRangeKm: number | null } | null;
+};
+
+export type DriverAuthTokens = { token: string; refreshToken: string; role: string };
+
+export async function requestDriverOtp(phoneNumber: string) {
+  return (await apiFetch('/api/auth/driver/otp/request', { method: 'POST', body: { phoneNumber } })) as { accepted: boolean };
 }
 
-// The backend always creates 'driver' accounts from this endpoint regardless
-// of what's sent — there's no role field here on purpose.
-export async function registerDriver(username: string, password: string) {
-  return apiFetch('/api/auth/signup', {
-    method: 'POST',
-    body: { username, password },
-  });
+export async function verifyDriverOtp(phoneNumber: string, code: string) {
+  return (await apiFetch('/api/auth/driver/otp/verify', { method: 'POST', body: { phoneNumber, code } })) as DriverOtpVerifyResult;
 }
 
-// Revokes every refresh token for the account server-side (including this
-// session's own), so the caller must sign the driver out right after a
-// successful change — the access token still works until it expires, but
-// silently fails to refresh after that otherwise.
-export async function changePassword(token: string, currentPassword: string, newPassword: string) {
-  return apiFetch('/api/auth/password', {
-    method: 'PATCH',
-    token,
-    body: { currentPassword, newPassword },
-  });
+export async function verifyDriverInvite(otpSessionToken: string, inviteCode: string) {
+  return (await apiFetch('/api/auth/driver/invite/verify', { method: 'POST', body: { otpSessionToken, inviteCode } })) as DriverInviteResult;
+}
+
+// Called once, after the app has already had the driver type the PIN twice
+// and compared the two entries itself — see AuthFlow's pin-set/pin-confirm
+// steps. Returns the final session tokens, same shape as loginDriverPin.
+export async function setDriverPin(otpSessionToken: string, pin: string) {
+  return (await apiFetch('/api/auth/driver/pin/set', { method: 'POST', body: { otpSessionToken, pin } })) as DriverAuthTokens;
+}
+
+export async function loginDriverPin(otpSessionToken: string, pin: string) {
+  return (await apiFetch('/api/auth/driver/pin/login', { method: 'POST', body: { otpSessionToken, pin } })) as DriverAuthTokens;
 }
 
 export async function logoutDriver(refreshToken: string | null) {
@@ -144,6 +183,18 @@ export async function logoutDriver(refreshToken: string | null) {
     // simply expire naturally after 30 days rather than being revoked
     // immediately. Not worth blocking or failing the local sign-out over.
   }
+}
+
+export type MyProfile = {
+  username: string;
+  role: string;
+  phoneNumber: string | null;
+  staffId: string | null;
+  fullName: string | null;
+};
+
+export async function fetchMyProfile(token: string) {
+  return (await apiFetch('/api/auth/me', { token })) as MyProfile;
 }
 
 export type MyVehicle = {
@@ -237,10 +288,6 @@ export async function confirmDelivery(
   }
 }
 
-export async function fetchTripHistory(token: string, orderId: number) {
-  return apiFetch(`/api/orders/${orderId}/history`, { token });
-}
-
 export async function updateOrderStatus(token: string, orderId: number, status: string) {
   return apiFetch(`/api/orders/${orderId}/status`, {
     method: 'PATCH',
@@ -257,10 +304,83 @@ export async function reportIncident(token: string, payload: { orderId?: number;
   });
 }
 
+export type MyIncident = {
+  id: number;
+  order_id: number | null;
+  description: string;
+  status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+  resolved_at: string | null;
+  created_at: string;
+};
+
+// A driver could previously submit a report and never find out whether
+// dispatch saw it or did anything about it — this is their own view of
+// what they've sent and where each one stands.
+export async function fetchMyIncidents(token: string) {
+  return (await apiFetch('/api/incidents/mine', { token })) as MyIncident[];
+}
+
 export async function registerPushToken(token: string, pushToken: string, platform: string) {
   return apiFetch('/api/notifications/register-token', {
     method: 'POST',
     token,
     body: { token: pushToken, platform },
   });
+}
+
+// Signing in only requires an approved account — it doesn't mean the
+// driver is cleared to carry cargo yet. The backend separately blocks
+// dispatch (assignOrderBundle/reassignOrder) until every one of these 5
+// documents is admin-approved.
+export type DocumentType = 'national_id' | 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'roadworthiness_certificate';
+
+export type DriverDocumentStatus = {
+  documentType: DocumentType;
+  label: string;
+  status: 'not_submitted' | 'pending' | 'approved' | 'rejected';
+  fileUrl: string | null;
+  rejectionReason: string | null;
+  uploadedAt: string | null;
+  reviewedAt: string | null;
+};
+
+export async function fetchMyDocuments(token: string) {
+  return (await apiFetch('/api/driver-documents/mine', { token })) as { checklist: DriverDocumentStatus[]; verified: boolean };
+}
+
+// Separate from apiFetch deliberately, same as confirmDelivery — a
+// multipart upload needs the runtime to set Content-Type (with the
+// multipart boundary) automatically and must send a raw FormData body.
+export async function uploadDriverDocument(
+  token: string,
+  documentType: DocumentType,
+  file: { uri: string; fileName?: string; mimeType?: string }
+) {
+  const formData = new FormData();
+  formData.append('documentType', documentType);
+  formData.append('document', {
+    uri: file.uri,
+    name: file.fileName || `${documentType}.jpg`,
+    type: file.mimeType || 'image/jpeg',
+  } as unknown as Blob);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+  try {
+    const response = await fetch(`${API_BASE}/api/driver-documents`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+      signal: controller.signal,
+    });
+    return await parseResponse(response);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Network request failed (upload timed out)');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

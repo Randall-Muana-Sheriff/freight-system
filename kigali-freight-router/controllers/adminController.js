@@ -1,18 +1,32 @@
+import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import pool from '../config/db.js';
-import { appendAuditLog } from '../services/auditLogService.js';
+import { appConfig } from '../config/appConfig.js';
+import { appendAuditLog, describeDriver, describeDriverById } from '../services/auditLogService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
-import { ALLOWED_ROLES } from '../utils/roles.js';
+import { normalizePhone, generateInviteCode } from '../utils/phone.js';
+import { sendSms } from '../services/smsService.js';
+import { revokeAllRefreshTokensForUser } from '../services/refreshTokenService.js';
+
+const INVITE_CODE_TTL_HOURS = 48;
+
+function hashCode(code) {
+    return crypto.createHash('sha256').update(code).digest('hex');
+}
 
 // Staff accounts (dispatcher/admin) are only ever created here, by an
-// existing admin. 'driver' is deliberately excluded — drivers self-signup
-// from the mobile app via POST /api/auth/signup.
+// existing admin. 'driver' is deliberately excluded — drivers are onboarded
+// via POST /api/admin/drivers/invite instead.
 const STAFF_ROLES = ['admin', 'dispatcher'];
 
 export const AdminController = {
     getUsers: async (req, res) => {
         try {
-            const result = await pool.query('SELECT id, username, role FROM users ORDER BY id DESC');
+            const result = await pool.query(
+                `SELECT id, username, role, status,
+                        phone_number AS "phoneNumber", staff_id AS "staffId", full_name AS "fullName"
+                 FROM users ORDER BY id DESC`
+            );
             return ok(res, result.rows);
         } catch (error) {
             return fail(res, {
@@ -22,6 +36,7 @@ export const AdminController = {
             });
         }
     },
+
 
     // POST /api/admin/users - creates a dispatcher or admin account directly
     // (the admin sets the initial password). This is the only way to create
@@ -54,7 +69,7 @@ export const AdminController = {
         }
 
         try {
-            const passwordHash = await bcrypt.hash(password, 10);
+            const passwordHash = await bcrypt.hash(password, appConfig.bcryptCost);
             const assignedRole = String(role).toLowerCase();
             const result = await pool.query(
                 `INSERT INTO users (username, password_hash, role)
@@ -87,6 +102,186 @@ export const AdminController = {
         }
     },
 
+    // POST /api/admin/drivers/invite - the dispatcher-facing replacement for
+    // driver self-signup: dispatch already knows who this driver is, so the
+    // account is created directly (pre-approved) with a generated staff ID
+    // and a 6-character invite code the driver redeems once from their
+    // phone (POST /api/auth/driver/invite/verify). The new driver's
+    // `username` is deliberately set to their phone number — every existing
+    // FK/JWT that already keys off users.username (orders.assigned_to,
+    // driver_locations.driver_name, etc.) keeps working with zero changes.
+    inviteDriver: async (req, res) => {
+        const { phoneNumber, fullName, vehicleId } = req.body || {};
+
+        const phone = normalizePhone(phoneNumber);
+        if (!phone) {
+            return fail(res, { status: 400, code: 'ADMIN_INVITE_INVALID_PHONE', message: 'Enter a valid Rwandan mobile number.' });
+        }
+        if (typeof fullName !== 'string' || fullName.trim().length < 2 || fullName.trim().length > 255) {
+            return fail(res, { status: 400, code: 'ADMIN_INVITE_INVALID_NAME', message: 'Full name must be 2 to 255 characters long.' });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // A driver who was invited but never actually finished
+            // onboarding (their 48h invite code expired before they used
+            // it, most commonly) previously had no way to be re-invited —
+            // running this endpoint again would hit the phone_number
+            // unique constraint and look like "already registered" even
+            // though they never actually got in. Reuse that dangling row
+            // and issue a fresh invite instead. A driver who HAS completed
+            // onboarding is a real, active account, so that case still
+            // correctly fails below via the same unique constraint.
+            const existingResult = await client.query(
+                `SELECT id FROM users WHERE phone_number = $1 AND role = 'driver' AND onboarding_completed_at IS NULL`,
+                [phone]
+            );
+            const existing = existingResult.rows[0];
+
+            let newDriver;
+            if (existing) {
+                const updatedResult = await client.query(
+                    `UPDATE users SET full_name = $1 WHERE id = $2 RETURNING id, username, staff_id AS "staffId"`,
+                    [fullName.trim(), existing.id]
+                );
+                newDriver = updatedResult.rows[0];
+            } else {
+                const staffIdResult = await client.query(`SELECT 'KF-' || nextval('staff_id_seq') AS "staffId"`);
+                const staffId = staffIdResult.rows[0].staffId;
+
+                const userResult = await client.query(
+                    `INSERT INTO users (username, phone_number, full_name, staff_id, role, status)
+                     VALUES ($1, $1, $2, $3, 'driver', 'approved')
+                     RETURNING id, username, staff_id AS "staffId"`,
+                    [phone, fullName.trim(), staffId]
+                );
+                newDriver = userResult.rows[0];
+            }
+
+            if (vehicleId !== undefined && vehicleId !== null && vehicleId !== '') {
+                const vehicleResult = await client.query(
+                    `UPDATE fleet_vehicles SET current_driver_id = $1 WHERE id = $2 AND current_driver_id IS NULL RETURNING id`,
+                    [newDriver.id, vehicleId]
+                );
+                if (vehicleResult.rowCount === 0) {
+                    await client.query('ROLLBACK');
+                    return fail(res, { status: 409, code: 'ADMIN_INVITE_VEHICLE_UNAVAILABLE', message: 'That vehicle is no longer unassigned.' });
+                }
+            }
+
+            // Invalidate any still-outstanding invite for this driver
+            // before issuing a new one, so only the latest code ever works
+            // rather than leaving an old valid code lying around too.
+            await client.query(`UPDATE driver_invites SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL`, [newDriver.id]);
+
+            const inviteCode = generateInviteCode();
+            const expiresAt = new Date(Date.now() + INVITE_CODE_TTL_HOURS * 60 * 60 * 1000);
+            await client.query(
+                `INSERT INTO driver_invites (user_id, invite_code_hash, expires_at) VALUES ($1, $2, $3)`,
+                [newDriver.id, hashCode(inviteCode), expiresAt]
+            );
+
+            await client.query('COMMIT');
+
+            const smsResult = await sendSms(
+                phone,
+                `Welcome to Kigali Freight. Your driver invite code is ${inviteCode}. It expires in ${INVITE_CODE_TTL_HOURS} hours.`
+            );
+
+            await appendAuditLog({
+                actionType: 'DRIVER_INVITED',
+                description: `Invited driver ${fullName.trim()} (${newDriver.staffId}) at ${phone}`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, {
+                driverId: newDriver.id,
+                staffId: newDriver.staffId,
+                phoneNumber: phone,
+                inviteCode,
+                smsSent: smsResult.sent,
+            }, { status: 201 });
+        } catch (error) {
+            await client.query('ROLLBACK');
+            if (error.code === '23505') {
+                return fail(res, { status: 400, code: 'ADMIN_INVITE_PHONE_TAKEN', message: 'A driver is already registered with that phone number.' });
+            }
+            return fail(res, { status: 500, code: 'ADMIN_INVITE_FAILED', message: errorMessage(error, 'Failed to invite driver.') });
+        } finally {
+            client.release();
+        }
+    },
+
+    // POST /api/admin/users/:id/reset-driver-pin - the backend half of the
+    // app's "Forgot your PIN? Contact dispatch" copy. Clears pin_hash only —
+    // onboarding_completed_at stays set, so the driver's next otp/verify
+    // still reports them as "returning" and routes straight back to PIN
+    // setup, not through the invite-code step again.
+    resetDriverPin: async (req, res) => {
+        const { id } = req.params;
+        try {
+            const result = await pool.query(
+                `UPDATE users SET pin_hash = NULL, pin_set_at = NULL
+                 WHERE id = $1 AND role = 'driver'
+                 RETURNING id, username`,
+                [id]
+            );
+            if (result.rows.length === 0) {
+                return fail(res, { status: 404, code: 'ADMIN_DRIVER_NOT_FOUND', message: 'Driver not found.' });
+            }
+
+            await appendAuditLog({
+                actionType: 'DRIVER_PIN_RESET',
+                description: `Reset PIN for ${await describeDriver(result.rows[0].username)}`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, { message: 'PIN reset. The driver will be asked to set a new one at their next sign-in.' });
+        } catch (error) {
+            return fail(res, { status: 500, code: 'ADMIN_DRIVER_PIN_RESET_FAILED', message: errorMessage(error, 'Failed to reset PIN.') });
+        }
+    },
+
+    // POST /admin/users/:id/revoke-sessions - forces any user (driver,
+    // dispatcher, or admin) out of every device they're currently signed
+    // into, by revoking all of their refresh tokens. Previously this
+    // capability (revokeAllRefreshTokensForUser) only ran when a user
+    // changed their OWN password — there was no way for an admin to react
+    // to someone ELSE's compromised device (a stolen phone, a dispatcher
+    // leaving the company) without waiting for that person to do it
+    // themselves. The user's current access token, if any, still expires
+    // on its own shortly after (short-lived by design) — this closes the
+    // longer-lived refresh-token window immediately instead.
+    revokeUserSessions: async (req, res) => {
+        const { id } = req.params;
+        try {
+            const userResult = await pool.query('SELECT id, username FROM users WHERE id = $1', [id]);
+            if (userResult.rows.length === 0) {
+                return fail(res, { status: 404, code: 'ADMIN_USER_NOT_FOUND', message: 'User not found.' });
+            }
+            const { username } = userResult.rows[0];
+            await revokeAllRefreshTokensForUser(username);
+
+            await appendAuditLog({
+                actionType: 'USER_SESSIONS_REVOKED',
+                description: `Revoked all active sessions for ${username}`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, { message: `All active sessions revoked for ${username}.` });
+        } catch (error) {
+            return fail(res, { status: 500, code: 'ADMIN_REVOKE_SESSIONS_FAILED', message: errorMessage(error, 'Failed to revoke sessions.') });
+        }
+    },
+
+    // Role governance is scoped to staff (dispatcher/admin) accounts only —
+    // a driver's role is never touched here in either direction. Drivers
+    // are governed through account approval (users.status) and document
+    // verification instead, both of which have their own dedicated review
+    // flows; folding them into generic role-editing here would let a role
+    // change silently bypass those.
     updateUserRole: async (req, res) => {
         const { id } = req.params;
         const { role } = req.body;
@@ -99,15 +294,27 @@ export const AdminController = {
             });
         }
 
-        if (!ALLOWED_ROLES.includes(String(role).toLowerCase())) {
+        if (!STAFF_ROLES.includes(String(role).toLowerCase())) {
             return fail(res, {
                 status: 400,
                 code: 'ADMIN_ROLE_INVALID',
-                message: `Role must be one of: ${ALLOWED_ROLES.join(', ')}.`,
+                message: `Role must be one of: ${STAFF_ROLES.join(', ')}.`,
             });
         }
 
         try {
+            const currentResult = await pool.query('SELECT role FROM users WHERE id = $1', [id]);
+            if (currentResult.rows.length === 0) {
+                return fail(res, { status: 404, code: 'ADMIN_USER_NOT_FOUND', message: 'User not found.' });
+            }
+            if (currentResult.rows[0].role === 'driver') {
+                return fail(res, {
+                    status: 400,
+                    code: 'ADMIN_ROLE_DRIVER_NOT_GOVERNED',
+                    message: 'Driver roles are managed through account approval and document verification, not role governance.',
+                });
+            }
+
             const result = await pool.query(
                 'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, role',
                 [String(role).toLowerCase(), id]
@@ -268,7 +475,7 @@ export const AdminController = {
             await appendAuditLog({
                 actionType: normalizedDriverId ? 'VEHICLE_ASSIGNED' : 'VEHICLE_UNASSIGNED',
                 description: normalizedDriverId
-                    ? `Assigned driver ${normalizedDriverId} to vehicle ${result.rows[0].plateNumber}`
+                    ? `Assigned ${await describeDriverById(normalizedDriverId)} to vehicle ${result.rows[0].plateNumber}`
                     : `Unassigned vehicle ${result.rows[0].plateNumber}`,
                 username: req.user?.username || 'System',
             });
@@ -408,13 +615,25 @@ export const AdminController = {
         }
     },
 
+    // Was a hard-coded LIMIT 100 with no way to see anything older — fine
+    // for a brand-new deployment, but a live fleet generates well over 100
+    // audit entries within the first weeks, at which point earlier history
+    // became permanently unreachable through this endpoint. Now paginated
+    // via ?limit=&offset=, still capped (200 max) so a caller can't force
+    // an unbounded scan of the table.
     getAuditLogs: async (req, res) => {
+        const requestedLimit = parseInt(req.query?.limit, 10);
+        const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 200) : 100;
+        const requestedOffset = parseInt(req.query?.offset, 10);
+        const offset = Number.isFinite(requestedOffset) && requestedOffset > 0 ? requestedOffset : 0;
+
         try {
             const result = await pool.query(
                 `SELECT id, action_type AS "actionType", description, username, created_at AS "timestamp"
                  FROM system_audit_logs
                  ORDER BY created_at DESC
-                 LIMIT 100`
+                 LIMIT $1 OFFSET $2`,
+                [limit, offset]
             );
             return ok(res, result.rows);
         } catch (error) {
@@ -422,6 +641,58 @@ export const AdminController = {
                 status: 500,
                 code: 'ADMIN_AUDIT_FETCH_FAILED',
                 message: errorMessage(error, 'Failed to fetch audit logs.'),
+            });
+        }
+    },
+
+    // GET /api/stats - system-wide counts for the admin statistics page.
+    // Every piece here is a cheap aggregate against tables that already
+    // exist — nothing new is tracked just to power this.
+    getStats: async (req, res) => {
+        try {
+            const [accountsResult, vehiclesResult, ordersResult, deliveredThisWeekResult, incidentsResult, avgDeliveryResult] = await Promise.all([
+                pool.query(`SELECT role, COUNT(*)::int AS count FROM users GROUP BY role`),
+                pool.query(`SELECT COUNT(*)::int AS count FROM fleet_vehicles`),
+                pool.query(`SELECT status, COUNT(*)::int AS count FROM orders GROUP BY status`),
+                pool.query(
+                    `SELECT COUNT(*)::int AS count
+                     FROM delivery_confirmations
+                     WHERE confirmed_at >= NOW() - INTERVAL '7 days'`
+                ),
+                pool.query(
+                    `SELECT COUNT(*)::int AS count
+                     FROM geofence_alerts
+                     WHERE event_type = 'MANUAL_INCIDENT' AND status = 'OPEN'`
+                ),
+                pool.query(
+                    `SELECT AVG(EXTRACT(EPOCH FROM (dc.confirmed_at - o.created_at)) / 3600) AS avg_hours
+                     FROM orders o
+                     JOIN delivery_confirmations dc ON dc.order_id = o.id
+                     WHERE o.status = 'DELIVERED'`
+                ),
+            ]);
+
+            const accountsByRole = Object.fromEntries(accountsResult.rows.map((row) => [row.role, row.count]));
+            const ordersByStatus = Object.fromEntries(ordersResult.rows.map((row) => [row.status, row.count]));
+            const avgHours = avgDeliveryResult.rows[0]?.avg_hours;
+
+            return ok(res, {
+                accounts: {
+                    driver: accountsByRole.driver || 0,
+                    dispatcher: accountsByRole.dispatcher || 0,
+                    admin: accountsByRole.admin || 0,
+                },
+                vehicles: vehiclesResult.rows[0]?.count || 0,
+                ordersByStatus,
+                deliveredThisWeek: deliveredThisWeekResult.rows[0]?.count || 0,
+                openIncidents: incidentsResult.rows[0]?.count || 0,
+                avgDeliveryHours: avgHours != null ? Number(avgHours) : null,
+            });
+        } catch (error) {
+            return fail(res, {
+                status: 500,
+                code: 'ADMIN_STATS_FETCH_FAILED',
+                message: errorMessage(error, 'Failed to fetch statistics.'),
             });
         }
     },

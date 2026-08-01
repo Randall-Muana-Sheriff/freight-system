@@ -2,13 +2,23 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE } from './api';
-
-// Same key used by auth.tsx and tokenStore.ts — duplicated here to avoid a
-// require cycle through tokenStore (which metro detects as a cycle because
-// auth.tsx also imports from tokenStore and from this file).
-const AUTH_TOKEN_KEY = 'kigali_freight_driver_token';
+import { refreshAccessToken, AUTH_TOKEN_KEY } from './tokenStore';
 
 export const LOCATION_TASK_NAME = 'kigali-freight-driver-background-location';
+
+// Phone GPS derives speed from Doppler shift / consecutive fixes, which has
+// a real noise floor — a phone sitting dead still on a table routinely
+// reports 1-7 km/h of phantom "speed" from that jitter alone, worse indoors
+// where multipath reflections degrade the fix further. A stationary truck
+// never legitimately reads under this threshold while moving, so clamping
+// anything below it to 0 removes the noise without hiding real movement.
+const STATIONARY_SPEED_DEADBAND_KMH = 5;
+
+function toStableSpeedKmh(speed: number | null | undefined): number | undefined {
+  if (typeof speed !== 'number' || speed < 0) return undefined;
+  const kmh = speed * 3.6;
+  return kmh < STATIONARY_SPEED_DEADBAND_KMH ? 0 : kmh;
+}
 
 type LocationTaskData = {
   locations: Array<{
@@ -38,27 +48,55 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   const latest = locations?.[locations.length - 1];
   if (!latest) return;
 
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  let token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
   if (!token) {
     // Signed out since the task was registered — nothing to report against.
     return;
   }
 
   const { latitude, longitude, speed } = latest.coords;
-  // GPS speed comes in meters/second; convert to km/h. Some devices report
-  // a negative or null speed when stationary/no fix — omit it in that case
-  // and let the backend fall back to its own estimate.
-  const speedKmh = typeof speed === 'number' && speed >= 0 ? speed * 3.6 : undefined;
+  const speedKmh = toStableSpeedKmh(speed);
 
-  try {
-    await fetch(`${API_BASE}/api/fleet/telemetry`, {
+  const postTelemetry = (bearerToken: string) =>
+    fetch(`${API_BASE}/api/fleet/telemetry`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${bearerToken}`,
       },
       body: JSON.stringify({ lat: latitude, lng: longitude, speedKmh }),
     });
+
+  try {
+    // The 15-minute access token expiring mid-shift is routine, not an
+    // error — this task ran on a raw fetch with no refresh path at all,
+    // so once the token expired every single ping silently failed
+    // (backend returns 403, not 401, for an expired JWT) until the driver
+    // happened to reopen the app and something else triggered a refresh.
+    // The marker going stale on the dispatcher map an hour into a shift,
+    // despite the phone genuinely being online the whole time, traced
+    // straight back to this.
+    //
+    // refreshAccessToken() is the SAME single-flight-guarded function the
+    // rest of the app uses (via apiFetch) — this used to be a separate,
+    // independent implementation, which meant a foreground refresh and a
+    // background one could race on the same single-use refresh token: the
+    // loser was left holding a token that could never work again, and kept
+    // retrying every 15s forever, hammering /api/auth/refresh hard enough
+    // to trip the login rate limit. Sharing one guarded implementation
+    // makes that race structurally impossible instead of just backing off
+    // after the fact.
+    let response = await postTelemetry(token);
+    if (response.status === 401 || response.status === 403) {
+      const refreshed = await refreshAccessToken(API_BASE);
+      if (refreshed) {
+        token = refreshed;
+        response = await postTelemetry(token);
+      }
+    }
+    if (!response.ok) {
+      console.warn('Background telemetry rejected:', response.status);
+    }
   } catch (err) {
     // No network / backend unreachable — this ping is simply lost rather
     // than queued for retry. Unlike order status updates or incident
@@ -88,6 +126,18 @@ export async function startBackgroundLocationTracking() {
     // the app is backgrounded/killed instead of continuing.
   }
 
+  await attemptStartLocationUpdates();
+}
+
+// Seen in practice on a freshly-installed app AND on a cold launch right
+// after a phone reboot: the native module can throw a NullPointerException
+// reading its own SharedPreferences the first time this runs, because
+// Android hasn't finished attaching the module's application context yet.
+// It's a brief startup race, not a real permission or registration
+// failure — retrying after a short pause reliably succeeds once the module
+// finishes initializing, instead of silently leaving tracking off for the
+// rest of the session.
+async function attemptStartLocationUpdates(retriesLeft = 2): Promise<void> {
   try {
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
       accuracy: Location.Accuracy.High,
@@ -106,13 +156,14 @@ export async function startBackgroundLocationTracking() {
       },
     });
   } catch (err) {
-    // Seen in practice on a freshly-installed app: the native module can
-    // throw (e.g. a NullPointerException reading its own SharedPreferences)
-    // the very first time this runs after install, before Android has
-    // finished setting up the app's private storage. This call is
-    // fire-and-forget from every caller (sign-in, hydrate) specifically so
-    // a location subsystem hiccup can never block login or crash the app —
-    // surfacing the failure here, not throwing, is what makes that true.
+    if (retriesLeft > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return attemptStartLocationUpdates(retriesLeft - 1);
+    }
+    // This call is fire-and-forget from every caller (sign-in, hydrate)
+    // specifically so a location subsystem hiccup can never block login or
+    // crash the app — surfacing the failure here, not throwing, is what
+    // makes that true.
     console.warn('Failed to start background location tracking:', err);
   }
 }
@@ -120,7 +171,17 @@ export async function startBackgroundLocationTracking() {
 export async function stopBackgroundLocationTracking() {
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
   if (!alreadyStarted) return;
-  await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  try {
+    await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+  } catch (err) {
+    // Same native SharedPreferences startup race as
+    // attemptStartLocationUpdates can hit this too — e.g. onTokensChanged
+    // firing an initial "no token yet" event while hydrate() is still
+    // loading the stored token, before anything was really running. This
+    // is called fire-and-forget in several places (auth.tsx), so it must
+    // never throw an unhandled rejection.
+    console.warn('Failed to stop background location tracking:', err);
+  }
 }
 
 // Diagnostic snapshot for a "why isn't my location showing up" screen —
@@ -153,7 +214,7 @@ export async function sendTestLocationPing(
 
     const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
     const { latitude, longitude, speed } = position.coords;
-    const speedKmh = typeof speed === 'number' && speed >= 0 ? speed * 3.6 : undefined;
+    const speedKmh = toStableSpeedKmh(speed);
 
     const response = await fetch(`${API_BASE}/api/fleet/telemetry`, {
       method: 'POST',

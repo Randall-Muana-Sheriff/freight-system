@@ -1,5 +1,6 @@
 import { registerPushToken } from '../services/pushNotificationService.js';
 import { ok, fail } from '../utils/httpResponse.js';
+import { logError } from '../utils/logger.js';
 
 export const NotificationController = {
     registerToken: async (req, res) => {
@@ -26,7 +27,7 @@ export const NotificationController = {
             await registerPushToken(username, token.trim(), typeof platform === 'string' ? platform : 'unknown');
             return ok(res, { registered: true });
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'PUSH_TOKEN_REGISTER_FAILED',

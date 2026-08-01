@@ -1,6 +1,8 @@
 import { Crosshair, MapPinned } from 'lucide-react';
+import { useSocket } from '../context/SocketContext';
 
 export default function DispatchPanel({ dispatchTargetMode, setDispatchTargetMode, setDrawModeActive, dispatchRankings }) {
+  const { resolveDriverName } = useSocket();
   return (
     <div className="bg-panel border border-line/10 p-3 rounded-md space-y-2">
       <h3 className="flex items-center gap-1.5 text-[10px] font-bold text-steel uppercase tracking-wider">
@@ -18,7 +20,7 @@ export default function DispatchPanel({ dispatchTargetMode, setDispatchTargetMod
         <div className="space-y-1 max-h-[110px] overflow-y-auto pt-1">
           {dispatchRankings.slice(0, 3).map((rank, i) => (
             <div key={i} className="flex justify-between items-center bg-ink/60 px-2 py-1.5 rounded text-[11px] border border-line/10">
-              <span className="font-bold text-paper truncate max-w-[130px]">{rank.driverName}</span>
+              <span className="font-bold text-paper truncate max-w-[130px]">{resolveDriverName(rank.driverName)}</span>
               <span className="font-mono text-tarp font-bold">{rank.distanceKm} km | {rank.etaMinutes} mins</span>
             </div>
           ))}

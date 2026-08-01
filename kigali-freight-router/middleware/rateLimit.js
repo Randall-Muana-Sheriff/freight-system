@@ -38,13 +38,19 @@ export function rateLimit({
     max = 20,
     keyPrefix = 'global',
     skip,
+    keyFn,
 } = {}) {
     return async (req, res, next) => {
         if (typeof skip === 'function' && skip(req)) {
             return next();
         }
 
-        const key = `ratelimit:${keyPrefix}:${req.ip || req.socket?.remoteAddress || 'unknown'}`;
+        // Most limiters key by IP (the default below). OTP/invite/PIN
+        // endpoints instead key by phone number via keyFn — the attack
+        // there is spamming/brute-forcing one victim's number, which can
+        // come from many IPs, not one attacker hammering from a single IP.
+        const identity = typeof keyFn === 'function' ? keyFn(req) : req.ip || req.socket?.remoteAddress || 'unknown';
+        const key = `ratelimit:${keyPrefix}:${identity || 'unknown'}`;
 
         try {
             const { count, ttlMs } = await incrementCounter(key, windowMs);

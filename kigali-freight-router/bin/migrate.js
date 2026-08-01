@@ -7,6 +7,10 @@ import pool from '../config/db.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ALLOW_DESTRUCTIVE_BASELINE = process.env.ALLOW_DESTRUCTIVE_BASELINE === '1';
+// Kept as a direct env read (not importing config/appConfig.js) so this
+// standalone script doesn't pull in appConfig's required-env-var checks
+// (JWT_SECRET etc.) that have nothing to do with running a migration.
+const BCRYPT_COST = parseInt(process.env.BCRYPT_COST, 10) || 10;
 
 const MIGRATIONS = [
     { id: 'init_spatial_baseline.sql', destructive: false },
@@ -24,6 +28,11 @@ const MIGRATIONS = [
     { id: 'add_delivery_flag_and_consignee.sql', destructive: false },
     { id: 'add_incident_status.sql', destructive: false },
     { id: 'create_vehicle_types.sql', destructive: false },
+    { id: 'add_user_status.sql', destructive: false },
+    { id: 'create_driver_documents.sql', destructive: false },
+    { id: 'add_driver_phone_auth.sql', destructive: false },
+    { id: 'add_driver_invites.sql', destructive: false },
+    { id: 'add_otp_codes.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';
@@ -138,7 +147,7 @@ async function seedAdmin(client) {
     if (existingAdmin.rows.length > 0) return;
 
     console.log(`🔑 No admin account exists yet; bootstrapping "${adminUsername}"...`);
-    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    const passwordHash = await bcrypt.hash(adminPassword, BCRYPT_COST);
     await client.query(
         `INSERT INTO users (username, password_hash, role)
          VALUES ($1, $2, 'admin')

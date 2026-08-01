@@ -1,0 +1,35 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Security headers for the static dashboard bundle.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # __API_CONNECT_SRC__ is substituted by docker-entrypoint.sh at
+    # container start from the API_BASE_URL env var (ws/wss + http/https
+    # variants of that origin) — the backend URL isn't known until runtime
+    # (same reason /config.js exists), so it can't be hardcoded here.
+    # style-src needs 'unsafe-inline': Leaflet positions every marker via
+    # inline `style="transform:..."` attributes, not stylesheet classes.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://*.tile.openstreetmap.org; font-src 'self'; connect-src 'self' __API_CONNECT_SRC__; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+
+    location / {
+        # Client-side routing fallback for the React SPA.
+        try_files $uri $uri/ /index.html;
+    }
+
+    location = /config.js {
+        # Generated fresh by docker-entrypoint.sh from the container's
+        # actual env on every start — never cache it like the other
+        # static assets below.
+        add_header Cache-Control "no-store" always;
+    }
+
+    location ~* \.(?:css|js|woff2?|ttf|svg|png|jpg|jpeg|gif|ico)$ {
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800, immutable";
+    }
+}

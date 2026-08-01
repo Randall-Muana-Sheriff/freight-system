@@ -1,18 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ScreenShell } from '../../components/ScreenShell';
-import { AssignmentCard } from '../../components/AssignmentCard';
-import { SectionHeader } from '../../components/SectionHeader';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { fetchDriverAssignments } from '../../lib/api';
-import { getTrackingDiagnostics } from '../../lib/locationTracking';
-import type { DriverAssignmentCard } from '../../lib/assignments';
-import { isJobInProgress, toDriverAssignmentCard } from '../../lib/assignments';
-
-const mono = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
+import { fetchDriverAssignments, fetchMyCompletedDeliveries, fetchMyDocuments, fetchMyProfile, fetchMyVehicle, type CompletedDelivery, type MyVehicle } from '../../lib/api';
+import { getTrackingDiagnostics, startBackgroundLocationTracking, stopBackgroundLocationTracking } from '../../lib/locationTracking';
+import { isJobInProgress, toDriverAssignmentCard, type DriverAssignmentCard } from '../../lib/assignments';
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -23,33 +18,42 @@ function getGreeting() {
   return 'Good night';
 }
 
-const CHIP_TONES = {
-  primary: { bg: 'rgba(255,138,61,0.14)', text: theme.colors.primary },
-  warning: { bg: 'rgba(224,162,56,0.16)', text: theme.colors.warning },
-} as const;
-
-function StatusChip({ icon, text, tone }: { icon: keyof typeof Ionicons.glyphMap; text: string; tone: keyof typeof CHIP_TONES }) {
-  const palette = CHIP_TONES[tone];
-  return (
-    <View style={[chipStyles.chip, { backgroundColor: palette.bg }]}>
-      <Ionicons name={icon} size={13} color={palette.text} />
-      <Text style={[chipStyles.text, { color: palette.text }]}>{text}</Text>
-    </View>
-  );
+function isToday(value?: string | null) {
+  if (!value) return false;
+  const date = new Date(value);
+  const now = new Date();
+  return date.toDateString() === now.toDateString();
 }
 
-const chipStyles = StyleSheet.create({
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 4, paddingHorizontal: 10, paddingVertical: 7 },
-  text: { fontSize: 11, fontWeight: '700' },
-});
+const QUICK_ACTIONS = [
+  { key: 'issue', label: 'Report Issue', detail: 'Safety & breakdowns', icon: 'warning-outline' as const, color: theme.colors.danger, href: '/(app)/incidents' as const },
+  { key: 'alerts', label: 'View Alerts', detail: 'Trip & safety updates', icon: 'notifications-outline' as const, color: theme.colors.accent, href: '/(app)/alerts' as const },
+  { key: 'jobs', label: 'My Jobs', detail: 'Dispatch board', icon: 'briefcase-outline' as const, color: theme.colors.primary, href: '/(app)/assignments' as const },
+  { key: 'log', label: 'Delivery Log', detail: 'Completed deliveries', icon: 'time-outline' as const, color: theme.colors.gold, href: '/(app)/profile' as const },
+];
 
 export default function DashboardScreen() {
-  const { username, token, pendingSyncCount } = useAuth();
+  const { username, token } = useAuth();
+  // `username` is a phone/PIN driver's real identity (a phone number) but
+  // was never meant to be shown as a name — fetch the actual name dispatch
+  // set up for this driver, same source as the Profile screen.
+  const [fullName, setFullName] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<DriverAssignmentCard[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  // null = not checked yet, so the chip stays silent rather than flashing
-  // a wrong state for a frame.
-  const [telemetryLive, setTelemetryLive] = useState<boolean | null>(null);
+  const [completedDeliveries, setCompletedDeliveries] = useState<CompletedDelivery[]>([]);
+  // null = not checked yet. A driver can log in the moment their account is
+  // approved, but dispatch separately withholds jobs until all 5 compliance
+  // documents are approved — this is the "why do I have no jobs" answer,
+  // surfaced before it becomes a support question.
+  const [documentsVerified, setDocumentsVerified] = useState<boolean | null>(null);
+  // undefined = still loading; null = confirmed there isn't one.
+  const [vehicle, setVehicle] = useState<MyVehicle | null | undefined>(undefined);
+  // null = not checked yet. Standing in for "on shift" — Start/End shift
+  // directly toggles the same background telemetry task the rest of the
+  // app already starts automatically at sign-in, rather than a separate
+  // concept the backend has no notion of yet.
+  const [onShift, setOnShift] = useState<boolean | null>(null);
+  const [shiftBusy, setShiftBusy] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -58,6 +62,18 @@ export default function DashboardScreen() {
       mountedRef.current = false;
     };
   }, []);
+
+  const loadProfile = async () => {
+    if (!token) return;
+    try {
+      const profile = await fetchMyProfile(token);
+      if (!mountedRef.current) return;
+      setFullName(profile.fullName);
+    } catch {
+      if (!mountedRef.current) return;
+      setFullName(null);
+    }
+  };
 
   const loadAssignments = async () => {
     if (!token) return;
@@ -71,177 +87,270 @@ export default function DashboardScreen() {
     }
   };
 
-  // Previously this chip just said "Telemetry live" unconditionally — true
-  // or not. Read the same diagnostic the Profile screen uses so the badge
-  // reflects whether the background task is actually registered.
-  const checkTelemetry = async () => {
+  const checkShift = async () => {
     try {
       const diagnostics = await getTrackingDiagnostics();
       if (!mountedRef.current) return;
-      setTelemetryLive(diagnostics.hasStarted);
+      setOnShift(diagnostics.hasStarted);
     } catch {
       if (!mountedRef.current) return;
-      setTelemetryLive(false);
+      setOnShift(false);
+    }
+  };
+
+  const checkVerification = async () => {
+    if (!token) return;
+    try {
+      const data = await fetchMyDocuments(token);
+      if (!mountedRef.current) return;
+      setDocumentsVerified(data.verified);
+    } catch {
+      if (!mountedRef.current) return;
+      setDocumentsVerified(null);
+    }
+  };
+
+  const checkVehicle = async () => {
+    if (!token) return;
+    try {
+      const data = await fetchMyVehicle(token);
+      if (!mountedRef.current) return;
+      setVehicle(data);
+    } catch {
+      if (!mountedRef.current) return;
+      setVehicle(null);
+    }
+  };
+
+  const loadDeliveries = async () => {
+    if (!token) return;
+    try {
+      const rows = await fetchMyCompletedDeliveries(token);
+      if (!mountedRef.current) return;
+      setCompletedDeliveries(rows);
+    } catch {
+      if (!mountedRef.current) return;
+      setCompletedDeliveries([]);
     }
   };
 
   useEffect(() => {
+    loadProfile();
     loadAssignments();
-    checkTelemetry();
+    checkShift();
+    checkVerification();
+    checkVehicle();
+    loadDeliveries();
   }, [token]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadAssignments(), checkTelemetry()]);
+    await Promise.all([loadProfile(), loadAssignments(), checkShift(), checkVerification(), checkVehicle(), loadDeliveries()]);
     setRefreshing(false);
   };
 
-  const { activeJob, isActiveJobInProgress, remainingAssignments, awaitingCount, inProgressCount } = useMemo(() => {
-    const inProgress = assignments.filter((a) => isJobInProgress(a.status));
-    const awaiting = assignments.filter((a) => !isJobInProgress(a.status));
-    const featured = inProgress[0] ?? awaiting[0] ?? null;
-    return {
-      activeJob: featured,
-      isActiveJobInProgress: featured ? isJobInProgress(featured.status) : false,
-      remainingAssignments: assignments.filter((a) => a.id !== featured?.id),
-      awaitingCount: awaiting.length,
-      inProgressCount: inProgress.length,
-    };
-  }, [assignments]);
+  const onToggleShift = async () => {
+    setShiftBusy(true);
+    try {
+      if (onShift) {
+        await stopBackgroundLocationTracking();
+      } else {
+        await startBackgroundLocationTracking();
+      }
+    } finally {
+      await checkShift();
+      setShiftBusy(false);
+    }
+  };
+
+  const { awaitingCount, inProgressCount } = useMemo(
+    () => ({
+      awaitingCount: assignments.filter((a) => !isJobInProgress(a.status)).length,
+      inProgressCount: assignments.filter((a) => isJobInProgress(a.status)).length,
+    }),
+    [assignments]
+  );
+
+  const doneTodayCount = completedDeliveries.filter((d) => isToday(d.confirmed_at)).length;
+  const doneThisWeekCount = completedDeliveries.filter((d) => {
+    if (!d.confirmed_at) return false;
+    return Date.now() - new Date(d.confirmed_at).getTime() <= 7 * 24 * 60 * 60 * 1000;
+  }).length;
 
   return (
     <ScreenShell refreshing={refreshing} onRefresh={onRefresh}>
       <View style={styles.headerRow}>
-        <View>
+        <View style={styles.headerTextWrap}>
           <Text style={styles.greeting}>{getGreeting()}</Text>
-          <Text style={styles.name}>{username || 'Driver'}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>{fullName || username || 'Driver'}</Text>
+          </View>
         </View>
-        <TouchableOpacity style={styles.avatarButton} activeOpacity={0.85} onPress={() => router.push('/(app)/profile')}>
-          <Ionicons name="person-outline" size={20} color={theme.colors.primary} />
+        <View style={[styles.shiftChip, onShift ? styles.shiftChipOn : styles.shiftChipOff]}>
+          <Text style={[styles.shiftChipText, { color: onShift ? theme.colors.primary : theme.colors.muted }]}>
+            {onShift ? 'On shift' : 'Off shift'}
+          </Text>
+        </View>
+      </View>
+
+      {documentsVerified === false ? (
+        <TouchableOpacity onPress={() => router.push('/(app)/documents')} activeOpacity={0.7} style={styles.notice}>
+          <View style={[styles.noticeRail, { backgroundColor: theme.colors.warning }]} />
+          <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.noticeTitle}>Verification required</Text>
+            <Text style={styles.noticeDetail}>Submit your documents to start receiving assignments.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+        </TouchableOpacity>
+      ) : null}
+
+      {vehicle === null ? (
+        <TouchableOpacity onPress={() => router.push('/(app)/profile')} activeOpacity={0.7} style={styles.notice}>
+          <View style={[styles.noticeRail, { backgroundColor: theme.colors.warning }]} />
+          <Ionicons name="car-outline" size={18} color={theme.colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.noticeTitle}>No vehicle assigned</Text>
+            <Text style={styles.noticeDetail}>Dispatch cannot send you jobs until a vehicle is assigned to you.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+        </TouchableOpacity>
+      ) : null}
+
+      <View style={[styles.shiftCard, onShift ? styles.shiftCardOn : null]}>
+        <Text style={styles.shiftEyebrow}>Dispatch board</Text>
+        <Text style={styles.shiftTitle}>
+          {assignments.length === 0 ? 'No jobs assigned' : `${assignments.length} job${assignments.length === 1 ? '' : 's'} on your board`}
+        </Text>
+        <Text style={styles.shiftSubtitle}>
+          {onShift ? 'Dispatch can assign you jobs while your shift is active.' : 'Start your shift so dispatch can assign the next manifest.'}
+        </Text>
+
+        <View style={styles.statsRow}>
+          <View style={styles.statCell}>
+            <Text style={styles.statLabel}>Awaiting</Text>
+            <Text style={styles.statValue}>{awaitingCount}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statCell}>
+            <Text style={styles.statLabel}>In progress</Text>
+            <Text style={styles.statValue}>{inProgressCount}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statCell}>
+            <Text style={styles.statLabel}>Done today</Text>
+            <Text style={styles.statValue}>{doneTodayCount}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.shiftButton, onShift ? styles.shiftButtonEnd : styles.shiftButtonStart]}
+          activeOpacity={0.9}
+          onPress={onToggleShift}
+          disabled={shiftBusy || onShift === null}
+        >
+          <Ionicons name={onShift ? 'stop-circle-outline' : 'play-circle-outline'} size={17} color={theme.colors.ink} />
+          <Text style={styles.shiftButtonText}>{onShift ? 'End shift' : 'Start shift'}</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.hero}>
-        <View style={styles.heroTopBar} />
-
-        <View style={styles.heroChipRow}>
-          {telemetryLive !== null ? (
-            <StatusChip
-              icon="radio-outline"
-              text={telemetryLive ? 'Telemetry live' : 'Telemetry off'}
-              tone={telemetryLive ? 'primary' : 'warning'}
-            />
-          ) : null}
-          {pendingSyncCount > 0 ? <StatusChip icon="cloud-offline-outline" text={`${pendingSyncCount} queued`} tone="warning" /> : null}
-        </View>
-
-        {activeJob ? (
-          <>
-            <Text style={[styles.heroEyebrow, { color: isActiveJobInProgress ? theme.colors.primary : theme.colors.accent }]}>
-              {isActiveJobInProgress ? 'Continue trip' : 'Next up'}
-            </Text>
-            <Text style={styles.heroTitle} numberOfLines={2}>{activeJob.title}</Text>
-            <View style={styles.heroMetaRow}>
-              <Ionicons name="navigate-outline" size={14} color={theme.colors.accent} />
-              <Text style={styles.heroMeta} numberOfLines={1}>{activeJob.destination}</Text>
+      <Text style={styles.quickLabel}>Quick actions</Text>
+      <View style={styles.quickGrid}>
+        {QUICK_ACTIONS.map((action) => (
+          <TouchableOpacity
+            key={action.key}
+            style={styles.quickTile}
+            activeOpacity={0.8}
+            onPress={() => router.push(action.href)}
+          >
+            <View style={[styles.quickIconWrap, { backgroundColor: `${action.color}1F` }]}>
+              <Ionicons name={action.icon} size={18} color={action.color} />
             </View>
-            <TouchableOpacity
-              style={styles.heroActionButton}
-              activeOpacity={0.9}
-              onPress={() => router.push(`/(app)/trip/${activeJob.id}`)}
-            >
-              <Text style={styles.heroActionText}>{isActiveJobInProgress ? 'Open trip' : 'Start pickup'}</Text>
-              <Ionicons name="arrow-forward" size={14} color={theme.colors.paper} />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={[styles.heroEyebrow, { color: theme.colors.muted }]}>All caught up</Text>
-            <Text style={styles.heroTitle}>No jobs assigned yet</Text>
-            <Text style={styles.heroMeta}>Dispatch will send your next manifest here as soon as it's ready.</Text>
-          </>
-        )}
-
-        <View style={styles.heroDivider} />
-
-        <View style={styles.heroFooterRow}>
-          <View style={styles.heroMetricMini}>
-            <Text style={styles.heroMetricLabel}>Awaiting pickup</Text>
-            <Text style={styles.heroMetricValue}>{awaitingCount}</Text>
-          </View>
-          <View style={styles.heroMetricMini}>
-            <Text style={styles.heroMetricLabel}>In progress</Text>
-            <Text style={styles.heroMetricValue}>{inProgressCount}</Text>
-          </View>
-        </View>
+            <Text style={styles.quickLabelText}>{action.label}</Text>
+            <Text style={styles.quickDetailText} numberOfLines={1}>
+              {action.key === 'log' ? `${doneThisWeekCount} this week` : action.detail}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
-
-      {remainingAssignments.length > 0 ? (
-        <>
-          <SectionHeader eyebrow="Manifest" title="Up next" subtitle="The rest of today's manifest." />
-          <View style={{ gap: 12 }}>
-            {remainingAssignments.map((item) => (
-              <AssignmentCard key={item.id} {...item} onPress={() => router.push(`/(app)/trip/${item.id}`)} />
-            ))}
-          </View>
-        </>
-      ) : null}
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 4 },
-  greeting: { color: theme.colors.muted, fontSize: 13, fontWeight: '600' },
-  name: { color: theme.colors.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.4, marginTop: 2 },
-  avatarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 24, marginTop: 4 },
+  headerTextWrap: { flex: 1 },
+  greeting: { color: theme.colors.muted, fontSize: 13, fontFamily: theme.fonts.bodyMedium },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  name: { color: theme.colors.text, fontSize: 26, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.4, flexShrink: 1 },
+  shiftChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.pill, borderWidth: 1, marginTop: 4 },
+  shiftChipOn: { backgroundColor: `${theme.colors.primary}1A`, borderColor: `${theme.colors.primary}55` },
+  shiftChipOff: { backgroundColor: theme.colors.panelSoft, borderColor: theme.colors.border },
+  shiftChipText: { fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.8 },
+  notice: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.panelSoft,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    gap: 10,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  hero: {
-    borderRadius: 10,
-    borderWidth: 1,
+  noticeRail: { width: 3, height: 28, borderRadius: 2 },
+  noticeTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  noticeDetail: { color: theme.colors.muted, fontSize: 11, lineHeight: 15, marginTop: 2, fontFamily: theme.fonts.body },
+  shiftCard: {
+    backgroundColor: theme.colors.surface2,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.panel,
-    padding: 18,
-    marginBottom: 28,
-    gap: 14,
-    overflow: 'hidden',
+    padding: 20,
+    marginBottom: 24,
   },
-  heroTopBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: theme.colors.primary },
-  heroChipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', minHeight: 27 },
-  heroEyebrow: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.2, fontFamily: mono },
-  heroTitle: { color: theme.colors.text, fontSize: 24, fontWeight: '900', letterSpacing: -0.4, lineHeight: 29 },
-  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  heroMeta: { color: theme.colors.muted, fontSize: 13, lineHeight: 19, flex: 1 },
-  heroActionButton: {
+  shiftCardOn: { borderColor: theme.colors.primary },
+  shiftEyebrow: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontFamily: theme.fonts.mono,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  shiftTitle: { color: theme.colors.text, fontSize: 21, fontFamily: theme.fonts.headingBlack, marginTop: 8, letterSpacing: -0.3 },
+  shiftSubtitle: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, marginTop: 6, fontFamily: theme.fonts.body },
+  statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 20 },
+  statCell: { flex: 1 },
+  statDivider: { width: 1, height: 30, backgroundColor: theme.colors.border, marginHorizontal: 12 },
+  statLabel: { color: theme.colors.muted, fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.6 },
+  statValue: { color: theme.colors.text, fontSize: 20, fontFamily: theme.fonts.headingBlack, marginTop: 4, fontVariant: ['tabular-nums'] },
+  shiftButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    borderRadius: 6,
-    backgroundColor: theme.colors.primary,
-    marginTop: 2,
+    borderRadius: theme.radius.pill,
+    paddingVertical: 14,
   },
-  heroActionText: { color: theme.colors.paper, fontSize: 13, fontWeight: '900' },
-  heroDivider: { height: 1, backgroundColor: theme.colors.border },
-  heroFooterRow: { flexDirection: 'row', gap: 10 },
-  heroMetricMini: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: theme.colors.panelSoft,
+  shiftButtonStart: { backgroundColor: theme.colors.primary },
+  shiftButtonEnd: { backgroundColor: theme.colors.danger },
+  shiftButtonText: { color: theme.colors.ink, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  quickLabel: {
+    color: theme.colors.muted,
+    fontSize: 11,
+    fontFamily: theme.fonts.mono,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 10,
+  },
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  quickTile: {
+    width: '47%',
+    backgroundColor: theme.colors.surface2,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
+    padding: 16,
   },
-  heroMetricLabel: { color: theme.colors.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: mono },
-  heroMetricValue: { color: theme.colors.text, fontSize: 20, fontWeight: '900', marginTop: 4, fontVariant: ['tabular-nums'] },
+  quickIconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  quickLabelText: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  quickDetailText: { color: theme.colors.muted, fontSize: 11, marginTop: 2, fontFamily: theme.fonts.body },
 });

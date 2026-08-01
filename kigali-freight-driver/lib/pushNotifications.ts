@@ -82,6 +82,11 @@ export function useNotificationResponseHandler() {
       const data = response.notification.request.content.data as { type?: string; orderIds?: string } | undefined;
       if (data?.type === 'order-assigned') {
         router.push('/(app)/assignments' as never);
+      } else if (data?.type === 'document-status') {
+        // Sent on both approval and rejection (see updateDocumentStatus in
+        // driverDocumentController.js) — either way, the documents screen
+        // is where the driver sees which one it was and what to do next.
+        router.push('/(app)/documents' as never);
       }
     });
 

@@ -110,7 +110,7 @@ export default function VehicleAssignmentPanel() {
                     <option value="">Select available driver</option>
                     {drivers.map((d) => (
                         <option key={d.id} value={d.id}>
-                            {d.username || d.email}
+                            {d.fullName || d.username || d.email}
                         </option>
                     ))}
                 </select>

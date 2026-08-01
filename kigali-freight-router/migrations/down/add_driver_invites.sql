@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS driver_invites CASCADE;

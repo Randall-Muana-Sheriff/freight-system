@@ -88,8 +88,21 @@ npm install
 Run migrations before starting the server:
 
 ```bash
-npm run migrate
+npm run db:migrate
 ```
+
+Roll back the most recently applied migration (or the last N with `--steps N`):
+
+```bash
+npm run db:migrate:down
+npm run db:migrate:down -- --steps 3
+```
+
+Not every migration has an automated down path — a handful of foundational
+or pure-data migrations (see `migrations/down/README.md`) can't be safely
+reversed automatically, and the rollback refuses cleanly rather than
+guessing. Each step runs in its own transaction, so a refusal partway
+through a multi-step rollback never leaves the schema half-migrated.
 
 ### Migration Safety Model
 
@@ -316,7 +329,7 @@ Server emit:
 - Port in use (`EADDRINUSE`): free port 5000 or change `PORT`.
 - PostGIS errors: verify `CREATE EXTENSION postgis` is permitted and migration ran.
 - 401/403 responses: confirm JWT token and role authorization.
-- Empty data after startup: run `npm run migrate` and verify DB credentials.
+- Empty data after startup: run `npm run db:migrate` and verify DB credentials.
 - CORS failures: set `CORS_ORIGIN` to include your frontend origin.
 - Metrics look incomplete behind a load balancer: `/metrics` is per-instance (standard Prometheus model) — configure your scraper to hit every instance, or scrape through a service mesh/sidecar.
 - `pg_dump` or `pg_restore` not found: install PostgreSQL client tools on the machine running the backup scripts.

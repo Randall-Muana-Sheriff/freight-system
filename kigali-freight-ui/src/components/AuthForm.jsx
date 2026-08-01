@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 
 // Login only — dispatcher/admin accounts are created by an existing admin
-// (see AdminUserManagement.jsx), not self-signup. Drivers self-signup from
+// (see AdminUserGovernance.jsx), not self-signup. Drivers self-signup from
 // the mobile app instead.
 export default function AuthForm() {
   const { login, authError } = useSocket();
@@ -38,15 +38,17 @@ export default function AuthForm() {
 
           <form onSubmit={handleSubmit} className="space-y-3 text-xs">
             <div>
-              <label className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Username</label>
+              <label htmlFor="auth-username" className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Username</label>
               <input
+                id="auth-username"
                 type="text" value={username} onChange={(e) => setUsername(e.target.value)} required
                 className="w-full p-2.5 bg-ink border border-line/15 rounded text-paper outline-none focus:border-route transition-colors"
               />
             </div>
             <div>
-              <label className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Password</label>
+              <label htmlFor="auth-password" className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Password</label>
               <input
+                id="auth-password"
                 type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
                 className="w-full p-2.5 bg-ink border border-line/15 rounded text-paper outline-none focus:border-route transition-colors"
               />

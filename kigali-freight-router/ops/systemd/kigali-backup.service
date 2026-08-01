@@ -1,0 +1,21 @@
+[Unit]
+Description=Kigali Freight database backup, verify, and prune
+# Backup.js/verify-backup.js/prune-backups.js already exist and work
+# (see ops/) — the previous gap was that nothing ever ran them on a
+# schedule. This unit is what a real production host actually executes;
+# kigali-backup.timer (same directory) is what triggers it daily.
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust to wherever the router is actually deployed on the real host.
+WorkingDirectory=/opt/kigali-freight/kigali-freight-router
+EnvironmentFile=/opt/kigali-freight/kigali-freight-router/.env
+ExecStart=/usr/bin/npm run backup:db -- /var/backups/kigali-freight
+# Verifies the backup that was JUST taken (not an old one) — the whole
+# point is catching a bad backup the same day it's made, not weeks later
+# when it's actually needed. Bash picks the newest .dump file in the
+# output directory rather than hardcoding a filename, since backup-db.js
+# names each file with its own timestamp.
+ExecStart=/bin/bash -c 'npm run backup:verify -- "$(ls -t /var/backups/kigali-freight/*.dump | head -n1)"'
+ExecStart=/usr/bin/npm run backup:prune -- /var/backups/kigali-freight

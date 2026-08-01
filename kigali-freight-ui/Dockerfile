@@ -28,8 +28,13 @@ RUN npm run build
 # Runtime stage - nginx
 FROM nginx:1.27-alpine AS runtime
 COPY --from=builder /app/kigali-freight-ui/dist /usr/share/nginx/html
-COPY kigali-freight-ui/nginx.conf /etc/nginx/conf.d/default.conf
+# A template, not the live config — docker-entrypoint.sh substitutes the
+# real API origin into it (from the API_BASE_URL env var) at container
+# start, since that's only known at deploy time, not at image-build time.
+COPY kigali-freight-ui/nginx.conf.template /etc/nginx/templates/nginx.conf.template
+COPY kigali-freight-ui/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

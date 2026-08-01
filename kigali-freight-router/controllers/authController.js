@@ -1,6 +1,7 @@
 import pool from '../config/db.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { appConfig } from '../config/appConfig.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
 import {
     issueRefreshToken,
@@ -19,61 +20,6 @@ function signAccessToken(user) {
 }
 
 export const AuthController = {
-    // Register a new user account
-    register: async (req, res) => {
-        const { username, password } = req.body;
-        if (!username || !password) {
-            return fail(res, {
-                status: 400,
-                code: 'AUTH_INVALID_PAYLOAD',
-                message: 'Username and password are required',
-            });
-        }
-        try {
-            // Self-signup always creates a 'driver' account. Elevation to
-            // 'dispatcher'/'admin' is an admin-only action (PATCH
-            // /api/admin/users/:id/role) — never something a caller can
-            // request for themselves at signup.
-            const assignedRole = 'driver';
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            const query = `
-                INSERT INTO users (username, password_hash, role)
-                VALUES ($1, $2, $3)
-                RETURNING id, username, role;
-            `;
-            const result = await pool.query(query, [username, hashedPassword, assignedRole]);
-            const newUser = result.rows[0];
-
-            const token = signAccessToken(newUser);
-            const refreshToken = await issueRefreshToken(newUser.username);
-
-            return ok(
-                res,
-                {
-                    token,
-                    refreshToken,
-                    role: newUser.role,
-                    message: 'User registered successfully',
-                },
-                { status: 201 }
-            );
-        } catch (error) {
-            if (error.code === '23505') { // PostgreSQL unique violation error code
-                return fail(res, {
-                    status: 400,
-                    code: 'AUTH_USERNAME_TAKEN',
-                    message: 'Username is already taken',
-                });
-            }
-            return fail(res, {
-                status: 500,
-                code: 'AUTH_REGISTER_FAILED',
-                message: errorMessage(error, 'Registration failed.'),
-            });
-        }
-    },
-
     // Verify user and issue a JWT token pair
     login: async (req, res) => {
         const { username, password } = req.body;
@@ -101,6 +47,23 @@ export const AuthController = {
                     status: 401,
                     code: 'AUTH_INVALID_CREDENTIALS',
                     message: 'Invalid username or password',
+                });
+            }
+
+            // Checked after the password so a wrong password never leaks
+            // whether a pending/rejected account even exists.
+            if (user.status === 'pending') {
+                return fail(res, {
+                    status: 403,
+                    code: 'AUTH_ACCOUNT_PENDING',
+                    message: 'Your account is awaiting admin approval.',
+                });
+            }
+            if (user.status === 'rejected') {
+                return fail(res, {
+                    status: 403,
+                    code: 'AUTH_ACCOUNT_REJECTED',
+                    message: 'Your account request was not approved. Contact your dispatcher.',
                 });
             }
 
@@ -188,7 +151,7 @@ export const AuthController = {
                 });
             }
 
-            const newHash = await bcrypt.hash(newPassword, 10);
+            const newHash = await bcrypt.hash(newPassword, appConfig.bcryptCost);
             await pool.query('UPDATE users SET password_hash = $1 WHERE username = $2', [newHash, username]);
 
             // Force every other session/device to re-authenticate with the
@@ -202,6 +165,27 @@ export const AuthController = {
                 code: 'AUTH_PASSWORD_CHANGE_FAILED',
                 message: errorMessage(error, 'Failed to update password.'),
             });
+        }
+    },
+
+    // GET /api/auth/me - the calling account's own profile. Added for the
+    // driver app's Profile screen: once a driver's `username` is their
+    // phone number (see the phone/OTP/PIN auth flow), showing the raw
+    // username as their "name" would be meaningless — this is where the
+    // real full name and staff ID actually come from.
+    me: async (req, res) => {
+        try {
+            const result = await pool.query(
+                `SELECT username, role, phone_number AS "phoneNumber", staff_id AS "staffId", full_name AS "fullName"
+                 FROM users WHERE username = $1`,
+                [req.user.username]
+            );
+            if (result.rows.length === 0) {
+                return fail(res, { status: 404, code: 'AUTH_ACCOUNT_NOT_FOUND', message: 'Account no longer exists.' });
+            }
+            return ok(res, result.rows[0]);
+        } catch (error) {
+            return fail(res, { status: 500, code: 'AUTH_ME_FAILED', message: errorMessage(error, 'Failed to load your account.') });
         }
     },
 

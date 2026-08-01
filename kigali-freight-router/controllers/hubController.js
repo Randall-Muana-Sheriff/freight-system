@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
+import { logError } from '../utils/logger.js';
 
 function validateHubPayload(body) {
     const { name, code, lat, lng } = body || {};
@@ -30,7 +31,7 @@ export const HubController = {
             );
             return ok(res, result.rows);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'HUBS_FETCH_FAILED',

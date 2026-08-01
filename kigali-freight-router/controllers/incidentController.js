@@ -1,6 +1,7 @@
 import pool from '../config/db.js';
 import { io } from '../server.js';
 import { ok, fail } from '../utils/httpResponse.js';
+import { logError } from '../utils/logger.js';
 
 export const IncidentController = {
     // GET /api/incidents - dispatcher/admin view of driver-submitted reports.
@@ -18,11 +19,37 @@ export const IncidentController = {
             );
             return ok(res, result.rows);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'INCIDENTS_FETCH_FAILED',
                 message: 'Failed to read incident reports.',
+            });
+        }
+    },
+
+    // GET /api/incidents/mine - a driver's own submitted reports and their
+    // status. getIncidents (above) is the dispatcher/admin-only full queue
+    // — a driver could POST a report but had no way to ever find out
+    // whether anyone looked at it or what happened next.
+    getMyIncidents: async (req, res) => {
+        try {
+            const driverName = req.user?.username;
+            const result = await pool.query(
+                `SELECT id, order_id, description, status, resolved_at, created_at
+                 FROM geofence_alerts
+                 WHERE event_type = 'MANUAL_INCIDENT' AND driver_name = $1
+                 ORDER BY created_at DESC
+                 LIMIT 50;`,
+                [driverName]
+            );
+            return ok(res, result.rows);
+        } catch (error) {
+            logError(req, 'Database error', error);
+            return fail(res, {
+                status: 500,
+                code: 'INCIDENTS_MINE_FETCH_FAILED',
+                message: 'Failed to read your incident reports.',
             });
         }
     },
@@ -62,7 +89,7 @@ export const IncidentController = {
 
             return ok(res, result.rows[0], { status: 201 });
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'INCIDENT_CREATE_FAILED',
@@ -107,7 +134,7 @@ export const IncidentController = {
 
             return ok(res, result.rows[0]);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'INCIDENT_STATUS_UPDATE_FAILED',

@@ -278,7 +278,7 @@ export default function RouteOptimizerPanel({ onRouteOptimized, stopTargetMode, 
                         >
                             <option value="">Save plan for driver...</option>
                             {drivers.map((d) => (
-                                <option key={d.id} value={d.username}>{d.username}</option>
+                                <option key={d.id} value={d.username}>{d.fullName || d.username}</option>
                             ))}
                         </select>
                         <button

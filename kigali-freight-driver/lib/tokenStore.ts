@@ -83,6 +83,35 @@ export function getCachedTokens(): TokenSet {
   return cache;
 }
 
+// Two small standalone preferences, deliberately kept out of the TokenSet
+// above (and its cache/pub-sub machinery) since neither is security-
+// sensitive session state — they're just UX conveniences that outlive any
+// one session.
+const AUTH_PHONE_KEY = 'kigali_freight_driver_remembered_phone';
+const AUTH_BIOMETRIC_KEY = 'kigali_freight_driver_biometric_enabled';
+
+// Prefills the phone step for a returning driver so they aren't retyping
+// their own number every time they reinstall or sign out.
+export async function getRememberedPhone(): Promise<string | null> {
+  return SecureStore.getItemAsync(AUTH_PHONE_KEY);
+}
+
+export async function setRememberedPhone(phone: string): Promise<void> {
+  await SecureStore.setItemAsync(AUTH_PHONE_KEY, phone);
+}
+
+export async function getBiometricEnabled(): Promise<boolean> {
+  return (await SecureStore.getItemAsync(AUTH_BIOMETRIC_KEY)) === '1';
+}
+
+export async function setBiometricEnabled(enabled: boolean): Promise<void> {
+  if (enabled) {
+    await SecureStore.setItemAsync(AUTH_BIOMETRIC_KEY, '1');
+  } else {
+    await SecureStore.deleteItemAsync(AUTH_BIOMETRIC_KEY);
+  }
+}
+
 // Prevents concurrent requests that all 401 at once from each independently
 // kicking off their own refresh call - they share one in-flight promise.
 let refreshInFlight: Promise<string | null> | null = null;
@@ -94,7 +123,15 @@ export async function refreshAccessToken(apiBase: string): Promise<string | null
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
-    const currentRefreshToken = cache.refreshToken;
+    // The background location task can call this from a cold JS context —
+    // the OS waking the app headlessly just to run the task, where
+    // hydrateTokenStore() was never called — so the in-memory cache can be
+    // empty even though a valid refresh token exists in SecureStore. Fall
+    // back to reading it directly rather than assuming the cache is warm.
+    let currentRefreshToken = cache.refreshToken;
+    if (!currentRefreshToken) {
+      currentRefreshToken = await SecureStore.getItemAsync(AUTH_REFRESH_TOKEN_KEY);
+    }
     if (!currentRefreshToken) return null;
 
     // Runs on every cold start whenever a refresh token is stored — a

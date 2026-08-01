@@ -77,7 +77,7 @@ export default function AppLayout() {
             borderTopColor: theme.colors.border,
             borderWidth: 0,
           },
-          tabBarLabelStyle: { fontSize: 11, fontWeight: '800' },
+          tabBarLabelStyle: { fontSize: 11, fontFamily: theme.fonts.bodySemiBold },
           tabBarItemStyle: { paddingTop: 0 },
         }}
       >
@@ -117,6 +117,7 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen name="trip/[id]" options={{ href: null }} />
+        <Tabs.Screen name="documents" options={{ href: null }} />
       </Tabs>
       <GestureDetector gesture={swipeGesture}>
         <View pointerEvents="box-only" style={[styles.swipeZone, { bottom: tabBar.totalHeight }]} />

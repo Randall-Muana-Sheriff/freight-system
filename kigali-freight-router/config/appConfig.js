@@ -45,6 +45,12 @@ export const appConfig = {
         database: required('DB_DATABASE'),
     },
     jwtSecret: required('JWT_SECRET'),
+    // Bcrypt work factor for password/PIN hashing. Was hardcoded to 10
+    // everywhere it's used, with no way to raise it as hardware gets
+    // faster short of a code change; now a single env-driven value shared
+    // by every hash site (authController, driverAuthController,
+    // adminController, bin/migrate.js).
+    bcryptCost: parseInt(optional('BCRYPT_COST', '10'), 10) || 10,
     // Optional: static bearer token required on GET /metrics (Prometheus
     // scrape configs use a static token, not a short-lived user JWT). When
     // unset, /metrics is closed rather than left open by default.

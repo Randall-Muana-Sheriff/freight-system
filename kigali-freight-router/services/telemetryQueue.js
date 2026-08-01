@@ -4,6 +4,29 @@ import { sendPushToUser } from './pushNotificationService.js';
 const DEFAULT_FLUSH_INTERVAL_MS = 250;
 const DEFAULT_BATCH_SIZE = 100;
 
+// Consumer GPS has a real accuracy floor — typically 3-10m even with clear
+// sky view, worse indoors/near buildings from multipath reflections. A
+// phone sitting dead still reports a slightly different fix on every read
+// from that noise alone, which without this would make the dispatcher
+// map marker visibly "wander" in a small radius. This mirrors the existing
+// STATIONARY_SPEED_DEADBAND_KMH in the driver app's locationTracking.ts,
+// which already does the same thing for the speed readout — this is the
+// position equivalent. 15m sits comfortably above the noise floor while
+// still catching a driver who's genuinely repositioning (e.g. pulling
+// forward at a loading dock).
+const POSITION_NOISE_FLOOR_METERS = 15;
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+    const EARTH_RADIUS_METERS = 6371000;
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(a));
+}
+
 // Shared-state keys. When REDIS_URL is configured these back real Redis
 // structures (a list for the durable queue, hashes for live state) so any
 // number of app instances/processes share the same fleet view and no
@@ -14,25 +37,69 @@ const QUEUE_KEY = 'kigali:telemetry:queue';
 export const FLEET_STATE_KEY = 'kigali:fleet:live-state';
 const DRIVER_BREACHES_KEY = 'kigali:fleet:driver-breaches';
 
+// A driver's assigned vehicle (and its type) changes rarely, but this join
+// would otherwise run on every single GPS ping (every ~250ms flush). A short
+// TTL cache keeps the live map's marker shape correct within half a minute
+// of a reassignment without adding a DB round-trip to the hot path, and
+// without the cross-module coupling a real invalidation hook into
+// adminController's assignVehicle would require.
+const VEHICLE_TYPE_CACHE_TTL_MS = 30_000;
+
 export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
     let flushTimer = null;
     let draining = false;
+    const vehicleTypeCache = new Map(); // driverName -> { vehicleType, expiresAt }
+
+    async function getVehicleTypeForDriver(driverName) {
+        const cached = vehicleTypeCache.get(driverName);
+        if (cached && cached.expiresAt > Date.now()) return cached.vehicleType;
+
+        const result = await pool.query(
+            `SELECT fv.vehicle_type AS "vehicleType"
+             FROM fleet_vehicles fv
+             JOIN users u ON u.id = fv.current_driver_id
+             WHERE u.username = $1
+             LIMIT 1;`,
+            [driverName]
+        );
+        const vehicleType = result.rows[0]?.vehicleType ?? null;
+        vehicleTypeCache.set(driverName, { vehicleType, expiresAt: Date.now() + VEHICLE_TYPE_CACHE_TTL_MS });
+        return vehicleType;
+    }
 
     async function processTelemetryItem(item) {
         const { driverName, lat, lng, timestamp, currentVelocityKmh } = item;
 
+        // Full-fidelity raw trail — deliberately never noise-filtered. This
+        // is what the breadcrumbs feature simplifies (Ramer-Douglas-Peucker)
+        // for playback, and it's the kind of record you'd want unfiltered
+        // for any later audit/dispute — filtering noise out at write time
+        // would be throwing away the very data a smoothing algorithm needs.
         await pool.query(
             `INSERT INTO driver_location_history (driver_name, lat, lng, geom, recorded_at)
              VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), NOW())`,
             [driverName, lat, lng]
         );
 
+        // "Current position" (driver_locations) is what the live map, ETA
+        // calculations, and nearest-driver suggestions treat as ground
+        // truth for "where is this driver right now" — this is the one
+        // that should hide GPS noise. If the new fix is within the noise
+        // floor of wherever they were already recorded, keep the existing
+        // point and just refresh updated_at, so a stationary driver still
+        // reads as freshly-online without their marker visibly drifting.
+        const previousFix = await pool.query(`SELECT lat, lng FROM driver_locations WHERE driver_name = $1`, [driverName]);
+        const previous = previousFix.rows[0];
+        const movedMeters = previous ? haversineMeters(previous.lat, previous.lng, lat, lng) : Infinity;
+        const displayLat = movedMeters > POSITION_NOISE_FLOOR_METERS ? lat : previous.lat;
+        const displayLng = movedMeters > POSITION_NOISE_FLOOR_METERS ? lng : previous.lng;
+
         await pool.query(
             `INSERT INTO driver_locations (driver_name, lat, lng, geom, updated_at)
              VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), NOW())
              ON CONFLICT (driver_name)
              DO UPDATE SET lat = EXCLUDED.lat, lng = EXCLUDED.lng, geom = EXCLUDED.geom, updated_at = NOW()`,
-            [driverName, lat, lng]
+            [driverName, displayLat, displayLng]
         );
 
         const boundaryCheck = await pool.query(
@@ -107,7 +174,11 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
             dispatchExternalAlert(`✅ *RESOLVED:* ${driverName} has safely departed the restricted perimeter.`);
         }
 
-        const nextState = { driverName, lat, lng, velocityKmh: currentVelocityKmh, lastSeen: timestamp };
+        // Broadcast the same noise-filtered position written above — using
+        // the raw fix here would still make the live map marker jitter even
+        // though driver_locations itself no longer does.
+        const vehicleType = await getVehicleTypeForDriver(driverName);
+        const nextState = { driverName, lat: displayLat, lng: displayLng, velocityKmh: currentVelocityKmh, lastSeen: timestamp, vehicleType };
         await hashSet(FLEET_STATE_KEY, driverName, nextState);
         io.emit('driver:location-update', nextState);
     }

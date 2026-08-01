@@ -1,6 +1,6 @@
 // src/components/TopCommandBar.jsx
 import { useState } from 'react';
-import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck } from 'lucide-react';
+import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { apiFetch } from '../utils/api';
 import { classifyFreshness, useNow } from '../utils/telemetryFreshness';
@@ -80,7 +80,7 @@ function StatChip({ icon: Icon, label, value, tone = 'text-paper' }) {
 // and the top-line KPIs all live here now so they're visible regardless of
 // which secondary tab a dispatcher has open.
 export default function TopCommandBar() {
-    const { userRole, jwtToken, isConnected, toggleNetworkStream, logout, trackedAssets, violations, activeOrders, inFlightOrders } = useSocket();
+    const { userRole, jwtToken, isConnected, toggleNetworkStream, logout, trackedAssets, violations, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
     const [menuOpen, setMenuOpen] = useState(false);
     const now = useNow();
     // Matches the map/fleet-list definition of "active" — a driver whose
@@ -107,6 +107,16 @@ export default function TopCommandBar() {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
+                {userRole === 'admin' && (
+                    <button
+                        onClick={() => setShowAdminCenter(true)}
+                        title="Open admin control center"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-route/30 bg-route/10 text-route hover:bg-route/20 transition-colors"
+                    >
+                        <ShieldCheck size={12} strokeWidth={2.5} />
+                        Admin center
+                    </button>
+                )}
                 <button
                     onClick={toggleNetworkStream}
                     title={isConnected ? 'Click to disconnect' : 'Click to reconnect'}
@@ -128,6 +138,8 @@ export default function TopCommandBar() {
                     <button
                         onClick={() => setMenuOpen((v) => !v)}
                         title="Account"
+                        aria-label="Account menu"
+                        aria-expanded={menuOpen}
                         className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-line/15 text-steel hover:text-paper transition-colors"
                     >
                         <KeyRound size={13} strokeWidth={2.5} />

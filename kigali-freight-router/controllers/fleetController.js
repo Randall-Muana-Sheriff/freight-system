@@ -6,6 +6,7 @@
 import pool from '../config/db.js';
 import { ok, fail } from '../utils/httpResponse.js';
 import { telemetryQueue } from '../server.js';
+import { logError } from '../utils/logger.js';
 
 export const FleetController = {
     // POST /api/fleet/telemetry — a driver's own device (background location
@@ -52,7 +53,7 @@ export const FleetController = {
             });
             return ok(res, { queued: true });
         } catch (error) {
-            console.error('🚨 Telemetry enqueue failed:', error.message);
+            logError(req, 'Telemetry enqueue failed', error);
             return fail(res, {
                 status: 500,
                 code: 'TELEMETRY_ENQUEUE_FAILED',
@@ -108,7 +109,7 @@ export const FleetController = {
                 fleetReport: liveFleetReport
             });
         } catch (error) {
-            console.error("🚨 Spatial Analytics Pipeline Error:", error.message);
+            logError(req, 'Spatial analytics pipeline error', error);
             return fail(res, {
                 status: 500,
                 code: 'FLEET_LIVE_STATUS_FAILED',
@@ -161,7 +162,7 @@ export const FleetController = {
                 trail: dynamicTrail
             });
         } catch (error) {
-            console.error("🚨 Downsampling engine crash:", error.message);
+            logError(req, 'Downsampling engine crash', error);
             return fail(res, {
                 status: 500,
                 code: 'FLEET_BREADCRUMBS_FAILED',
@@ -173,21 +174,43 @@ export const FleetController = {
     // Add this method to your existing FleetController object
     getFleetPerformanceReport: async (req, res) => {
         try {
+            // Dwell time is measured from arrival to delivery confirmation.
+            // "Arrival" was previously only ever the ARRIVED_AT_DESTINATION
+            // geofence alert, which requires the driver's GPS to have
+            // actually crossed that geofence at the right moment — a dead
+            // zone or a backgrounded app at exactly the wrong time drops the
+            // order out of this report entirely even though it delivered
+            // fine and is fully visible everywhere else (stats, history,
+            // recent deliveries). The driver's own ARRIVED status update
+            // (order_status_logs) is a reliable fallback arrival timestamp
+            // that doesn't depend on a geofence event ever firing, so a
+            // delivered order now only drops out of this report if *neither*
+            // signal exists at all.
             const analyticsQuery = `
-            SELECT 
-                o.assigned_to AS driver_name,
-                COUNT(o.id) AS total_completed_orders,
-                
+            WITH arrival_times AS (
+                SELECT DISTINCT ON (o.id)
+                    o.id AS order_id,
+                    o.assigned_to AS driver_name,
+                    o.updated_at AS delivered_at,
+                    COALESCE(ga.created_at, osl.changed_at) AS arrived_at
+                FROM orders o
+                LEFT JOIN geofence_alerts ga ON ga.order_id = o.id AND ga.event_type = 'ARRIVED_AT_DESTINATION'
+                LEFT JOIN order_status_logs osl ON osl.order_id = o.id AND osl.new_status = 'ARRIVED'
+                WHERE o.status = 'DELIVERED' AND o.assigned_to IS NOT NULL
+                ORDER BY o.id, ga.created_at DESC NULLS LAST, osl.changed_at DESC NULLS LAST
+            )
+            SELECT
+                driver_name,
+                COUNT(*) AS total_completed_orders,
+
                 -- 1. Average time spent waiting at the loading dock (Dwell Time)
-                ROUND(AVG(EXTRACT(EPOCH FROM (o.updated_at - ga.created_at)) / 60)::numeric, 1) AS avg_dwell_minutes,
-                
+                ROUND(AVG(EXTRACT(EPOCH FROM (delivered_at - arrived_at)) / 60)::numeric, 1) AS avg_dwell_minutes,
+
                 -- 2. Max bottleneck duration recorded at a loading dock
-                ROUND(MAX(EXTRACT(EPOCH FROM (o.updated_at - ga.created_at)) / 60)::numeric, 1) AS max_dwell_minutes
-            FROM orders o
-            JOIN geofence_alerts ga ON o.id = ga.order_id
-            WHERE o.status = 'DELIVERED' 
-              AND ga.event_type = 'ARRIVED_AT_DESTINATION'
-            GROUP BY o.assigned_to
+                ROUND(MAX(EXTRACT(EPOCH FROM (delivered_at - arrived_at)) / 60)::numeric, 1) AS max_dwell_minutes
+            FROM arrival_times
+            WHERE arrived_at IS NOT NULL
+            GROUP BY driver_name
             ORDER BY avg_dwell_minutes DESC;
         `;
 
@@ -204,7 +227,7 @@ export const FleetController = {
                 }))
             });
         } catch (error) {
-            console.error("🚨 Analytics Engine Failure:", error.message);
+            logError(req, 'Analytics engine failure', error);
             return fail(res, {
                 status: 500,
                 code: 'FLEET_PERFORMANCE_FAILED',

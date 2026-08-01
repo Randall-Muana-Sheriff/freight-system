@@ -5,6 +5,7 @@ import OrdersPanel from './OrdersPanel';
 import IncidentReportsPanel from './IncidentReportsPanel';
 import IncidentRegistry from './IncidentRegistry';
 import FleetAssetList from './FleetAssetList';
+import LiveFleetStatusPanel from './LiveFleetStatusPanel';
 import { useSocket } from '../context/SocketContext';
 
 export default function OperationsRail({ orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, clearNewOrderDeliveryCoords }) {
@@ -22,6 +23,7 @@ export default function OperationsRail({ orderDeliveryTargetMode, setOrderDelive
             )}
             <IncidentReportsPanel />
             <IncidentRegistry />
+            <LiveFleetStatusPanel />
             <FleetAssetList />
         </aside>
     );

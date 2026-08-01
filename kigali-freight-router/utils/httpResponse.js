@@ -25,7 +25,21 @@ export function fail(res, options = {}) {
     return res.status(status).json(payload);
 }
 
+// Returns a message SAFE to send to an API client. This used to prefer the
+// raw error.message over the caller's fallback — the opposite of what
+// every call site actually wants — which leaked internal Postgres/library
+// error text (constraint names, column names, connection details) into
+// client-facing JSON responses across ~40 call sites. Now the fallback is
+// what ships to the client; the real error detail is only appended in
+// non-production (NODE_ENV unset/"development"/"test"), for local
+// debugging convenience, and is always also available server-side via
+// whatever console.error/logger call sits next to this in each catch
+// block.
 export function errorMessage(error, fallback) {
     if (!error) return fallback;
-    return error.message || fallback;
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (!isProduction && error.message) {
+        return `${fallback} (${error.message})`;
+    }
+    return fallback;
 }

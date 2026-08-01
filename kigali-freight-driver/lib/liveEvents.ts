@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_BASE } from './api';
 import { DriverNotification } from './notifications';
 import { useAuth } from './auth';
+
+// Scoped per-driver (not a single shared key) so switching accounts on the
+// same device never shows one driver's alerts to another.
+function storageKeyFor(username: string) {
+  return `kigali_freight_driver_alerts_${username}`;
+}
 
 function toTime(timestamp?: string) {
   if (!timestamp) return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -23,6 +30,36 @@ export function useLiveDriverEvents() {
   const { token, username } = useAuth();
   const [events, setEvents] = useState<DriverNotification[]>([]);
   const [connected, setConnected] = useState(false);
+
+  // This list previously lived only in React state, which is wiped every
+  // time the authenticated part of the app remounts — including a normal
+  // sign-out/sign-in cycle, not just an app restart. Restoring from
+  // AsyncStorage on mount (keyed per-driver) means alerts survive that.
+  useEffect(() => {
+    if (!username) return;
+    let cancelled = false;
+    AsyncStorage.getItem(storageKeyFor(username))
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setEvents(parsed);
+      })
+      .catch(() => {
+        // Corrupt or missing cache — just start from an empty list.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
+
+  // Persist on every change so a sign-out/sign-in or app restart in the
+  // middle of a shift doesn't lose whatever's already been captured.
+  useEffect(() => {
+    if (!username) return;
+    AsyncStorage.setItem(storageKeyFor(username), JSON.stringify(events)).catch(() => {
+      // Best-effort cache — not worth surfacing a failure to the driver.
+    });
+  }, [events, username]);
 
   useEffect(() => {
     if (!token || !username) return;
@@ -83,7 +120,14 @@ export function useLiveDriverEvents() {
     };
   }, [token, username]);
 
-  const clearEvents = () => setEvents([]);
+  const clearEvents = () => {
+    setEvents([]);
+    if (username) AsyncStorage.removeItem(storageKeyFor(username)).catch(() => {});
+  };
 
-  return { events, connected, clearEvents };
+  const dismissEvent = (id: string) => {
+    setEvents((current) => current.filter((event) => event.id !== id));
+  };
+
+  return { events, connected, clearEvents, dismissEvent };
 }

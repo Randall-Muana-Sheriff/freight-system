@@ -2,7 +2,7 @@ import { AlertTriangle, Siren } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 
 export default function IncidentRegistry() {
-  const { violations } = useSocket();
+  const { violations, resolveDriverName } = useSocket();
 
   return (
     <div className="bg-panel border border-line/10 p-3 rounded-md space-y-2">
@@ -24,7 +24,7 @@ export default function IncidentRegistry() {
               <div className="flex justify-between font-bold text-paper">
                 <span className="flex items-center gap-1.5">
                   {violation.type === 'SPEED_VIOLATION' ? <AlertTriangle size={12} className="text-hazard" /> : <Siren size={12} className="text-rust" />}
-                  {violation.driverName}
+                  {resolveDriverName(violation.driverName)}
                 </span>
                 <span className="font-mono text-[9px] text-steel">{new Date(violation.enteredAt).toLocaleTimeString()}</span>
               </div>

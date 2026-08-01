@@ -6,7 +6,7 @@ import { useSocket } from '../context/SocketContext';
 
 export default function AdminControlPanel() {
     const { jwtToken, userRole, savedVehicleTypes, refreshFeeds } = useSocket();
-    const [vehicleName, setVehicleName] = useState('');
+    const [plateNumber, setPlateNumber] = useState('');
     const [vehicleType, setVehicleType] = useState('');
     const [maxWeight, setMaxWeight] = useState('500');
     const [maxRangeKm, setMaxRangeKm] = useState('150');
@@ -42,8 +42,8 @@ export default function AdminControlPanel() {
 
     const handleRegisterVehicle = async (e) => {
         e.preventDefault();
-        if (!vehicleName) {
-            setError('Please provide a vehicle name.');
+        if (!plateNumber) {
+            setError('Please provide a license plate.');
             return;
         }
         setSubmitting(true);
@@ -51,18 +51,24 @@ export default function AdminControlPanel() {
         setSuccessMsg(null);
 
         try {
+            // The backend's createVehicle endpoint calls this field `name`
+            // and stores it straight into fleet_vehicles.plate_number — it's
+            // the same value shown as "Plate" everywhere else (driver
+            // profile, fleet roster, audit log). Keep sending it as `name`
+            // here to match the API, even though every user-facing label in
+            // this form now correctly calls it a license plate.
             await apiFetch('/api/vehicles', {
                 method: 'POST',
                 token: jwtToken,
                 body: {
-                    name: vehicleName,
+                    name: plateNumber,
                     type: vehicleType,
                     maxWeight: parseFloat(maxWeight),
                     maxRangeKm: parseFloat(maxRangeKm),
                 },
             });
-            setSuccessMsg(`Vehicle ${vehicleName} successfully registered!`);
-            setVehicleName('');
+            setSuccessMsg(`Vehicle ${plateNumber} successfully registered!`);
+            setPlateNumber('');
             loadVehicles();
         } catch (err) {
             setError(err.message);
@@ -159,9 +165,9 @@ export default function AdminControlPanel() {
                 <div className="text-[10px] font-mono uppercase tracking-wider text-carbon font-bold">Register new fleet asset</div>
                 <input
                     type="text"
-                    placeholder="Vehicle name (e.g. Heavy Hauler #02)"
-                    value={vehicleName}
-                    onChange={(e) => setVehicleName(e.target.value)}
+                    placeholder="License plate (e.g. RAD 123 A)"
+                    value={plateNumber}
+                    onChange={(e) => setPlateNumber(e.target.value)}
                     className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 focus:outline-none focus:border-route font-mono transition-colors"
                 />
                 <div className="flex gap-1.5">

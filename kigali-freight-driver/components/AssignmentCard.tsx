@@ -1,24 +1,25 @@
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../lib/theme';
-
-const mono = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
 
 function getStatusPalette(status: string) {
   const normalized = status.toLowerCase();
 
   if (normalized.includes('delivered')) {
-    return { rail: theme.colors.success, badge: 'rgba(91,140,110,0.16)', border: 'rgba(91,140,110,0.4)', text: theme.colors.success, icon: 'checkmark-circle-outline' as const };
+    return { color: theme.colors.success, icon: 'checkmark-circle' as const };
   }
   if (normalized.includes('transit') || normalized.includes('route')) {
-    return { rail: theme.colors.primary, badge: 'rgba(255,138,61,0.16)', border: 'rgba(255,138,61,0.4)', text: theme.colors.primary, icon: 'navigate-outline' as const };
+    return { color: theme.colors.primary, icon: 'navigate' as const };
   }
   if (normalized.includes('pickup') || normalized.includes('assigned')) {
-    return { rail: theme.colors.accent, badge: 'rgba(91,132,166,0.18)', border: 'rgba(91,132,166,0.4)', text: theme.colors.accent, icon: 'briefcase-outline' as const };
+    return { color: theme.colors.accent, icon: 'briefcase' as const };
   }
-  return { rail: theme.colors.muted, badge: theme.colors.panelSoft, border: theme.colors.border, text: theme.colors.text, icon: 'information-circle-outline' as const };
+  return { color: theme.colors.muted, icon: 'ellipse-outline' as const };
 }
 
+// Flat, divided row instead of a bordered card — a list of these reads as
+// one continuous manifest with a hairline between entries, rather than a
+// stack of separate boxes floating on the same background.
 export function AssignmentCard({
   title,
   route,
@@ -37,62 +38,45 @@ export function AssignmentCard({
   const palette = getStatusPalette(status);
 
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.card}>
-      <View style={[styles.rail, { backgroundColor: palette.rail }]} />
+    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.row}>
+      <View style={[styles.iconWrap, { backgroundColor: `${palette.color}1F` }]}>
+        <Ionicons name={palette.icon} size={17} color={palette.color} />
+      </View>
       <View style={styles.body}>
         <View style={styles.topRow}>
-          <View style={styles.titleWrap}>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.route}>{route}</Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: palette.badge, borderColor: palette.border }]}>
-            <Ionicons name={palette.icon} size={11} color={palette.text} />
-            <Text style={[styles.badgeText, { color: palette.text }]}>{status}</Text>
-          </View>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <Text style={[styles.status, { color: palette.color }]} numberOfLines={1}>{status}</Text>
         </View>
-
+        <Text style={styles.route} numberOfLines={1}>{route}</Text>
         <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Ionicons name="navigate-outline" size={15} color={theme.colors.accent} />
-            <Text style={styles.metaText} numberOfLines={1}>{destination}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={15} color={theme.colors.muted} />
-            <Text style={styles.metaMono}>{eta}</Text>
-          </View>
+          <Ionicons name="navigate-outline" size={12} color={theme.colors.muted} />
+          <Text style={styles.metaText} numberOfLines={1}>{destination}</Text>
+          <Text style={styles.metaDot}>·</Text>
+          <Text style={styles.metaMono}>{eta}</Text>
         </View>
       </View>
+      <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} style={{ marginTop: 8 }} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
+  row: {
     flexDirection: 'row',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.panel,
-    overflow: 'hidden',
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
   },
-  rail: { width: 3 },
-  body: { flex: 1, padding: 16, gap: 12 },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  titleWrap: { flex: 1 },
-  title: { color: theme.colors.text, fontSize: 17, fontWeight: '800' },
-  route: { color: theme.colors.muted, marginTop: 4, fontSize: 12, fontFamily: mono },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
-  metaText: { color: theme.colors.text, flex: 1, fontSize: 13 },
-  metaMono: { color: theme.colors.text, fontSize: 12, fontFamily: mono, fontVariant: ['tabular-nums'] },
+  iconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  body: { flex: 1, gap: 3 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
+  title: { flex: 1, color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  status: { fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.4 },
+  route: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  metaText: { color: theme.colors.text, fontSize: 12, flexShrink: 1, fontFamily: theme.fonts.body },
+  metaDot: { color: theme.colors.muted, fontSize: 12 },
+  metaMono: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono },
 });

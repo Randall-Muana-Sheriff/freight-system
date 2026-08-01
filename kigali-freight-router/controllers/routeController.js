@@ -2,8 +2,9 @@
 import pool from '../config/db.js';
 import { io } from '../server.js';
 import { solveVRP } from '../services/vrpOptimizer.js';
-import { appendAuditLog } from '../services/auditLogService.js';
+import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
+import { logError } from '../utils/logger.js';
 
 function normalizeRouteCoordinates(routePath) {
     if (!routePath) return [];
@@ -44,6 +45,32 @@ function normalizeStoredRoutePath(routePath) {
     };
 }
 
+// The VRP solver only ever compares Haversine (as-the-crow-flies) distances,
+// so the sequence it returns has no relationship to actual roads. This asks
+// OSRM's public routing server to snap that same stop sequence to the real
+// road network purely for map display — it doesn't feed back into the
+// solver's distance/capacity math, which still uses the Haversine totals
+// already computed. Returns null (not a thrown error) on any failure, since
+// a missing road overlay is a cosmetic degradation, not something that
+// should fail the whole optimization request — the frontend already knows
+// to fall back to a straight line between stops when this is absent.
+async function fetchRoadGeometry(sequence) {
+    if (!Array.isArray(sequence) || sequence.length < 2) return null;
+    try {
+        const coordsString = sequence.map((node) => `${node.lng},${node.lat}`).join(';');
+        const response = await fetch(
+            `http://router.project-osrm.org/route/v1/driving/${coordsString}?overview=full&geometries=geojson`
+        );
+        const data = await response.json();
+        if (data.code !== 'Ok' || !data.routes?.[0]?.geometry?.coordinates) return null;
+        // GeoJSON coordinates are [lng, lat]; Leaflet positions are [lat, lng].
+        return data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+    } catch (err) {
+        logError(null, 'Road geometry lookup failed, falling back to straight line', err);
+        return null;
+    }
+}
+
 export const RouteController = {
     // Fetch all committed routes
     getRoutes: async (req, res) => {
@@ -51,7 +78,7 @@ export const RouteController = {
             const result = await pool.query('SELECT * FROM completed_routes ORDER BY id DESC');
             return ok(res, result.rows);
         } catch (err) {
-            console.error('❌ Fetch Routes Failed:', err.message);
+            logError(req, 'Fetch routes failed', err);
             return fail(res, {
                 status: 500,
                 code: 'ROUTES_FETCH_FAILED',
@@ -65,19 +92,20 @@ export const RouteController = {
         const { depot, vehicles, stops, vehicleCapacity } = req.body;
         try {
             const solution = solveVRP({ depot, stops: stops || [], vehicleCapacity: Number(vehicleCapacity) || 100 });
-            const routes = solution.routes.map((route, index) => ({
+            const routes = await Promise.all(solution.routes.map(async (route, index) => ({
                 vehicleId: vehicles?.[index]?.id || vehicles?.[0]?.id || index + 1,
                 sequence: route.sequence,
                 totalDistanceKm: route.totalDistanceKm,
                 totalLoad: route.totalLoad,
-            }));
+                roadGeometry: await fetchRoadGeometry(route.sequence),
+            })));
 
             return ok(res, {
                 routes,
                 summary: solution.summary,
             });
         } catch (err) {
-            console.error('❌ Optimization Failed:', err.message);
+            logError(req, 'Optimization failed', err);
             return fail(res, {
                 status: 500,
                 code: 'ROUTES_OPTIMIZE_FAILED',
@@ -100,12 +128,12 @@ export const RouteController = {
             io.emit('routeUpdated', result.rows[0]);
             await appendAuditLog({
                 actionType: 'ROUTE_SAVED',
-                description: `Saved route snapshot for ${driverName || 'Dispatcher Snapshot'}`,
+                description: `Saved route snapshot for ${driverName ? await describeDriver(driverName) : 'Dispatcher Snapshot'}`,
                 username: req.user?.username || 'System',
             });
             return ok(res, { route: result.rows[0] });
         } catch (err) {
-            console.error('❌ Route snapshot save failed:', err.message);
+            logError(req, 'Route snapshot save failed', err);
             return fail(res, {
                 status: 500,
                 code: 'ROUTES_SNAPSHOT_SAVE_FAILED',
@@ -137,16 +165,16 @@ export const RouteController = {
             io.emit('routeUpdated', result.rows[0]);
             await appendAuditLog({
                 actionType: 'ROUTE_COMMITTED',
-                description: `Committed route for ${driverName || `Driver #${parsedVehicleId}`}`,
+                description: `Committed route for ${driverName ? await describeDriver(driverName) : `Driver #${parsedVehicleId}`}`,
                 username: req.user?.username || 'System',
             });
             return ok(res, { route: result.rows[0] });
         } catch (err) {
-            console.error('❌ DETAILED DB COMMIT ERROR:', err.message);
+            logError(req, 'Route commit failed', err);
             return fail(res, {
                 status: 500,
                 code: 'ROUTES_COMMIT_FAILED',
-                message: `Database error: ${err.message}`,
+                message: errorMessage(err, 'Failed to commit route.'),
             });
         }
     }

@@ -1,8 +1,13 @@
 // src/utils/api.js
-export const API_BASE = import.meta.env.VITE_API_BASE_URL;
+import { getApiBase } from './runtimeConfig.js';
+
+export const API_BASE = getApiBase();
 
 if (!API_BASE) {
-    throw new Error('Missing VITE_API_BASE_URL. Create a .env file from .env.example and set your backend URL.');
+    throw new Error(
+        'Missing API base URL. For local dev, create a .env file from .env.example and set VITE_API_BASE_URL. ' +
+        'In a deployed container, set the API_BASE_URL env var (see docker-entrypoint.sh).'
+    );
 }
 
 function createHttpError(message, status) {
@@ -62,6 +67,14 @@ export async function fetchRoutes(token) {
 
 export async function fetchGeofences(token) {
     return apiFetch('/api/geofences', { method: 'GET', token });
+}
+
+// Address/place search, proxied through our backend to Nominatim (keeps
+// its 1 req/sec usage policy + User-Agent requirement server-side instead
+// of exposing that host directly to the browser).
+export async function geocodeSearch(query, token) {
+    const result = await apiFetch(`/api/geocode/search?q=${encodeURIComponent(query)}`, { method: 'GET', token });
+    return result?.results ?? [];
 }
 
 // VRP Multi-Stop Route Optimization Caller with advanced fleet and time windows
@@ -182,4 +195,72 @@ export async function updateIncidentStatus(incidentId, status, token) {
 export async function fetchDrivers(token) {
     const users = await apiFetch('/api/users', { method: 'GET', token });
     return users.filter((u) => String(u.role).toLowerCase() === 'driver');
+}
+
+export async function fetchAdminStats(token) {
+    return apiFetch('/api/stats', { method: 'GET', token });
+}
+
+// Spatial clustering of PENDING orders into batches a driver could pick up
+// in one loop — read-only suggestions, dispatch still assigns manually.
+export async function fetchBatchedOrders(token) {
+    return apiFetch('/api/orders/pooling', { method: 'GET', token });
+}
+
+export async function fetchOrderHistory(orderId, token) {
+    return apiFetch(`/api/orders/${orderId}/history`, { method: 'GET', token });
+}
+
+export async function fetchLiveFleetStatus(token) {
+    return apiFetch('/api/fleet/telemetry-sheet', { method: 'GET', token });
+}
+
+// hours: lookback window for the trail (backend default 4). tolerance:
+// RDP simplification in degrees (backend default 0.0001, ~11m).
+export async function fetchDriverBreadcrumbs(driverName, token, { hours, tolerance } = {}) {
+    const params = new URLSearchParams();
+    if (hours != null) params.set('hours', hours);
+    if (tolerance != null) params.set('tolerance', tolerance);
+    const qs = params.toString();
+    return apiFetch(`/api/fleet/history/${encodeURIComponent(driverName)}${qs ? `?${qs}` : ''}`, { method: 'GET', token });
+}
+
+export async function fetchFleetPerformanceReport(token) {
+    return apiFetch('/api/fleet/analytics/performance', { method: 'GET', token });
+}
+
+// Dispatcher-issued driver onboarding — replaces the old self-signup +
+// approval path for drivers. Creates a pre-approved driver account (their
+// username becomes their phone number) and a 6-character invite code the
+// driver redeems from the mobile app.
+export async function inviteDriver(payload, token) {
+    return apiFetch('/api/drivers/invite', { method: 'POST', token, body: payload });
+}
+
+// The backend half of the driver app's "Forgot your PIN? Contact dispatch"
+// copy — clears the driver's PIN so they're prompted to set a new one at
+// their next sign-in, without sending them through invite-code entry again.
+export async function resetDriverPin(userId, token) {
+    return apiFetch(`/api/users/${userId}/reset-driver-pin`, { method: 'POST', token });
+}
+
+// Vehicles with no driver currently assigned — used to populate the
+// optional "assign a vehicle now" picker in the Invite Driver form.
+export async function fetchUnassignedVehicles(token) {
+    const vehicles = await apiFetch('/api/vehicles', { method: 'GET', token });
+    return vehicles.filter((v) => !v.currentDriverId);
+}
+
+// Driver compliance documents (national ID, license, vehicle registration,
+// insurance, roadworthiness certificate) — admin review queue.
+export async function fetchDriverDocuments(token) {
+    return apiFetch('/api/driver-documents', { method: 'GET', token });
+}
+
+export async function updateDriverDocumentStatus(id, status, rejectionReason, token) {
+    return apiFetch(`/api/driver-documents/${id}/status`, {
+        method: 'PATCH',
+        token,
+        body: { status, rejectionReason },
+    });
 }

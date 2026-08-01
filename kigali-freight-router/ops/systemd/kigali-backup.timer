@@ -1,0 +1,14 @@
+[Unit]
+Description=Run kigali-backup.service daily
+
+[Timer]
+# Staggered rather than exactly midnight, so it doesn't compete with
+# every other cron/systemd job on the host that defaults to 00:00.
+OnCalendar=*-*-* 02:17:00
+# If the host was off/asleep at 02:17, run once on next boot instead of
+# silently skipping a whole day's backup.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

@@ -5,7 +5,10 @@ import pool from '../config/db.js';
 import { io } from '../server.js';
 import { ok, fail } from '../utils/httpResponse.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
-import { uploadDeliveryPhoto } from '../config/r2Client.js';
+import { uploadDeliveryPhoto, toSignedUrl } from '../config/r2Client.js';
+import { isDriverVerified } from '../services/driverVerificationService.js';
+import { logError } from '../utils/logger.js';
+import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
 
@@ -54,7 +57,7 @@ export const OrderController = {
             const result = await pool.query(query, [username]);
             return ok(res, result.rows);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'DRIVER_ASSIGNMENTS_FETCH_FAILED',
@@ -102,9 +105,16 @@ export const OrderController = {
             `;
 
             const result = await pool.query(query, [username]);
-            return ok(res, result.rows);
+            // photo_url stores the object's storage KEY, not a public URL
+            // (the bucket is private) — sign a short-lived download link
+            // per row at response time instead.
+            const rows = await Promise.all(result.rows.map(async (row) => ({
+                ...row,
+                photo_url: await toSignedUrl(row.photo_url),
+            })));
+            return ok(res, rows);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'DRIVER_COMPLETED_FETCH_FAILED',
@@ -134,7 +144,7 @@ export const OrderController = {
             const result = await pool.query(query);
             return ok(res, result.rows);
         } catch (error) {
-            console.error("Database Error:", error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_ACTIVE_FETCH_FAILED',
@@ -157,6 +167,20 @@ export const OrderController = {
                     status: 400,
                     code: 'ORDERS_HUB_REQUIRED',
                     message: 'A pickup hub is required.',
+                });
+            }
+            if (!isValidWeightKg(weight_kg)) {
+                return fail(res, {
+                    status: 400,
+                    code: 'ORDERS_INVALID_WEIGHT',
+                    message: 'Weight must be a positive number of kilograms.',
+                });
+            }
+            if (!isValidLat(delivery_lat) || !isValidLng(delivery_lng)) {
+                return fail(res, {
+                    status: 400,
+                    code: 'ORDERS_INVALID_DELIVERY_COORDINATES',
+                    message: 'Delivery latitude must be between -90 and 90, and longitude between -180 and 180.',
                 });
             }
 
@@ -223,7 +247,7 @@ export const OrderController = {
 
             return ok(res, { message: "Order logged successfully.", order: newOrder }, { status: 201 });
         } catch (error) {
-            console.error("Database Error:", error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_CREATE_FAILED',
@@ -295,6 +319,19 @@ export const OrderController = {
                 });
             }
             const vehicle = vehicleResult.rows[0];
+
+            // A driver can log in as soon as their account is approved, but
+            // that's not the same as being cleared to actually carry cargo
+            // — block dispatch until all 5 required compliance documents
+            // (see driverVerificationService.js) are admin-approved.
+            if (!(await isDriverVerified(client, driverName))) {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: 'ORDERS_ASSIGN_DRIVER_UNVERIFIED',
+                    message: `${driverName} has not completed document verification yet.`,
+                });
+            }
 
             // Select matching pending orders using a FOR UPDATE lock to freeze rows until transaction completes
             const verificationQuery = `SELECT id, weight_kg FROM orders WHERE id = ANY($1) AND status = 'PENDING' FOR UPDATE;`;
@@ -371,7 +408,7 @@ export const OrderController = {
             });
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error("Transaction Aborted! Safe Rollback Executed:", error.message);
+            logError(req, 'Transaction aborted, rollback executed', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_ASSIGN_FAILED',
@@ -398,7 +435,7 @@ export const OrderController = {
             );
             return ok(res, result.rows);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_IN_FLIGHT_FETCH_FAILED',
@@ -494,6 +531,15 @@ export const OrderController = {
             }
             const vehicle = vehicleResult.rows[0];
 
+            if (!(await isDriverVerified(client, nextDriver))) {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: 'ORDERS_ASSIGN_DRIVER_UNVERIFIED',
+                    message: `${nextDriver} has not completed document verification yet.`,
+                });
+            }
+
             if (vehicle.max_weight_kg !== null) {
                 const currentLoadResult = await client.query(
                     `SELECT COALESCE(SUM(weight_kg), 0) AS total
@@ -549,7 +595,7 @@ export const OrderController = {
             return ok(res, { message: `Reassigned to ${nextDriver}.`, order: updateResult.rows[0] });
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_REASSIGN_FAILED',
@@ -635,7 +681,7 @@ export const OrderController = {
             return ok(res, { message: `Milestone updated to [${status}].`, order: updatedOrder });
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error("Database Error:", error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_STATUS_UPDATE_FAILED',
@@ -692,7 +738,11 @@ export const OrderController = {
             // Upload before writing any rows — if R2 isn't configured or the
             // upload fails, we want a clean early error, not a committed
             // confirmation row pointing at a photo that doesn't exist.
-            const photoUrl = await uploadDeliveryPhoto({
+            // Returns a storage KEY, not a URL — the bucket is private, so
+            // only a freshly-signed URL (generated below, just for this
+            // response) is ever handed to a client; the key is what's
+            // persisted to delivery_confirmations.photo_url.
+            const photoKey = await uploadDeliveryPhoto({
                 buffer: req.file.buffer,
                 mimeType: req.file.mimetype,
                 orderId: id,
@@ -719,7 +769,7 @@ export const OrderController = {
             await client.query(
                 `INSERT INTO delivery_confirmations (order_id, driver_name, photo_url, notes, distance_from_target_m, location_flagged)
                  VALUES ($1, $2, $3, $4, $5, $6);`,
-                [id, driverName, photoUrl, notes || null, distanceFromTargetM, locationFlagged]
+                [id, driverName, photoKey, notes || null, distanceFromTargetM, locationFlagged]
             );
 
             const updateResult = await client.query(
@@ -735,6 +785,7 @@ export const OrderController = {
             await client.query('COMMIT');
 
             const updatedOrder = updateResult.rows[0];
+            const photoUrl = await toSignedUrl(photoKey);
             io.emit('order:status-updated', {
                 orderId: updatedOrder.id,
                 status: updatedOrder.status,
@@ -750,12 +801,13 @@ export const OrderController = {
             return ok(res, { message: 'Delivery confirmed.', order: updatedOrder, photoUrl, locationFlagged, distanceFromTargetM });
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             const isStorageError = error.message?.includes('not configured');
+            const isFileTypeError = error.message?.includes('does not match an allowed');
             return fail(res, {
-                status: isStorageError ? 503 : 500,
-                code: isStorageError ? 'DELIVERY_PHOTO_STORAGE_UNAVAILABLE' : 'DELIVERY_CONFIRMATION_FAILED',
-                message: isStorageError ? error.message : 'Failed to confirm delivery.',
+                status: isStorageError ? 503 : isFileTypeError ? 400 : 500,
+                code: isStorageError ? 'DELIVERY_PHOTO_STORAGE_UNAVAILABLE' : isFileTypeError ? 'DELIVERY_PHOTO_INVALID_TYPE' : 'DELIVERY_CONFIRMATION_FAILED',
+                message: isStorageError || isFileTypeError ? error.message : 'Failed to confirm delivery.',
             });
         } finally {
             client.release();
@@ -782,9 +834,13 @@ export const OrderController = {
                  ORDER BY dc.confirmed_at DESC
                  LIMIT 50;`
             );
-            return ok(res, result.rows);
+            const rows = await Promise.all(result.rows.map(async (row) => ({
+                ...row,
+                photo_url: await toSignedUrl(row.photo_url),
+            })));
+            return ok(res, rows);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'DELIVERIES_FETCH_FAILED',
@@ -855,7 +911,7 @@ export const OrderController = {
 
             return ok(res, batches);
         } catch (error) {
-            console.error("Optimized PostGIS Index Error:", error.message);
+            logError(req, 'PostGIS index error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_POOLING_FAILED',
@@ -899,7 +955,7 @@ export const OrderController = {
 
             return ok(res, order);
         } catch (error) {
-            console.error('Database Error:', error.message);
+            logError(req, 'Database error', error);
             return fail(res, { status: 500, code: 'ORDERS_FETCH_FAILED', message: 'Failed to read order record.' });
         }
     },
@@ -917,7 +973,7 @@ export const OrderController = {
             const result = await pool.query(query, [id]);
             return ok(res, result.rows);
         } catch (error) {
-            console.error("Database Error:", error.message);
+            logError(req, 'Database error', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_HISTORY_FAILED',
@@ -985,7 +1041,7 @@ export const OrderController = {
                 recommendedDrivers: recommendations
             });
         } catch (error) {
-            console.error("🚨 Spatial Dispatch Matcher Failure:", error.message);
+            logError(req, 'Spatial dispatch matcher failure', error);
             return fail(res, {
                 status: 500,
                 code: 'ORDERS_NEAREST_DRIVERS_FAILED',

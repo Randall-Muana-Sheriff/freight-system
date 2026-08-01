@@ -103,7 +103,7 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
                         {editingId ? `Editing hub #${editingId}` : 'New hub'}
                     </div>
                     {editingId && (
-                        <button type="button" onClick={resetForm} className="text-steel hover:text-paper">
+                        <button type="button" onClick={resetForm} aria-label="Cancel editing" title="Cancel editing" className="text-steel hover:text-paper">
                             <X size={12} strokeWidth={2.5} />
                         </button>
                     )}

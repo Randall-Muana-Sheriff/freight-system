@@ -6,19 +6,52 @@ export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, draw
   const { userRole, savedGeofences, saveGeofence, deleteGeofence } = useSocket();
   const [newFenceName, setNewFenceName] = useState('');
   const [newFenceSpeedLimit, setNewFenceSpeedLimit] = useState('60');
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState(null);
 
+  // Previously had no try/catch at all — a failed save (network drop,
+  // 500, stale-fence-already-deleted race) left the draw-mode form open
+  // with no error shown and the drawn points silently kept, with no
+  // indication anything went wrong for a safety-critical feature
+  // (speed-limit geofences).
   const handleSave = async () => {
     if (!newFenceName || drawnPoints.length < 3) return;
-    await saveGeofence({ name: newFenceName, points: drawnPoints, speedLimitKmh: newFenceSpeedLimit });
-    setNewFenceName('');
-    setNewFenceSpeedLimit('60');
-    setDrawnPoints([]);
-    setDrawModeActive(false);
+    setSaving(true);
+    setError(null);
+    try {
+      await saveGeofence({ name: newFenceName, points: drawnPoints, speedLimitKmh: newFenceSpeedLimit });
+      setNewFenceName('');
+      setNewFenceSpeedLimit('60');
+      setDrawnPoints([]);
+      setDrawModeActive(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (fenceId) => {
+    setError(null);
+    setDeletingId(fenceId);
+    try {
+      await deleteGeofence(fenceId);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
     <>
       <div className="bg-panel border border-line/10 p-3 rounded-md text-xs">
+        {error && (
+          <div className="mb-2 p-2 bg-rust/10 border border-rust/30 rounded text-[11px] text-rust font-mono">
+            {error}
+          </div>
+        )}
         {drawModeActive ? (
           <div className="space-y-2">
             <input
@@ -36,9 +69,9 @@ export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, draw
               <span className="text-[10px] text-steel font-mono">KM/H</span>
             </div>
             <div className="flex gap-2">
-              <button onClick={handleSave} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-tarp text-ink font-bold rounded text-[10px] uppercase">
+              <button onClick={handleSave} disabled={saving} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-tarp text-ink font-bold rounded text-[10px] uppercase disabled:opacity-50">
                 <ShieldCheck size={12} strokeWidth={2.5} />
-                Commit bounds
+                {saving ? 'Saving...' : 'Commit bounds'}
               </button>
               <button onClick={() => { setDrawModeActive(false); setDrawnPoints([]); }} className="py-1.5 px-3 bg-ink border border-line/15 text-steel font-bold rounded text-[10px] uppercase">Clear</button>
             </div>
@@ -67,9 +100,13 @@ export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, draw
                   <span className="text-[9px] text-hazard font-mono">Limit: {fence.speedLimitKmh} km/h</span>
                 </div>
                 {(userRole === 'admin' || userRole === 'dispatcher') && (
-                  <button onClick={() => deleteGeofence(fence.id)} className="flex items-center gap-1 text-[9px] bg-rust/10 border border-rust/30 hover:bg-rust/20 text-rust py-0.5 px-2.5 rounded font-bold uppercase">
+                  <button
+                    onClick={() => handleDelete(fence.id)}
+                    disabled={deletingId === fence.id}
+                    className="flex items-center gap-1 text-[9px] bg-rust/10 border border-rust/30 hover:bg-rust/20 text-rust py-0.5 px-2.5 rounded font-bold uppercase disabled:opacity-50"
+                  >
                     <Trash2 size={10} strokeWidth={2.5} />
-                    Delete
+                    {deletingId === fence.id ? '...' : 'Delete'}
                   </button>
                 )}
               </div>

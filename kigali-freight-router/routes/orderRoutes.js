@@ -2,16 +2,43 @@ import { Router } from 'express';
 import multer from 'multer';
 import { OrderController } from '../controllers/orderController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
 
 // Delivery confirmation photos are held in memory only long enough to
 // stream to R2 - never written to local disk, and capped at 8MB (a phone
-// camera photo comfortably fits; this just guards against abuse).
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+// camera photo comfortably fits; this just guards against abuse). The
+// fileFilter is a cheap first-pass rejection on the declared mimetype;
+// the authoritative check is the byte-level signature check in
+// config/r2Client.js (assertRealFileType), since a client can lie about
+// Content-Type — this filter just avoids wasting an upload attempt on an
+// obviously-wrong file before that check even runs.
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 8 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (['image/jpeg', 'image/png'].includes(file.mimetype)) return cb(null, true);
+        cb(new Error('Only JPEG or PNG photos are accepted.'));
+    },
+});
+
+// Order creation and status changes are authenticated dispatcher/driver
+// actions, not public — this exists to blunt a runaway client retry loop
+// or a compromised session rather than to constrain normal dispatch pace.
+const orderWriteLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 200, keyPrefix: 'order-write' });
+// Photo uploads are heavier (network + storage cost) than a plain status
+// PATCH, so they get their own, tighter limit, keyed per-driver rather
+// than per-IP since drivers are typically on carrier NAT/shared IPs.
+const uploadLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    keyPrefix: 'order-upload',
+    keyFn: (req) => req.user?.username || req.ip,
+});
 
 // Manifest & Tracking Routes
-router.post('/', authMiddleware(['admin', 'dispatcher']), OrderController.createOrder);
+router.post('/', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.createOrder);
 router.get('/active', authMiddleware(['admin', 'dispatcher']), OrderController.getActiveOrders);
 router.get('/driver/assignments', authMiddleware(['admin', 'driver', 'dispatcher']), OrderController.getDriverAssignments);
 router.get('/driver/completed', authMiddleware(['admin', 'driver', 'dispatcher']), OrderController.getMyCompletedDeliveries);
@@ -25,14 +52,15 @@ router.get('/in-flight', authMiddleware(['admin', 'dispatcher']), OrderControlle
 router.get('/:id', authMiddleware(['admin', 'dispatcher', 'driver']), OrderController.getOrderById);
 
 // Dispatch Routing & Driver Assignment Trigger
-router.post('/assign', authMiddleware(['admin', 'dispatcher']), OrderController.assignOrderBundle);
-router.patch('/:id/reassign', authMiddleware(['admin', 'dispatcher']), OrderController.reassignOrder);
+router.post('/assign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.assignOrderBundle);
+router.patch('/:id/reassign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.reassignOrder);
 
 // Delivery Lifecycle Milestone Route
-router.patch('/:id/status', authMiddleware(['admin', 'driver', 'dispatcher']), OrderController.updateOrderStatus);
+router.patch('/:id/status', authMiddleware(['admin', 'driver', 'dispatcher']), orderWriteLimit, OrderController.updateOrderStatus);
 router.post(
     '/:id/confirm-delivery',
     authMiddleware(['admin', 'driver', 'dispatcher']),
+    uploadLimit,
     upload.single('photo'),
     OrderController.confirmDelivery
 );

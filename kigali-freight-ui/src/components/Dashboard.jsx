@@ -2,13 +2,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { useRoutes } from '../utils/useRoutes';
+import { fetchDriverBreadcrumbs } from '../utils/api';
 import TopCommandBar from './TopCommandBar';
 import OperationsRail from './OperationsRail';
 import SecondaryPanel from './SecondaryPanel';
 import FleetMap from './FleetMap';
 
 export default function Dashboard() {
-    const { jwtToken, calculateRoadMatrixETA, socket } = useSocket();
+    const { jwtToken, calculateRoadMatrixETA, socket, resolveDriverName } = useSocket();
     const { routes: savedRoutes, loading: routesLoading, refreshRoutes } = useRoutes(jwtToken);
 
     // Geofence drawing
@@ -77,6 +78,9 @@ export default function Dashboard() {
     const [optimizedRoutes, setOptimizedRoutes] = useState([]);
     const trailLimit = 15;
 
+    // Historical breadcrumbs (live telemetry trail, not a committed route)
+    const [breadcrumbsLoading, setBreadcrumbsLoading] = useState(false);
+
     // Real-time synchronization event listener via Socket.io
     useEffect(() => {
         if (!socket) return;
@@ -131,6 +135,24 @@ export default function Dashboard() {
             setPlaybackCoords([]);
             playbackCoordsRef.current = [];
             setPlaybackIndex(0);
+        }
+    };
+
+    const loadBreadcrumbsForPlayback = async (driverName, hours) => {
+        setBreadcrumbsLoading(true);
+        setIsPlaying(false);
+        try {
+            const result = await fetchDriverBreadcrumbs(driverName, jwtToken, { hours });
+            const points = result.trail || [];
+            setSelectedPlaybackRoute({ id: `breadcrumbs:${driverName}`, label: `${resolveDriverName(driverName)} · last ${hours}h · ${result.survivingPointsCount} pts` });
+            setPlaybackCoords(points);
+            playbackCoordsRef.current = points;
+            setPlaybackIndex(0);
+        } catch (err) {
+            console.error('Failed to load driver breadcrumbs:', err);
+            alert(err.message || 'Failed to load breadcrumbs for this driver.');
+        } finally {
+            setBreadcrumbsLoading(false);
         }
     };
 
@@ -196,6 +218,8 @@ export default function Dashboard() {
                     selectedPlaybackRoute={selectedPlaybackRoute}
                     loadRouteForPlayback={loadRouteForPlayback}
                     togglePlaybackPlay={togglePlaybackPlay}
+                    onLoadBreadcrumbs={loadBreadcrumbsForPlayback}
+                    breadcrumbsLoading={breadcrumbsLoading}
                     drawModeActive={drawModeActive}
                     setDrawModeActive={setDrawModeActive}
                     drawnPoints={drawnPoints}

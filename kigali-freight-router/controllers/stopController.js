@@ -3,6 +3,7 @@ import pool from '../config/db.js';
 import { io } from '../server.js';
 import { appendAuditLog } from '../services/auditLogService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
+import { isValidLat, isValidLng, isValidDemand } from '../utils/validators.js';
 
 export const StopController = {
     // GET pending stops
@@ -31,7 +32,21 @@ export const StopController = {
                 message: 'Name, latitude, and longitude are required.',
             });
         }
-        
+        if (!isValidLat(lat) || !isValidLng(lng)) {
+            return fail(res, {
+                status: 400,
+                code: 'STOPS_INVALID_COORDINATES',
+                message: 'Latitude must be between -90 and 90, and longitude between -180 and 180.',
+            });
+        }
+        if (demand !== undefined && !isValidDemand(demand)) {
+            return fail(res, {
+                status: 400,
+                code: 'STOPS_INVALID_DEMAND',
+                message: 'Demand must be a positive number.',
+            });
+        }
+
         try {
             const result = await pool.query(
                 `INSERT INTO delivery_stops (name, lat, lng, demand, status) VALUES ($1, $2, $3, $4, 'PENDING') RETURNING *`,

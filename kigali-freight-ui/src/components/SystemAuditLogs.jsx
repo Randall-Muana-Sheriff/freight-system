@@ -5,7 +5,7 @@ import { apiFetch } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 
 export default function SystemAuditLogs() {
-    const { jwtToken, userRole, socket } = useSocket();
+    const { jwtToken, userRole, socket, resolveDriverName } = useSocket();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -66,16 +66,16 @@ export default function SystemAuditLogs() {
                 </div>
             )}
 
-            <div className="max-h-40 overflow-y-auto space-y-1">
+            <div className="max-h-[560px] overflow-y-auto space-y-1.5">
                 {logs.length === 0 && !loading && (
                     <div className="text-steel text-center py-2">No audit events recorded yet.</div>
                 )}
                 {logs.map((log, idx) => (
-                    <div key={log.id || idx} className="bg-ink/60 p-2 rounded border border-line/10 flex justify-between items-start text-[10px]">
+                    <div key={log.id || idx} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-start text-[10px]">
                         <div>
                             <span className="text-carbon font-bold uppercase">[{log.actionType}]</span>{' '}
                             <span className="text-steel">{log.description}</span>
-                            <div className="text-[9px] text-steel/70 mt-0.5">Operator: {log.username || 'System'}</div>
+                            <div className="text-[9px] text-steel/70 mt-0.5">Operator: {log.username ? resolveDriverName(log.username) : 'System'}</div>
                         </div>
                         <span className="text-[9px] text-steel font-mono whitespace-nowrap ml-2">
                             {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}

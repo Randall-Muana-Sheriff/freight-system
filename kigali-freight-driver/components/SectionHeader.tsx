@@ -1,4 +1,4 @@
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../lib/theme';
 
 export function SectionHeader({ title, subtitle, eyebrow = 'Manifest' }: { title: string; subtitle?: string; eyebrow?: string }) {
@@ -14,8 +14,6 @@ export function SectionHeader({ title, subtitle, eyebrow = 'Manifest' }: { title
   );
 }
 
-const mono = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
-
 const styles = StyleSheet.create({
   wrap: { marginBottom: 14 },
   tagWrap: {
@@ -25,14 +23,14 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 4,
+    borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.panelSoft,
     borderWidth: 1,
     borderColor: theme.colors.border,
     marginBottom: 10,
   },
   tagDot: { width: 6, height: 6, borderRadius: 99, backgroundColor: theme.colors.primary },
-  tag: { color: theme.colors.muted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: mono },
-  title: { color: theme.colors.text, fontSize: 21, fontWeight: '900', letterSpacing: -0.2 },
-  subtitle: { color: theme.colors.muted, fontSize: 13, marginTop: 5, lineHeight: 18 },
+  tag: { color: theme.colors.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: theme.fonts.mono },
+  title: { color: theme.colors.text, fontSize: 21, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.2 },
+  subtitle: { color: theme.colors.muted, fontSize: 13, marginTop: 5, lineHeight: 18, fontFamily: theme.fonts.body },
 });

@@ -1,19 +1,19 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
-import { InlineBanner, type BannerTone } from '../../components/InlineBanner';
+import { ToastOverlay } from '../../components/ToastOverlay';
+import { ImageViewerModal } from '../../components/ImageViewerModal';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { changePassword, fetchMyVehicle, fetchMyCompletedDeliveries, type MyVehicle, type CompletedDelivery } from '../../lib/api';
+import { fetchMyProfile, fetchMyVehicle, fetchMyCompletedDeliveries, fetchMyDocuments, type MyProfile, type MyVehicle, type CompletedDelivery } from '../../lib/api';
 import { getTrackingDiagnostics, sendTestLocationPing } from '../../lib/locationTracking';
 
-const mono = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
-
 type Diagnostics = Awaited<ReturnType<typeof getTrackingDiagnostics>>;
-type Banner = { tone: BannerTone; icon: keyof typeof Ionicons.glyphMap; message: string };
+type Toast = { icon: keyof typeof Ionicons.glyphMap; message: string };
 type Tone = 'good' | 'bad' | 'neutral';
 
 const TONE_COLOR: Record<Tone, string> = {
@@ -34,10 +34,59 @@ function overallLocationStatus(diagnostics: Diagnostics | null) {
   if (blocked) {
     return { label: 'Needs attention', tone: 'bad' as Tone, detail: "Dispatch can't see your location until you allow it in Settings." };
   }
+  if (diagnostics.hasStarted && diagnostics.foregroundStatus === 'granted' && diagnostics.backgroundStatus !== 'granted') {
+    // Previously this fell into the "Active" branch below — foreground
+    // tracking genuinely is running, but background permission was never
+    // granted (most commonly just never explicitly asked/answered, i.e.
+    // 'undetermined', not an outright 'denied') rather than a hardware/
+    // permission a driver would think to check. The visible effect is the
+    // same either way: the moment this driver backgrounds the app or locks
+    // their phone, their marker on dispatch's map goes stale with nothing
+    // in the app having told them that would happen.
+    return {
+      label: 'Foreground only',
+      tone: 'neutral' as Tone,
+      detail: 'Dispatch only sees your position while this app is open. Allow "All the time" in Settings to keep sharing while your phone is locked.',
+    };
+  }
   if (diagnostics.hasStarted && diagnostics.foregroundStatus === 'granted') {
     return { label: 'Active', tone: 'good' as Tone, detail: 'Your position is being shared with dispatch.' };
   }
   return { label: 'Not set up', tone: 'neutral' as Tone, detail: "Location sharing hasn't started yet." };
+}
+
+// A bordered card per section, per the dispatcher-provided design — the
+// driver is reviewing distinct, dispatch-owned facts about themselves
+// (vehicle specs, connectivity health, security settings), not scanning one
+// continuous manifest, so a boxed layout reads better here than the flat
+// divided lists used elsewhere in the app.
+function Card({
+  icon,
+  title,
+  summary,
+  summaryTone,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  summary?: string;
+  summaryTone?: Tone;
+  children: ReactNode;
+}) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name={icon} size={17} color={theme.colors.primary} />
+        <Text style={styles.cardTitle}>{title}</Text>
+        {summary ? (
+          <Text style={[styles.cardSummary, summaryTone ? { color: TONE_COLOR[summaryTone] } : null]} numberOfLines={1}>
+            {summary}
+          </Text>
+        ) : null}
+      </View>
+      <View style={styles.cardBody}>{children}</View>
+    </View>
+  );
 }
 
 function StatusRow({ label, value, tone }: { label: string; value: string; tone: Tone }) {
@@ -71,36 +120,47 @@ function formatDeliveredDate(value?: string | null) {
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function ProfileScreen() {
-  const { username, token, pendingSyncCount, signOut } = useAuth();
+  const { token, pendingSyncCount, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
+  const [profile, setProfile] = useState<MyProfile | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [sendingPing, setSendingPing] = useState(false);
-  const [pingBanner, setPingBanner] = useState<Banner | null>(null);
+  const [pingToast, setPingToast] = useState<Toast | null>(null);
+  const [togglingBiometric, setTogglingBiometric] = useState(false);
 
   // undefined = still loading; null = confirmed there isn't one yet.
   const [vehicle, setVehicle] = useState<MyVehicle | null | undefined>(undefined);
   const [completedDeliveries, setCompletedDeliveries] = useState<CompletedDelivery[] | undefined>(undefined);
-
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [passwordShowErrors, setPasswordShowErrors] = useState(false);
-  const [passwordBanner, setPasswordBanner] = useState<Banner | null>(null);
+  const [documentsVerified, setDocumentsVerified] = useState<boolean | null | undefined>(undefined);
+  const [approvedDocCount, setApprovedDocCount] = useState(0);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
 
   const loadDiagnostics = async () => {
     setDiagnostics(await getTrackingDiagnostics());
   };
 
-  useEffect(() => {
-    loadDiagnostics();
-    if (!token) return;
-    fetchMyVehicle(token)
-      .then(setVehicle)
-      .catch(() => setVehicle(null));
-    fetchMyCompletedDeliveries(token)
-      .then(setCompletedDeliveries)
-      .catch(() => setCompletedDeliveries([]));
-  }, [token]);
+  // useFocusEffect (not a plain useEffect) so this re-runs every time the
+  // tab is switched back to — tab screens stay mounted in the background,
+  // so a plain mount-only effect would keep showing whatever was fetched on
+  // the very first visit.
+  useFocusEffect(
+    useCallback(() => {
+      loadDiagnostics();
+      if (!token) return;
+      fetchMyProfile(token).then(setProfile).catch(() => setProfile(null));
+      fetchMyVehicle(token)
+        .then(setVehicle)
+        .catch(() => setVehicle(null));
+      fetchMyCompletedDeliveries(token)
+        .then(setCompletedDeliveries)
+        .catch(() => setCompletedDeliveries([]));
+      fetchMyDocuments(token)
+        .then((data) => {
+          setDocumentsVerified(data.verified);
+          setApprovedDocCount(data.checklist.filter((d) => d.status === 'approved').length);
+        })
+        .catch(() => setDocumentsVerified(null));
+    }, [token])
+  );
 
   const deliveredThisWeekCount = (completedDeliveries || []).filter((item) => {
     if (!item.confirmed_at) return false;
@@ -115,145 +175,106 @@ export default function ProfileScreen() {
   const onSendPing = async () => {
     if (!token) return;
     setSendingPing(true);
-    setPingBanner(null);
+    setPingToast(null);
     try {
       const result = await sendTestLocationPing(token);
       await loadDiagnostics();
       if (result.ok) {
-        setPingBanner({ tone: 'success', icon: 'checkmark-circle-outline', message: `Sent — dispatch now sees you at ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.` });
+        setPingToast({ icon: 'checkmark-circle-outline', message: `Sent — dispatch now sees you at ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.` });
       } else {
-        setPingBanner({ tone: 'danger', icon: 'alert-circle-outline', message: result.error });
+        setPingToast({ icon: 'alert-circle-outline', message: result.error });
       }
     } finally {
       setSendingPing(false);
     }
   };
 
-  const currentPasswordMissing = passwordShowErrors && !currentPassword;
-  const newPasswordMissing = passwordShowErrors && !newPassword;
-  const newPasswordTooShort = passwordShowErrors && !!newPassword && newPassword.length < 8;
-  const confirmMismatch = passwordShowErrors && !!confirmPassword && newPassword !== confirmPassword;
-
-  const onChangePassword = async () => {
-    if (!token) return;
-    if (!currentPassword || newPassword.length < 8 || newPassword !== confirmPassword) {
-      setPasswordShowErrors(true);
-      setPasswordBanner({ tone: 'danger', icon: 'alert-circle-outline', message: 'Check the fields below and try again.' });
-      return;
-    }
-
-    setChangingPassword(true);
-    setPasswordBanner(null);
+  const onToggleBiometric = async () => {
+    setTogglingBiometric(true);
     try {
-      await changePassword(token, currentPassword, newPassword);
-      // Changing the password revokes every session server-side, including
-      // this one — an explicit, blocking confirmation here (rather than the
-      // inline banners used elsewhere) is deliberate: the driver needs to
-      // understand why they're about to land back on the login screen.
-      Alert.alert('Password updated', 'Please sign in again with your new password.', [
-        {
-          text: 'OK',
-          onPress: async () => {
-            await signOut();
-            router.replace('/(auth)/login');
-          },
-        },
-      ]);
-    } catch (error) {
-      setPasswordBanner({
-        tone: 'danger',
-        icon: 'alert-circle-outline',
-        message: error instanceof Error ? error.message : 'Failed to update password.',
-      });
+      if (biometricEnabled) {
+        await disableBiometric();
+      } else {
+        await enableBiometric();
+      }
     } finally {
-      setChangingPassword(false);
+      setTogglingBiometric(false);
     }
   };
 
   const locationStatus = overallLocationStatus(diagnostics);
+  const displayName = profile?.fullName || 'Driver';
+  const initial = displayName.trim().charAt(0).toUpperCase();
 
   return (
+    <>
     <ScreenShell>
       <SectionHeader eyebrow="Operator" title="Profile" subtitle="Account, location sharing, and security." />
 
       <View style={styles.identityCard}>
         <View style={styles.avatar}>
-          <Ionicons name="person-outline" size={28} color={theme.colors.primary} />
+          <Text style={styles.avatarInitial}>{initial}</Text>
         </View>
-        <Text style={styles.name}>{username || 'Driver'}</Text>
-        <Text style={styles.role}>Assigned driver account</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{displayName}</Text>
+          {documentsVerified === true ? <Ionicons name="checkmark-circle" size={18} color={theme.colors.success} /> : null}
+        </View>
+        {profile?.staffId ? (
+          <View style={styles.staffBadge}>
+            <Ionicons name="id-card-outline" size={12} color={theme.colors.primary} />
+            <Text style={styles.staffBadgeText}>{profile.staffId} · Freight Driver</Text>
+          </View>
+        ) : null}
+        {vehicle ? (
+          <View style={styles.identityVehiclePill}>
+            <Ionicons name="car-outline" size={12} color={theme.colors.muted} />
+            <Text style={styles.identityVehicleText}>{vehicle.plateNumber}</Text>
+          </View>
+        ) : null}
       </View>
 
-      <Text style={styles.sectionLabel}>Your vehicle</Text>
-      <View style={styles.card}>
+      {documentsVerified === false ? (
+        <TouchableOpacity onPress={() => router.push('/(app)/documents')} activeOpacity={0.7} style={styles.notice}>
+          <View style={[styles.noticeRail, { backgroundColor: theme.colors.warning }]} />
+          <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.noticeTitle}>Verification incomplete</Text>
+            <Text style={styles.noticeDetail}>
+              {approvedDocCount} of 5 documents approved — assignments are withheld until verification is complete.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+        </TouchableOpacity>
+      ) : documentsVerified === true ? (
+        <View style={styles.notice}>
+          <View style={[styles.noticeRail, { backgroundColor: theme.colors.success }]} />
+          <Ionicons name="checkmark-circle-outline" size={18} color={theme.colors.success} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.noticeTitle}>Verified</Text>
+            <Text style={styles.noticeDetail}>All required documents are approved.</Text>
+          </View>
+        </View>
+      ) : null}
+
+      <Card icon="car-outline" title="Vehicle">
         {vehicle === undefined ? (
           <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
         ) : vehicle ? (
-          <>
-            <View style={styles.vehicleHeaderRow}>
-              <View style={styles.vehicleIconWrap}>
-                <Ionicons name="car-outline" size={22} color={theme.colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.vehiclePlate}>{vehicle.plateNumber}</Text>
-                <Text style={styles.vehicleType}>{vehicle.vehicleType.replace(/_/g, ' ')}</Text>
-              </View>
-            </View>
-            <View style={styles.statusRows}>
-              <InfoRow label="Max weight" value={vehicle.maxWeightKg != null ? `${Number(vehicle.maxWeightKg).toFixed(0)} kg` : 'Not recorded'} />
-              <InfoRow label="Max range" value={vehicle.maxRangeKm != null ? `${Number(vehicle.maxRangeKm).toFixed(0)} km` : 'Not recorded'} />
-            </View>
-          </>
+          <View style={styles.statusRows}>
+            <InfoRow label="Type" value={vehicle.vehicleType.replace(/_/g, ' ')} />
+            <InfoRow label="Max weight" value={vehicle.maxWeightKg != null ? `${Number(vehicle.maxWeightKg).toFixed(0)} kg` : 'Not recorded'} />
+            <InfoRow label="Max range" value={vehicle.maxRangeKm != null ? `${Number(vehicle.maxRangeKm).toFixed(0)} km` : 'Not recorded'} />
+            <InfoRow label="Plate" value={vehicle.plateNumber} />
+          </View>
         ) : (
           <View style={styles.emptyInline}>
             <Ionicons name="car-outline" size={20} color={theme.colors.muted} />
             <Text style={styles.emptyInlineText}>No vehicle assigned yet — contact dispatch to get one.</Text>
           </View>
         )}
-      </View>
+      </Card>
 
-      <Text style={styles.sectionLabel}>Delivery history</Text>
-      <View style={styles.card}>
-        {completedDeliveries === undefined ? (
-          <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
-        ) : completedDeliveries.length === 0 ? (
-          <View style={styles.emptyInline}>
-            <Ionicons name="checkmark-done-circle-outline" size={20} color={theme.colors.muted} />
-            <Text style={styles.emptyInlineText}>No completed deliveries yet — they'll show up here once you deliver your first job.</Text>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.historyStat}>
-              <Text style={styles.historyStatNumber}>{deliveredThisWeekCount}</Text> delivered this week
-            </Text>
-            <View style={{ gap: 8 }}>
-              {completedDeliveries.slice(0, 8).map((item) => (
-                <View key={item.id} style={styles.historyRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.historyTitle} numberOfLines={1}>{item.cargo_description || `Shipment #${item.id}`}</Text>
-                    <Text style={styles.historyMeta}>{item.origin_hub_name || 'Origin unknown'} · {formatDeliveredDate(item.confirmed_at)}</Text>
-                  </View>
-                  {item.photo_url ? (
-                    <TouchableOpacity onPress={() => Linking.openURL(item.photo_url as string)} hitSlop={8}>
-                      <Ionicons name="image-outline" size={18} color={theme.colors.accent} />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-            {completedDeliveries.length > 8 ? (
-              <Text style={styles.historyMore}>+{completedDeliveries.length - 8} more in your history</Text>
-            ) : null}
-          </>
-        )}
-      </View>
-
-      <Text style={styles.sectionLabel}>Connectivity</Text>
-      <View style={styles.card}>
-        {pingBanner ? (
-          <InlineBanner tone={pingBanner.tone} icon={pingBanner.icon} message={pingBanner.message} onDismiss={() => setPingBanner(null)} />
-        ) : null}
-
+      <Card icon="radio-outline" title="Connectivity" summary={locationStatus?.label} summaryTone={locationStatus?.tone}>
         {locationStatus ? (
           <View style={styles.overallStatusRow}>
             <Ionicons
@@ -261,8 +282,11 @@ export default function ProfileScreen() {
               size={20}
               color={TONE_COLOR[locationStatus.tone]}
             />
+            {/* The status word itself (Active / Needs attention / Not set
+                up) already reads as the card's summary badge up in the
+                header — repeating it again in bold right here added no
+                information, just the same word twice in two sizes. */}
             <View style={{ flex: 1 }}>
-              <Text style={[styles.overallStatusLabel, { color: TONE_COLOR[locationStatus.tone] }]}>{locationStatus.label}</Text>
               <Text style={styles.overallStatusDetail}>{locationStatus.detail}</Text>
             </View>
           </View>
@@ -283,229 +307,223 @@ export default function ProfileScreen() {
         ) : null}
 
         {locationStatus?.tone === 'bad' ? (
-          <TouchableOpacity style={styles.settingsButton} activeOpacity={0.9} onPress={() => Linking.openSettings()}>
-            <Ionicons name="settings-outline" size={15} color={theme.colors.paper} />
-            <Text style={styles.settingsButtonText}>Open Settings</Text>
+          <TouchableOpacity style={styles.dangerButton} activeOpacity={0.9} onPress={() => Linking.openSettings()}>
+            <Ionicons name="settings-outline" size={15} color={theme.colors.ink} />
+            <Text style={styles.primaryButtonText}>Open Settings</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.pingButton} onPress={onSendPing} activeOpacity={0.9} disabled={sendingPing}>
+          <TouchableOpacity style={styles.primaryButton} onPress={onSendPing} activeOpacity={0.9} disabled={sendingPing}>
             {sendingPing ? (
-              <ActivityIndicator color={theme.colors.paper} />
+              <ActivityIndicator color={theme.colors.ink} />
             ) : (
               <>
-                <Ionicons name="navigate-outline" size={16} color={theme.colors.paper} />
-                <Text style={styles.pingButtonText}>Send a location update now</Text>
+                <Ionicons name="navigate-outline" size={16} color={theme.colors.ink} />
+                <Text style={styles.primaryButtonText}>Send a location update now</Text>
               </>
             )}
           </TouchableOpacity>
         )}
-      </View>
+      </Card>
 
-      <Text style={styles.sectionLabel}>Security</Text>
-      <View style={styles.card}>
-        {passwordBanner ? (
-          <InlineBanner tone={passwordBanner.tone} icon={passwordBanner.icon} message={passwordBanner.message} onDismiss={() => setPasswordBanner(null)} />
-        ) : null}
+      <Card icon="key-outline" title="Security">
+        <View style={styles.statusRows}>
+          <InfoRow label="Sign-in method" value="4-digit PIN" />
+        </View>
 
-        <Text style={styles.label}>Current password</Text>
-        <TextInput
-          secureTextEntry
-          placeholder="••••••••"
-          placeholderTextColor={theme.colors.muted}
-          style={[styles.input, currentPasswordMissing && styles.inputError]}
-          value={currentPassword}
-          onChangeText={(value) => {
-            setCurrentPassword(value);
-            setPasswordBanner(null);
-          }}
-        />
-        {currentPasswordMissing ? <Text style={styles.fieldError}>Enter your current password.</Text> : null}
+        <View style={styles.biometricRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.biometricTitle}>Biometric login</Text>
+            <Text style={styles.biometricDetail}>Unlock the app with your fingerprint or face instead of your PIN.</Text>
+          </View>
+          <TouchableOpacity
+            onPress={onToggleBiometric}
+            disabled={togglingBiometric}
+            style={[styles.toggle, biometricEnabled && styles.toggleOn]}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.toggleKnob, biometricEnabled && styles.toggleKnobOn]} />
+          </TouchableOpacity>
+        </View>
 
-        <Text style={styles.label}>New password</Text>
-        <TextInput
-          secureTextEntry
-          placeholder="At least 8 characters"
-          placeholderTextColor={theme.colors.muted}
-          style={[styles.input, (newPasswordMissing || newPasswordTooShort) && styles.inputError]}
-          value={newPassword}
-          onChangeText={(value) => {
-            setNewPassword(value);
-            setPasswordBanner(null);
-          }}
-        />
-        {newPasswordMissing ? <Text style={styles.fieldError}>Enter a new password.</Text> : null}
-        {!newPasswordMissing && newPasswordTooShort ? <Text style={styles.fieldError}>Must be at least 8 characters.</Text> : null}
+        <Text style={styles.microcopy}>Forgot your PIN? Contact your dispatcher to have it reset.</Text>
+      </Card>
 
-        <Text style={styles.label}>Confirm new password</Text>
-        <TextInput
-          secureTextEntry
-          placeholder="Re-enter new password"
-          placeholderTextColor={theme.colors.muted}
-          style={[styles.input, confirmMismatch && styles.inputError]}
-          value={confirmPassword}
-          onChangeText={(value) => {
-            setConfirmPassword(value);
-            setPasswordBanner(null);
-          }}
-        />
-        {confirmMismatch ? <Text style={styles.fieldError}>Passwords don't match.</Text> : null}
-
-        <TouchableOpacity activeOpacity={0.9} style={styles.pingButton} onPress={onChangePassword} disabled={changingPassword}>
-          {changingPassword ? (
-            <ActivityIndicator color={theme.colors.paper} />
-          ) : (
-            <>
-              <Ionicons name="key-outline" size={16} color={theme.colors.paper} />
-              <Text style={styles.pingButtonText}>Update password</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        <Text style={styles.microcopy}>You'll need to sign in again afterward, on every device.</Text>
-      </View>
-
-      <Text style={styles.sectionLabel}>Support</Text>
-      <View style={styles.card}>
+      <Card icon="help-buoy-outline" title="Support">
         <Text style={styles.supportText}>
-          If you lose connectivity, keep the app open — queued updates sync automatically once you're back in range.
+          If you lose connectivity, keep the app open — queued updates sync automatically once you&apos;re back in range.
         </Text>
         <TouchableOpacity style={styles.supportButton} activeOpacity={0.9} onPress={() => router.push('/(app)/incidents')}>
-          <Ionicons name="warning-outline" size={15} color={theme.colors.warning} />
+          <Ionicons name="warning-outline" size={15} color={theme.colors.danger} />
           <Text style={styles.supportButtonText}>Report an issue</Text>
         </TouchableOpacity>
-      </View>
+      </Card>
 
-      <TouchableOpacity onPress={logout} style={styles.logout} activeOpacity={0.9}>
+      {completedDeliveries === undefined || completedDeliveries.length > 0 ? (
+        <Card icon="time-outline" title="Delivery history" summary={completedDeliveries && completedDeliveries.length > 0 ? `${deliveredThisWeekCount} this week` : undefined}>
+          {completedDeliveries === undefined ? (
+            <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
+          ) : (
+            <>
+              <View>
+                {completedDeliveries.slice(0, 8).map((item) => (
+                  <View key={item.id} style={styles.historyRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.historyTitle} numberOfLines={1}>{item.cargo_description || `Shipment #${item.id}`}</Text>
+                      <Text style={styles.historyMeta}>{item.origin_hub_name || 'Origin unknown'} · {formatDeliveredDate(item.confirmed_at)}</Text>
+                    </View>
+                    {item.photo_url ? (
+                      <TouchableOpacity onPress={() => setViewingPhoto(item.photo_url as string)} hitSlop={8}>
+                        <Ionicons name="image-outline" size={18} color={theme.colors.accent} />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+              {completedDeliveries.length > 8 ? (
+                <Text style={styles.historyMore}>+{completedDeliveries.length - 8} more in your history</Text>
+              ) : null}
+            </>
+          )}
+        </Card>
+      ) : null}
+
+      <TouchableOpacity onPress={logout} style={styles.logout} activeOpacity={0.7}>
         <Ionicons name="log-out-outline" size={16} color={theme.colors.danger} />
         <Text style={styles.logoutText}>Sign out</Text>
       </TouchableOpacity>
     </ScreenShell>
+    <ImageViewerModal url={viewingPhoto} onClose={() => setViewingPhoto(null)} />
+    <ToastOverlay message={pingToast?.message ?? null} icon={pingToast?.icon ?? 'alert-outline'} onHide={() => setPingToast(null)} />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   identityCard: {
-    borderRadius: 10,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 24,
+    marginBottom: 16,
+    backgroundColor: theme.colors.surface2,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.panel,
-    alignItems: 'center',
-    padding: 24,
-    gap: 6,
-    marginBottom: 24,
   },
   avatar: {
     width: 68,
     height: 68,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,138,61,0.14)',
+    borderRadius: 34,
+    backgroundColor: `${theme.colors.primary}22`,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  name: { color: theme.colors.text, fontSize: 22, fontWeight: '900' },
-  role: { color: theme.colors.muted, fontSize: 13 },
-  sectionLabel: {
-    color: theme.colors.muted,
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    fontFamily: mono,
-    marginBottom: 10,
+  avatarInitial: { color: theme.colors.primary, fontSize: 26, fontFamily: theme.fonts.headingBlack },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  name: { color: theme.colors.text, fontSize: 22, fontFamily: theme.fonts.headingBlack },
+  staffBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: theme.radius.pill,
+    backgroundColor: theme.colors.panelSoft,
+    marginTop: 6,
   },
+  staffBadgeText: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.8 },
+  identityVehiclePill: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  identityVehicleText: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.mono },
+  notice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  noticeRail: { width: 3, height: 28, borderRadius: 2 },
+  noticeTitle: { color: theme.colors.text, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  noticeDetail: { color: theme.colors.muted, fontSize: 11, lineHeight: 15, marginTop: 2, fontFamily: theme.fonts.body },
   card: {
-    padding: 16,
-    borderRadius: 10,
+    backgroundColor: theme.colors.surface2,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.panel,
-    gap: 12,
-    marginBottom: 24,
+    padding: 18,
+    marginBottom: 16,
   },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  cardTitle: { flex: 1, color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  cardSummary: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.bodySemiBold, maxWidth: 130 },
+  cardBody: { gap: 12 },
   overallStatusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  overallStatusLabel: { fontSize: 15, fontWeight: '800' },
-  overallStatusDetail: { color: theme.colors.muted, fontSize: 12, marginTop: 2, lineHeight: 17 },
-  statusRows: { gap: 8, paddingTop: 4, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  overallStatusDetail: { color: theme.colors.muted, fontSize: 12, marginTop: 2, lineHeight: 17, fontFamily: theme.fonts.body },
+  statusRows: { gap: 10 },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statusLabel: { color: theme.colors.muted, fontSize: 12 },
+  statusLabel: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.body },
   statusValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 7, height: 7, borderRadius: 99 },
-  statusValue: { fontSize: 12, fontWeight: '700' },
-  infoValue: { color: theme.colors.text, fontSize: 12, fontWeight: '700' },
-  vehicleHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  vehicleIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,138,61,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vehiclePlate: { color: theme.colors.text, fontSize: 17, fontWeight: '800' },
-  vehicleType: { color: theme.colors.muted, fontSize: 12, marginTop: 2, textTransform: 'capitalize' },
+  statusValue: { fontSize: 12, fontFamily: theme.fonts.bodySemiBold },
+  infoValue: { color: theme.colors.text, fontSize: 12, fontFamily: theme.fonts.bodySemiBold, textTransform: 'capitalize' },
   emptyInline: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  emptyInlineText: { flex: 1, color: theme.colors.muted, fontSize: 13, lineHeight: 18 },
-  historyStat: { color: theme.colors.muted, fontSize: 13 },
-  historyStatNumber: { color: theme.colors.text, fontWeight: '900', fontSize: 14 },
+  emptyInlineText: { flex: 1, color: theme.colors.muted, fontSize: 13, lineHeight: 18, fontFamily: theme.fonts.body },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: theme.colors.panelSoft,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    paddingVertical: 10,
   },
-  historyTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '700' },
-  historyMeta: { color: theme.colors.muted, fontSize: 11, marginTop: 2, fontFamily: mono },
-  historyMore: { color: theme.colors.muted, fontSize: 11, textAlign: 'center' },
-  pingButton: {
+  historyTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  historyMeta: { color: theme.colors.muted, fontSize: 11, marginTop: 2, fontFamily: theme.fonts.mono },
+  historyMore: { color: theme.colors.muted, fontSize: 11, textAlign: 'center', fontFamily: theme.fonts.body },
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: theme.colors.primary,
-    borderRadius: 6,
-    paddingVertical: 13,
+    borderRadius: theme.radius.pill,
+    paddingVertical: 14,
   },
-  pingButtonText: { color: theme.colors.paper, fontSize: 13, fontWeight: '800' },
-  settingsButton: {
+  primaryButtonText: { color: theme.colors.ink, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  dangerButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: theme.colors.danger,
-    borderRadius: 6,
-    paddingVertical: 13,
+    borderRadius: theme.radius.pill,
+    paddingVertical: 14,
   },
-  settingsButtonText: { color: theme.colors.paper, fontSize: 13, fontWeight: '800' },
-  label: { color: theme.colors.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontFamily: mono, marginTop: 4 },
-  input: {
-    borderRadius: 6,
+  biometricRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
+  biometricTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  biometricDetail: { color: theme.colors.muted, fontSize: 11, lineHeight: 15, marginTop: 2, fontFamily: theme.fonts.body },
+  toggle: {
+    width: 46,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: theme.colors.panelSoft,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    padding: 13,
-    color: theme.colors.text,
-    fontSize: 14,
+    padding: 3,
+    justifyContent: 'center',
   },
-  inputError: { borderColor: theme.colors.danger },
-  fieldError: { color: theme.colors.danger, fontSize: 11, marginTop: -6 },
-  microcopy: { color: theme.colors.muted, fontSize: 11, textAlign: 'center', marginTop: -2 },
-  supportText: { color: theme.colors.muted, fontSize: 13, lineHeight: 18 },
-  supportButton: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
-  supportButtonText: { color: theme.colors.warning, fontSize: 13, fontWeight: '800' },
+  toggleOn: { backgroundColor: `${theme.colors.primary}33`, borderColor: theme.colors.primary },
+  toggleKnob: { width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.muted },
+  toggleKnobOn: { backgroundColor: theme.colors.primary, alignSelf: 'flex-end' },
+  microcopy: { color: theme.colors.muted, fontSize: 11, textAlign: 'center', marginTop: 14, fontFamily: theme.fonts.body },
+  supportText: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, fontFamily: theme.fonts.body },
+  supportButton: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 12 },
+  supportButtonText: { color: theme.colors.danger, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
   logout: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(193,68,46,0.14)',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(193,68,46,0.28)',
+    marginTop: 8,
     paddingVertical: 14,
   },
-  logoutText: { color: theme.colors.danger, fontSize: 15, fontWeight: '800' },
+  logoutText: { color: theme.colors.danger, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
 });
