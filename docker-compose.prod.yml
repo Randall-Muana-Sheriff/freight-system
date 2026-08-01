@@ -40,6 +40,15 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      # The base file hardcodes this as a literal (not a ${VAR}
+      # interpolation at all), so there was no way to override it via any
+      # env file — the router silently kept rejecting every browser
+      # request from the real production dashboard's origin with CORS
+      # errors, even though direct API calls (curl, which doesn't enforce
+      # CORS) worked fine. Required in production: a wrong or missing
+      # value here should fail the deploy loudly, not silently fall back
+      # to an origin no real browser will ever be making requests from.
+      CORS_ORIGIN: ${CORS_ORIGIN:?Set CORS_ORIGIN in .env.production to your real https://dispatch.yourcompany.com}
       # The base file aliases these to the local MinIO container's own
       # credentials — fine for dev (MinIO stands in for R2 there), but it
       # meant this override was required to actually reach real Cloudflare
