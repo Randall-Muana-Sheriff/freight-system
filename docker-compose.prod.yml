@@ -25,6 +25,19 @@ services:
 
   router:
     ports: !reset []
+    # The base file makes minio-init a hard dependency (needed in dev so
+    # the bucket exists before the router starts). In production, without
+    # this override, `docker compose up postgres redis router ui caddy`
+    # silently pulls in minio + minio-init anyway as router's transitive
+    # dependencies — including publishing MinIO's ports (9000-9001)
+    # straight to the internet, which is exactly the kind of unnecessary
+    # open door this overlay exists to close. Overriding the full
+    # dependency map removes minio-init entirely.
+    depends_on: !override
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       NODE_ENV: production
       # The base file aliases these to the local MinIO container's own
