@@ -73,6 +73,20 @@ const config: ExpoConfig = {
         isAndroidForegroundServiceEnabled: true,
       },
     ],
+    // Uploads source maps for release builds so Sentry can de-minify stack
+    // traces. organization/project are not sensitive (they're the same
+    // slugs visible in the Sentry project URL) — the actual credential is
+    // SENTRY_AUTH_TOKEN, read at build time from .env.sentry-build-plugin
+    // (local builds, gitignored) or the EAS secret of the same name
+    // (cloud builds via `eas build`). Without that token present, this
+    // plugin just skips the upload step rather than failing the build.
+    [
+      '@sentry/react-native/expo',
+      {
+        organization: 'unilak',
+        project: 'kigali-freight-driver',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

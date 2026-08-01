@@ -1,6 +1,7 @@
 .env
 .env.local
 .env*.local
+.env.sentry-build-plugin
 google-services.json
 node_modules/
 .expo/
