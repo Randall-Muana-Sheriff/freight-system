@@ -27,6 +27,23 @@ services:
     ports: !reset []
     environment:
       NODE_ENV: production
+      # The base file aliases these to the local MinIO container's own
+      # credentials — fine for dev (MinIO stands in for R2 there), but it
+      # meant this override was required to actually reach real Cloudflare
+      # R2 in production, which never existed until now. Overriding the
+      # full set of keys here (Compose merges environment maps per-key)
+      # replaces the MinIO aliasing entirely. Left unset in .env.production,
+      # these resolve to empty strings, which config/r2Client.js's
+      # isConfigured() correctly treats as "not configured" — the router
+      # starts fine and just disables photo/document upload with a log
+      # warning, rather than requiring a real R2 account before anything
+      # else can go live.
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+      R2_PUBLIC_URL_BASE: ${R2_PUBLIC_URL_BASE:-}
 
   ui:
     ports: !reset []
