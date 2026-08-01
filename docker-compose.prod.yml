@@ -1,0 +1,59 @@
+# Production overlay — use together with the base file, never alone:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# What this changes relative to local dev:
+#   - Adds Caddy in front of router+ui for automatic HTTPS (see deploy/Caddyfile).
+#   - Stops publishing postgres/redis/router/ui ports directly to the host —
+#     on a real internet-facing machine, only Caddy's 80/443 should be
+#     reachable from outside; everything else talks over the compose
+#     network only. Locally these were fine to expose for convenience
+#     (`psql` from the host, hitting the API directly); in production
+#     they're an unnecessary open door.
+#   - Sets NODE_ENV=production on the router, which activates the safe-
+#     error-message behavior in utils/httpResponse.js (raw internal error
+#     detail is only ever included in non-production responses).
+#
+# What this deliberately does NOT do: choose a secrets manager for you, or
+# stand up a real host. See docs/deployment/README.md for both.
+
+services:
+  postgres:
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
+  router:
+    ports: !reset []
+    environment:
+      NODE_ENV: production
+
+  ui:
+    ports: !reset []
+    environment:
+      # Must be the real public HTTPS URL Caddy terminates — not
+      # localhost, and not the router's internal compose hostname (a
+      # browser/phone can't resolve "router", only Caddy's public domain).
+      API_BASE_URL: ${API_BASE_URL:?Set API_BASE_URL in .env.production to your real https://api.yourcompany.com}
+
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: kigali-freight-caddy
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env.production (e.g. api.yourcompany.com)}
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.production (e.g. dispatch.yourcompany.com)}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - router
+      - ui
+
+volumes:
+  caddy_data:
+  caddy_config:

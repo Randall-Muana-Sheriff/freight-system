@@ -1,0 +1,23 @@
+# Real, working reverse-proxy + automatic HTTPS config — not a stub.
+# Caddy requests and renews Let's Encrypt certificates for these two
+# domains entirely on its own; the only manual step is pointing DNS at
+# this host and setting the two env vars below before `docker compose up`.
+# See docs/deployment/README.md for the full walkthrough.
+#
+# Required env vars (set in .env.production, never committed):
+#   API_DOMAIN=api.yourcompany.com
+#   APP_DOMAIN=dispatch.yourcompany.com
+
+{$API_DOMAIN} {
+	reverse_proxy router:5000
+
+	# Socket.IO's websocket upgrade needs the same proxy target — Caddy
+	# handles the Upgrade/Connection headers automatically for
+	# reverse_proxy, this just documents that it's covered, not a gap.
+	encode gzip
+}
+
+{$APP_DOMAIN} {
+	reverse_proxy ui:80
+	encode gzip
+}

@@ -2,10 +2,17 @@
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": [".env*"],
   "globalEnv": [
-    "DATABASE_URL",
+    "DB_USER",
+    "DB_PASSWORD",
+    "DB_HOST",
+    "DB_PORT",
+    "DB_DATABASE",
     "JWT_SECRET",
     "REDIS_URL",
-    "NODE_ENV"
+    "NODE_ENV",
+    "ADMIN_USERNAME",
+    "ADMIN_PASSWORD",
+    "METRICS_TOKEN"
   ],
   "tasks": {
     "build": {

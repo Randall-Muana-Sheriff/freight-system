@@ -54,8 +54,8 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
-  test:
-    name: Tests
+  test-ui:
+    name: Tests (Web dashboard)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -68,14 +68,45 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: kigali-freight-ui/package-lock.json
 
       - name: Install dependencies
         run: npm ci
+        working-directory: kigali-freight-ui
 
-      - name: Run unit tests
+      - name: Run tests
         run: npm run test
+        working-directory: kigali-freight-ui
 
-  test:integration:
+  test-driver-unit:
+    name: Tests (Driver app)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: kigali-freight-driver/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: kigali-freight-driver
+
+      - name: Run tests
+        run: npm run test
+        working-directory: kigali-freight-driver
+
+  # Job id can't contain a colon — GitHub Actions job ids must match
+  # ^[a-zA-Z_][a-zA-Z0-9_-]*$. The previous "test:integration" id made this
+  # entire workflow file invalid, meaning NOTHING in it — lint, test,
+  # build, security audits — actually ran on any push or PR.
+  test-integration:
     name: Integration Tests (Router)
     runs-on: ubuntu-latest
     services:
@@ -101,6 +132,25 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+    # Shared by both steps below — config/appConfig.js requires DB_USER/
+    # DB_PASSWORD/DB_HOST/DB_PORT/DB_DATABASE individually (there is no
+    # DATABASE_URL support anywhere in this app); the previous version of
+    # this job only ever set DATABASE_URL, which the app silently ignored,
+    # so `npm run db:migrate` was failing here on "Missing required
+    # environment variable: DB_USER" before the test step ever ran.
+    # ADMIN_USERNAME/ADMIN_PASSWORD bootstrap the admin account
+    # tests/integration.test.js logs in as (self-signup no longer exists).
+    env:
+      DB_USER: freight
+      DB_PASSWORD: freight
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_DATABASE: kigali_freight
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-secret-key-for-ci-only
+      ADMIN_USERNAME: it_ci_admin
+      ADMIN_PASSWORD: TestAdminPass123!
+      METRICS_TOKEN: test-metrics-token-for-ci-only
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -116,20 +166,14 @@ jobs:
 
       - name: Run database migrations
         run: npm run db:migrate
-        env:
-          DATABASE_URL: postgres://freight:freight@localhost:5432/kigali_freight
 
       - name: Run integration tests
         run: npm run test:integration
-        env:
-          DATABASE_URL: postgres://freight:freight@localhost:5432/kigali_freight
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: test-secret-key-for-ci-only
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test-ui, test-driver-unit]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -164,16 +208,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Audit dependencies
-        run: npm audit --audit-level=high --if-present
+        run: npm audit --workspace=kigali-freight-router --audit-level=high
 
       - name: Check for outdated packages
-        run: npm outdated || true
+        run: npm outdated --workspace=kigali-freight-router || true
 
-  test:driver:
+  test-driver:
     name: Driver App (TypeCheck + Lint)
     runs-on: ubuntu-latest
     steps:
@@ -213,13 +254,8 @@ jobs:
           cache: 'npm'
           cache-dependency-path: kigali-freight-ui/package-lock.json
 
-      - name: Install UI dependencies
-        run: npm ci
-        working-directory: kigali-freight-ui
-
       - name: Audit UI dependencies
-        run: npm audit --audit-level=high --if-present
-        working-directory: kigali-freight-ui
+        run: npm audit --workspace=kigali-freight-ui --audit-level=high
 
   security-audit-driver:
     name: Security Audit (Driver)
@@ -235,30 +271,30 @@ jobs:
           cache: 'npm'
           cache-dependency-path: kigali-freight-driver/package-lock.json
 
-      - name: Install driver dependencies
-        run: npm ci
-        working-directory: kigali-freight-driver
-
       - name: Audit driver dependencies
-        run: npm audit --audit-level=high --if-present
-        working-directory: kigali-freight-driver
+        run: npm audit --workspace=kigali-freight-driver --audit-level=high
 
-  # Deploy to staging on develop branch
+  # Deploy to staging on develop branch. This step is intentionally a
+  # placeholder, not a fake success — there is currently no real staging
+  # host or deploy credentials configured anywhere in this repo. See
+  # docs/deployment/ for the real, activatable deploy scaffolding (SSH +
+  # docker-compose.staging.yml) and what's needed to turn this from a echo
+  # into a real deployment.
   deploy-staging:
     name: Deploy Staging
     runs-on: ubuntu-latest
-    needs: [build, test:integration, security-audit, test:driver, security-audit-ui, security-audit-driver]
+    needs: [build, test-integration, security-audit, test-driver, security-audit-ui, security-audit-driver]
     if: github.ref == 'refs/heads/develop'
     environment: staging
     steps:
-      - name: Deploy to staging
-        run: echo "Deploy to staging environment"
+      - name: Deploy to staging (placeholder — see docs/deployment/README.md)
+        run: echo "No staging host configured yet. See docs/deployment/README.md to activate this step."
 
 # Deploy to production on main branch
   # deploy-production:
   #   name: Deploy Production
   #   runs-on: ubuntu-latest
-  #   needs: [build, test:integration, security-audit]
+  #   needs: [build, test-integration, security-audit]
   #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
   #   environment: production
   #   steps:
