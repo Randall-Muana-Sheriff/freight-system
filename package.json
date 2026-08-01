@@ -14,7 +14,7 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "db:migrate": "turbo run db:migrate --filter=router",
+    "db:migrate": "turbo run db:migrate --filter=kigali-freight-router",
     "docker:build": "turbo run docker:build",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
@@ -28,6 +28,6 @@
   },
   "packageManager": "npm@10.8.0",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.22.0"
   }
 }
