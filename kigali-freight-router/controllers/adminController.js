@@ -7,6 +7,7 @@ import { ok, fail, errorMessage } from '../utils/httpResponse.js';
 import { normalizePhone, generateInviteCode } from '../utils/phone.js';
 import { sendSms } from '../services/smsService.js';
 import { revokeAllRefreshTokensForUser } from '../services/refreshTokenService.js';
+import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
 const INVITE_CODE_TTL_HOURS = 48;
 
@@ -20,12 +21,30 @@ function hashCode(code) {
 const STAFF_ROLES = ['admin', 'dispatcher'];
 
 export const AdminController = {
+    // `verified`/`hasVehicle` are only meaningful for role='driver' rows
+    // (null for staff accounts) — computed here with the exact same
+    // "all 5 required documents approved" definition isDriverVerified
+    // uses for actual assignment enforcement, so the dispatcher's driver
+    // picker (which filters on these) can never drift out of sync with
+    // what the backend will actually allow.
     getUsers: async (req, res) => {
         try {
             const result = await pool.query(
-                `SELECT id, username, role, status,
-                        phone_number AS "phoneNumber", staff_id AS "staffId", full_name AS "fullName"
-                 FROM users ORDER BY id DESC`
+                `SELECT u.id, u.username, u.role, u.status,
+                        u.phone_number AS "phoneNumber", u.staff_id AS "staffId", u.full_name AS "fullName",
+                        CASE WHEN u.role = 'driver' THEN COALESCE(dv.approved_count, 0) = $1 ELSE NULL END AS verified,
+                        CASE WHEN u.role = 'driver' THEN EXISTS (
+                            SELECT 1 FROM fleet_vehicles fv WHERE fv.current_driver_id = u.id
+                        ) ELSE NULL END AS "hasVehicle"
+                 FROM users u
+                 LEFT JOIN (
+                     SELECT username, COUNT(*)::int AS approved_count
+                     FROM driver_documents
+                     WHERE document_type = ANY($2::text[]) AND status = 'approved'
+                     GROUP BY username
+                 ) dv ON dv.username = u.username
+                 ORDER BY u.id DESC;`,
+                [REQUIRED_DOCUMENT_TYPES.length, REQUIRED_DOCUMENT_TYPES]
             );
             return ok(res, result.rows);
         } catch (error) {
