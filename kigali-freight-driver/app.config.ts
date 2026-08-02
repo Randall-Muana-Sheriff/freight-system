@@ -4,7 +4,13 @@ const config: ExpoConfig = {
   name: 'Kigali Freight Driver',
   slug: 'kigali-freight-driver',
   scheme: 'kigali-freight-driver',
-  version: '1.0.0',
+  // Bumped for the Expo SDK 54→57 upgrade (React Native 0.81→0.86 and
+  // every native module along with it) — required so this build gets a
+  // genuinely different runtimeVersion (policy: 'appVersion', see below)
+  // than the old SDK-54 build. Sharing a runtimeVersion across two
+  // natively-incompatible builds would let EAS Update think a JS-only
+  // update from one is safe to serve to the other.
+  version: '1.1.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
@@ -32,9 +38,6 @@ const config: ExpoConfig = {
   updates: {
     url: 'https://u.expo.dev/2047b750-f546-42e2-8e5e-ea92fddf6296',
   },
-  splash: {
-    backgroundColor: '#050C18',
-  },
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: false,
@@ -42,7 +45,9 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.muana.kigalifreightdriver',
-    edgeToEdgeEnabled: true,
+    // Edge-to-edge is mandatory (no opt-out) as of Android 16 / this SDK —
+    // the old edgeToEdgeEnabled toggle was removed since there's nothing
+    // left to toggle.
     adaptiveIcon: {
       foregroundImage: './assets/icon.png',
       backgroundColor: '#050C18',

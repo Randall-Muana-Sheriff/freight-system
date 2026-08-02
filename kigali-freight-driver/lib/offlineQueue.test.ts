@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { updateOrderStatus, reportIncident, confirmDelivery } from './api';
 import {
@@ -78,9 +79,9 @@ jest.mock('./api', () => ({
     confirmDelivery: jest.fn(),
 }));
 
-const mockUpdateOrderStatus = updateOrderStatus as jest.Mock;
-const mockReportIncident = reportIncident as jest.Mock;
-const mockConfirmDelivery = confirmDelivery as jest.Mock;
+const mockUpdateOrderStatus = jest.mocked(updateOrderStatus);
+const mockReportIncident = jest.mocked(reportIncident);
+const mockConfirmDelivery = jest.mocked(confirmDelivery);
 
 describe('offlineQueue', () => {
     beforeEach(async () => {

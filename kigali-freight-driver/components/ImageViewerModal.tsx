@@ -31,7 +31,7 @@ export function ImageViewerModal({ url, onClose }: { url: string | null; onClose
             onLoadEnd={() => setLoading(false)}
           />
         ) : null}
-        {loading ? <ActivityIndicator style={StyleSheet.absoluteFillObject} color={theme.colors.primary} pointerEvents="none" /> : null}
+        {loading ? <ActivityIndicator style={StyleSheet.absoluteFill} color={theme.colors.primary} pointerEvents="none" /> : null}
       </View>
     </Modal>
   );

@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import * as SecureStore from 'expo-secure-store';
 import {
     setTokens,
@@ -26,6 +27,12 @@ jest.mock('expo-secure-store', () => {
     };
 });
 
+// jest.fn() with no type args defaults to a `never`-argument mock under
+// the current @jest/globals types — fetch is mocked with plain
+// fetch-response-like stubs here, not real Response objects, so this
+// loosely-typed alias is what actually matches how it's used below.
+type FetchMock = jest.Mock<(...args: unknown[]) => Promise<unknown>>;
+
 const mockSecureStore = SecureStore as unknown as {
     getItemAsync: jest.Mock;
     setItemAsync: jest.Mock;
@@ -37,7 +44,7 @@ describe('tokenStore', () => {
     beforeEach(async () => {
         mockSecureStore.__store.clear();
         mockSecureStore.getItemAsync.mockClear();
-        global.fetch = jest.fn();
+        global.fetch = jest.fn() as unknown as typeof fetch;
         await clearTokens();
     });
 
@@ -86,7 +93,7 @@ describe('tokenStore', () => {
 
         it('on success, stores the new token pair and returns the new access token', async () => {
             await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
-            (global.fetch as jest.Mock).mockResolvedValue({
+            (global.fetch as unknown as FetchMock).mockResolvedValue({
                 ok: true,
                 json: async () => ({ data: { token: 'new-access', refreshToken: 'new-refresh' } }),
             });
@@ -102,7 +109,7 @@ describe('tokenStore', () => {
 
         it('clears tokens and returns null when the server rejects the refresh token (expired/revoked)', async () => {
             await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
-            (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+            (global.fetch as unknown as FetchMock).mockResolvedValue({ ok: false });
 
             const result = await refreshAccessToken('http://api.test');
 
@@ -112,7 +119,7 @@ describe('tokenStore', () => {
 
         it('does NOT clear tokens on a network failure — a transient blip should not force sign-out', async () => {
             await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
-            (global.fetch as jest.Mock).mockRejectedValue(new Error('Network request failed'));
+            (global.fetch as unknown as FetchMock).mockRejectedValue(new Error('Network request failed'));
 
             const result = await refreshAccessToken('http://api.test');
 
@@ -127,7 +134,7 @@ describe('tokenStore', () => {
         it('shares one in-flight request across concurrent callers instead of firing a refresh storm', async () => {
             await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
             let resolveFetch: (value: unknown) => void = () => {};
-            (global.fetch as jest.Mock).mockReturnValue(
+            (global.fetch as unknown as FetchMock).mockReturnValue(
                 new Promise((resolve) => { resolveFetch = resolve; })
             );
 

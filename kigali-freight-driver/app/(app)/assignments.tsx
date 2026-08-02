@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { router, useFocusEffect } from 'expo-router';
 import { ScreenShell } from '../../components/ScreenShell';
 import { AssignmentCard } from '../../components/AssignmentCard';
 import { SectionHeader } from '../../components/SectionHeader';

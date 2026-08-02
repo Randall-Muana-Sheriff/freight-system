@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ColorValue } from 'react-native';
 import { Redirect, Tabs, usePathname, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -8,7 +8,7 @@ import { useAuth } from '../../lib/auth';
 import { useNotificationResponseHandler } from '../../lib/pushNotifications';
 import { useTabBarMetrics } from '../../lib/tabBarMetrics';
 
-function TabIcon({ name, color, size }: { name: keyof typeof Ionicons.glyphMap; color: string; size: number }) {
+function TabIcon({ name, color, size }: { name: keyof typeof Ionicons.glyphMap; color: ColorValue; size: number }) {
   return <Ionicons name={name} size={size} color={color} />;
 }
 
