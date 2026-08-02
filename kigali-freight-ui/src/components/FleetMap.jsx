@@ -8,6 +8,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { useSocket } from '../context/SocketContext';
+import { useMapInteraction } from '../context/MapInteractionContext';
 import { truckIcon, flagIcon, hubIcon, getVehicleIcon, VEHICLE_TYPE_LEGEND } from '../utils/mapIcons';
 import { classifyFreshness, formatLastSeen, useNow } from '../utils/telemetryFreshness';
 import MapSizeFix from './map/MapSizeFix';
@@ -17,16 +18,17 @@ import FullscreenControl from './map/FullscreenControl';
 import LocateControl from './map/LocateControl';
 import ScaleBarControl from './map/ScaleBarControl';
 
-export default function FleetMap({
-  drawModeActive, drawnPoints, setDrawnPoints,
-  dispatchTargetMode, dispatchLocation, setDispatchLocation, onDispatchClick,
-  trailLimit, playbackCoords, playbackIndex,
-  optimizedRoutes = [],
-  stopTargetMode, setStopTargetMode, newStopCoords, setNewStopCoords,
-  orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
-  hubTargetMode, setHubTargetMode, newHubCoords, setNewHubCoords
-}) {
+export default function FleetMap() {
   const { jwtToken, savedGeofences, savedHubs, routeHistories, trackedAssets, activeBreachedDrivers, resolveDriverName } = useSocket();
+  const {
+    drawModeActive, drawnPoints, setDrawnPoints,
+    dispatchTargetMode, dispatchLocation, setDispatchLocation, handleDispatchClick: onDispatchClick,
+    trailLimit, playbackCoords, playbackIndex,
+    optimizedRoutes,
+    stopTargetMode, setStopTargetMode, newStopCoords, setNewStopCoords,
+    orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
+    hubTargetMode, setHubTargetMode, newHubCoords, setNewHubCoords,
+  } = useMapInteraction();
   const now = useNow();
   // Trails are opt-in per vehicle rather than always-on for the whole
   // fleet — with many vehicles moving at once, a permanent breadcrumb line

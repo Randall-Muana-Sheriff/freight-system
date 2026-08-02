@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Map, Truck } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
+import { useMapInteraction } from '../context/MapInteractionContext';
 import DispatchPanel from './DispatchPanel';
 import RouteOptimizerPanel from './RouteOptimizerPanel';
 import RoutesPanel from './RoutesPanel';
@@ -19,15 +20,16 @@ const TABS = [
     { id: 'fleet', label: 'Fleet', icon: Truck, staffOnly: true },
 ];
 
-export default function SecondaryPanel({
-    dispatchTargetMode, setDispatchTargetMode, dispatchRankings,
-    setOptimizedRoutes, stopTargetMode, setStopTargetMode, newStopCoords,
-    savedRoutes, routesLoading, playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute, loadRouteForPlayback, togglePlaybackPlay,
-    onLoadBreadcrumbs, breadcrumbsLoading,
-    drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints,
-    hubTargetMode, setHubTargetMode, newHubCoords, clearNewHubCoords,
-}) {
+export default function SecondaryPanel() {
     const { userRole } = useSocket();
+    const {
+        dispatchTargetMode, setDispatchTargetMode, dispatchRankings,
+        setOptimizedRoutes, stopTargetMode, setStopTargetMode, newStopCoords,
+        savedRoutes, routesLoading, playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute, loadRouteForPlayback, togglePlaybackPlay,
+        loadBreadcrumbsForPlayback: onLoadBreadcrumbs, breadcrumbsLoading,
+        drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints,
+        hubTargetMode, setHubTargetMode, newHubCoords, clearNewHubCoords,
+    } = useMapInteraction();
     const [activeTab, setActiveTab] = useState('planning');
     const isStaff = userRole === 'admin' || userRole === 'dispatcher';
 
