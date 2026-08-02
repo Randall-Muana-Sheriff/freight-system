@@ -9,14 +9,25 @@ const config: ExpoConfig = {
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   // EAS Update: ships JS-only changes to an already-installed build over
-  // the air, no new native build/reinstall needed. "fingerprint" (not the
-  // more common "appVersion") computes runtime compatibility from the
-  // actual native code automatically — this project has already added
-  // two native modules (Sentry, NetInfo) without anyone thinking about a
-  // version bump each time, and appVersion's safety depends entirely on
-  // remembering to do that by hand. fingerprint can't be forgotten.
+  // the air, no new native build/reinstall needed.
+  //
+  // Originally set to "fingerprint" for exactly the reason described
+  // below — but real testing (not just reasoning about it) found that
+  // policy actively broken for this project's actual workflow: EAS
+  // builds run on Expo's cloud servers with a fresh dependency install,
+  // while `eas update` bundles JS using whatever's resolved locally —
+  // and fingerprint hashing is sensitive enough that these two
+  // environments computed different values with zero real native change
+  // between them, silently breaking update delivery (the app only
+  // accepts an update whose runtime version matches its own exactly).
+  // "appVersion" is less automatic (it depends on remembering to bump
+  // `version` below whenever a native module changes) but it's
+  // deterministic and doesn't depend on two separate environments
+  // agreeing on a native-dependency hash — bump `version` by hand after
+  // adding/upgrading any native module, exactly as this app's own
+  // history (Sentry, NetInfo) shows is a real, recurring event.
   runtimeVersion: {
-    policy: 'fingerprint',
+    policy: 'appVersion',
   },
   updates: {
     url: 'https://u.expo.dev/2047b750-f546-42e2-8e5e-ea92fddf6296',
