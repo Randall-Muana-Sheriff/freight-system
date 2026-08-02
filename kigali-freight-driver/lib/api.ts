@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { File, UploadType, type UploadResult } from 'expo-file-system';
 import { refreshAccessToken } from './tokenStore';
 
 function resolveApiBase() {
@@ -53,6 +54,35 @@ async function parseResponse(response: Response) {
 
   if (!response.ok && !acceptedResponse) {
     const message = payload?.error?.message || payload?.error || payload?.message || `Request failed with status ${response.status}`;
+    throw new Error(message);
+  }
+
+  if (acceptedResponse && payload == null) {
+    return { accepted: true };
+  }
+
+  if (payload && typeof payload === 'object' && 'success' in payload && 'data' in payload) {
+    return payload.data;
+  }
+
+  return payload;
+}
+
+// Same response-shape handling as parseResponse, but for expo-file-system's
+// File.upload() result — a plain {body, status, headers} object rather than
+// a fetch Response. Multipart uploads use this native upload API instead of
+// fetch+FormData: Expo's own global fetch replacement (see runtime.native.ts
+// in the expo package) only accepts real Blob/File parts, not the classic
+// React Native {uri, name, type} idiom, and doesn't reliably fall back to
+// React Native's own fetch either — File.upload() constructs the multipart
+// body in native code, sidestepping both JS fetch implementations entirely.
+function parseUploadResult(result: UploadResult) {
+  const contentType = result.headers?.['content-type'] || result.headers?.['Content-Type'] || '';
+  const payload = contentType.includes('application/json') && result.body ? JSON.parse(result.body) : null;
+  const acceptedResponse = result.status === 202;
+
+  if (result.status < 200 || (result.status >= 300 && !acceptedResponse)) {
+    const message = payload?.error?.message || payload?.error || payload?.message || `Request failed with status ${result.status}`;
     throw new Error(message);
   }
 
@@ -248,43 +278,36 @@ export async function fetchOrderById(token: string, orderId: number) {
   return (await apiFetch(`/api/orders/${orderId}`, { token })) as OrderDetail;
 }
 
-// Separate from apiFetch deliberately: multipart/form-data uploads need the
-// runtime to set Content-Type (with the multipart boundary) automatically
-// and must send a raw FormData body, not JSON.stringify'd — overloading
-// the JSON-only apiFetch helper for this one case would risk breaking it
-// for every other caller.
+// Separate from apiFetch deliberately: a multipart upload needs to build the
+// multipart body itself rather than JSON.stringify'ing it. Uses
+// expo-file-system's native File.upload() instead of fetch+FormData — see
+// the comment on parseUploadResult for why.
 export async function confirmDelivery(
   token: string,
   orderId: number,
   photo: { uri: string; fileName?: string; mimeType?: string },
   notes?: string
 ) {
-  const formData = new FormData();
-  formData.append('photo', {
-    uri: photo.uri,
-    name: photo.fileName || 'delivery-confirmation.jpg',
-    type: photo.mimeType || 'image/jpeg',
-  } as unknown as Blob);
-  if (notes) formData.append('notes', notes);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const file = new File(photo.uri);
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Network request failed (upload timed out)')), 30000);
+  });
 
   try {
-    const response = await fetch(`${API_BASE}/api/orders/${orderId}/confirm-delivery`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-      signal: controller.signal,
-    });
-    return await parseResponse(response);
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Network request failed (upload timed out)');
-    }
-    throw error;
+    const result = await Promise.race([
+      file.upload(`${API_BASE}/api/orders/${orderId}/confirm-delivery`, {
+        uploadType: UploadType.MULTIPART,
+        fieldName: 'photo',
+        mimeType: photo.mimeType || 'image/jpeg',
+        headers: { Authorization: `Bearer ${token}` },
+        parameters: notes ? { notes } : undefined,
+      }),
+      timeout,
+    ]);
+    return parseUploadResult(result);
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timeoutId!);
   }
 }
 
@@ -349,38 +372,32 @@ export async function fetchMyDocuments(token: string) {
 }
 
 // Separate from apiFetch deliberately, same as confirmDelivery — a
-// multipart upload needs the runtime to set Content-Type (with the
-// multipart boundary) automatically and must send a raw FormData body.
+// multipart upload needs to build the multipart body itself, via
+// expo-file-system's native File.upload() (see parseUploadResult).
 export async function uploadDriverDocument(
   token: string,
   documentType: DocumentType,
-  file: { uri: string; fileName?: string; mimeType?: string }
+  fileAsset: { uri: string; fileName?: string; mimeType?: string }
 ) {
-  const formData = new FormData();
-  formData.append('documentType', documentType);
-  formData.append('document', {
-    uri: file.uri,
-    name: file.fileName || `${documentType}.jpg`,
-    type: file.mimeType || 'image/jpeg',
-  } as unknown as Blob);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const file = new File(fileAsset.uri);
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Network request failed (upload timed out)')), 30000);
+  });
 
   try {
-    const response = await fetch(`${API_BASE}/api/driver-documents`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: formData,
-      signal: controller.signal,
-    });
-    return await parseResponse(response);
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Network request failed (upload timed out)');
-    }
-    throw error;
+    const result = await Promise.race([
+      file.upload(`${API_BASE}/api/driver-documents`, {
+        uploadType: UploadType.MULTIPART,
+        fieldName: 'document',
+        mimeType: fileAsset.mimeType || 'image/jpeg',
+        headers: { Authorization: `Bearer ${token}` },
+        parameters: { documentType },
+      }),
+      timeout,
+    ]);
+    return parseUploadResult(result);
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timeoutId!);
   }
 }
