@@ -9,6 +9,10 @@ node_modules/
 kigali-freight-driver/.git.bak-driver-only/
 .env
 .env.local
+# Credential files referenced by docker-compose.prod.yml's volume mounts
+# (e.g. the Firebase Admin service account) — live only on the deploy
+# host, never in the repo.
+/secrets/
 *.log
 npm-debug.log*
 dist/
