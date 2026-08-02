@@ -8,6 +8,19 @@ const config: ExpoConfig = {
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
+  // EAS Update: ships JS-only changes to an already-installed build over
+  // the air, no new native build/reinstall needed. "fingerprint" (not the
+  // more common "appVersion") computes runtime compatibility from the
+  // actual native code automatically — this project has already added
+  // two native modules (Sentry, NetInfo) without anyone thinking about a
+  // version bump each time, and appVersion's safety depends entirely on
+  // remembering to do that by hand. fingerprint can't be forgotten.
+  runtimeVersion: {
+    policy: 'fingerprint',
+  },
+  updates: {
+    url: 'https://u.expo.dev/2047b750-f546-42e2-8e5e-ea92fddf6296',
+  },
   splash: {
     backgroundColor: '#050C18',
   },
