@@ -18,7 +18,16 @@
 
 services:
   postgres:
-    ports: !reset []
+    # Loopback-only, not a public exposure: 127.0.0.1:5432 is reachable
+    # only from processes already running on this host, never from the
+    # internet — meaningfully different from the 0.0.0.0 binding this
+    # overlay exists to remove elsewhere. Needed so the host-level backup
+    # systemd timer (ops/systemd/) can run pg_dump directly; the
+    # alternative (bundling postgresql-client into the router's own
+    # Docker image just for a cron job) is more moving parts for the
+    # same result.
+    ports: !override
+      - '127.0.0.1:5432:5432'
 
   redis:
     ports: !reset []
