@@ -125,6 +125,9 @@ export const DriverDocumentController = {
             return ok(res, doc, { status: 201 });
         } catch (error) {
             const isFileTypeError = error.message?.includes('does not match an allowed');
+            if (!isFileTypeError) {
+                console.error(`❌ uploadDocument failed [${req.requestId || 'no-request-id'}]:`, error.stack || error.message);
+            }
             return fail(res, {
                 status: isFileTypeError ? 400 : 500,
                 code: isFileTypeError ? 'DRIVER_DOCUMENT_INVALID_FILE_TYPE' : 'DRIVER_DOCUMENT_UPLOAD_FAILED',
