@@ -98,7 +98,64 @@ database with a row-count sanity check** (not just "is the archive file
 listable" — see the comment at the top of `verify-backup.js` for why that
 distinction matters), then prunes anything older than 14 days.
 
-## 5. Confirm it's actually working
+## 5. Automate expired-code cleanup
+
+`otp_codes` and `driver_invites` otherwise grow forever — every driver
+login attempt writes a row that's only ever read once. Same pattern as
+backups, installed the same way:
+
+```bash
+sudo cp kigali-freight-router/ops/systemd/kigali-purge-auth-codes.* /etc/systemd/system/
+# Edit kigali-purge-auth-codes.service first: fix WorkingDirectory and
+# EnvironmentFile the same way you did for kigali-backup.service.
+sudo systemctl daemon-reload
+sudo systemctl enable --now kigali-purge-auth-codes.timer
+sudo systemctl list-timers kigali-purge-auth-codes.timer   # confirm it's scheduled
+```
+
+## 6. Continuous deployment (optional)
+
+`.github/workflows/ci.yml`'s `deploy-production` job automates exactly the
+manual `rsync` + `docker compose build && up -d` cycle described in step 3
+above — it runs on every push to `main`, only after every lint/typecheck/
+test/security-audit job in the same workflow has passed. To turn it on:
+
+1. Generate a dedicated deploy key (don't reuse a personal one):
+   `ssh-keygen -t ed25519 -f deploy_key -N ""`.
+2. Append `deploy_key.pub`'s contents to the production host's
+   `~/.ssh/authorized_keys` for the deploy user.
+3. In the GitHub repo: Settings → Secrets and variables → Actions → New
+   repository secret, named `PRODUCTION_SSH_KEY`, value = the full
+   contents of the private `deploy_key` file. Delete your local copy of
+   `deploy_key` once it's saved there.
+4. Push to `main` — the workflow's `deploy-production` job picks it up
+   automatically from then on. Its host/user/path are plain values in the
+   workflow file itself (not secrets — they're not exploitable without the
+   key), so update those directly if either ever changes.
+
+Until that secret exists, the job runs and fails loudly the moment the
+sync step tries to actually use the empty/invalid key, rather than
+silently doing nothing — a missing secret is a visible red X on the
+workflow run, not a deploy that quietly never happened.
+
+## 7. Driver app releases (optional)
+
+`.github/workflows/driver-eas.yml` automates the same `eas update`/
+`eas build` commands run by hand from a local machine all session: any
+push to `main` touching `kigali-freight-driver/` or `packages/` runs a
+typecheck/lint/test pass, then — only if that passes — publishes an OTA
+update to the `preview` branch/environment. A full native build (a new
+installable APK/IPA) is never automatic; trigger one manually from the
+GitHub repo's Actions tab → "Driver App - EAS" → Run workflow, choosing
+platform and build profile.
+
+To turn it on: generate a token at
+[expo.dev](https://expo.dev)/accounts/`<your account>`/settings/access-tokens,
+then add it as a repository secret named `EXPO_TOKEN` (same Settings →
+Secrets and variables → Actions page as above). Same fail-loudly behavior
+as the production deploy above if it's missing.
+
+## 8. Confirm it's actually working
 
 - `curl https://api.yourcompany.com/health` → `{"success":true,"data":{"status":"ok",...}}`
 - Open `https://dispatch.yourcompany.com` → the dispatcher login screen,

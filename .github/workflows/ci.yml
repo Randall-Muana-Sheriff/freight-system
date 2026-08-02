@@ -306,13 +306,66 @@ jobs:
       - name: Deploy to staging (placeholder — see docs/deployment/README.md)
         run: echo "No staging host configured yet. See docs/deployment/README.md to activate this step."
 
-# Deploy to production on main branch
-  # deploy-production:
-  #   name: Deploy Production
-  #   runs-on: ubuntu-latest
-  #   needs: [build, test-integration, security-audit]
-  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-  #   environment: production
-  #   steps:
-  #     - name: Deploy to production
-  #       run: echo "Deploy to production environment"
+  # Deploy to production on main branch. Only runs after every check above
+  # (including both security-audit jobs and the driver app's own
+  # typecheck/lint) has passed on main itself, never on a PR. Requires one
+  # repo secret: PRODUCTION_SSH_KEY (the private half of a key whose public
+  # half is already in freightadmin@api.inzira.systems's authorized_keys —
+  # see docs/deployment/README.md for how that host was set up). Host and
+  # user aren't secrets — they're not exploitable without the key — so
+  # they're plain values below rather than extra secrets to configure.
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: [build, test-integration, security-audit, test-driver, security-audit-ui, security-audit-driver]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    env:
+      PRODUCTION_HOST: api.inzira.systems
+      PRODUCTION_USER: freightadmin
+      PRODUCTION_PATH: freight-system
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$PRODUCTION_HOST" >> ~/.ssh/known_hosts
+
+      # Excludes the driver app entirely — neither the router nor the UI
+      # Docker build ever reads from it (see their Dockerfiles: only root
+      # package.json/package-lock.json, packages/, and their own directory
+      # are COPYed in), so shipping it here would just be dead weight.
+      # --delete keeps the server's checkout from drifting from the repo
+      # over time, but never touches anything matched by --exclude — so
+      # .env/.env.production/secrets/ (all server-only, never in git) are
+      # both skipped AND protected from deletion, not just skipped.
+      - name: Sync repository to production host
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='**/node_modules' \
+            --exclude='kigali-freight-driver' \
+            --exclude='.env' \
+            --exclude='.env.production' \
+            --exclude='.env.local' \
+            --exclude='secrets/' \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes" \
+            ./ "$PRODUCTION_USER@$PRODUCTION_HOST:$PRODUCTION_PATH/"
+
+      - name: Build and restart affected services
+        run: |
+          ssh -i ~/.ssh/deploy_key "$PRODUCTION_USER@$PRODUCTION_HOST" "
+            cd $PRODUCTION_PATH &&
+            docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml build router ui &&
+            docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d router ui
+          "
+
+      - name: Verify the deployed router is healthy
+        run: |
+          sleep 5
+          curl -sf "https://$PRODUCTION_HOST/health" || (echo "::error::Health check failed after deploy" && exit 1)
