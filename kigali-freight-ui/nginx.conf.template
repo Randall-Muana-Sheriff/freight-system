@@ -14,7 +14,13 @@ server {
     # (same reason /config.js exists), so it can't be hardcoded here.
     # style-src needs 'unsafe-inline': Leaflet positions every marker via
     # inline `style="transform:..."` attributes, not stylesheet classes.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://*.tile.openstreetmap.org; font-src 'self'; connect-src 'self' __API_CONNECT_SRC__; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
+    # img-src includes *.r2.cloudflarestorage.com for driver document /
+    # delivery-photo previews — those are signed URLs pointing directly at
+    # R2's S3-compatible endpoint (see toSignedUrl in r2Client.js), not
+    # same-origin, so without this the browser blocks every one of them
+    # (a CSP violation logged to the browser console, but the <img>
+    # itself just renders blank with no visible error in the UI).
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.basemaps.cartocdn.com https://server.arcgisonline.com https://*.tile.openstreetmap.org https://*.r2.cloudflarestorage.com; font-src 'self'; connect-src 'self' __API_CONNECT_SRC__; object-src 'none'; base-uri 'self'; frame-ancestors 'none'" always;
 
     location / {
         # Client-side routing fallback for the React SPA.
