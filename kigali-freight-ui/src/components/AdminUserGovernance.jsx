@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiFetch } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 const EMPTY_NEW_USER = { username: '', password: '', role: 'dispatcher' };
 
@@ -16,10 +17,14 @@ export default function AdminUserGovernance() {
     // manage.
     const staffUsers = useMemo(() => users.filter((u) => u.role !== 'driver'), [users]);
     const [loading, setLoading] = useState(false);
+    // Shared by fetchUsers and handleRoleChange, which unlike account
+    // creation have no "busy" concept in the UI today — left as plain
+    // state rather than forced into the hook below just for consistency.
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
     const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
-    const [creating, setCreating] = useState(false);
+    const { busy: creating, error: createError, run: runCreate } = useAsyncAction();
+    const displayError = error || createError;
 
     const fetchUsers = useCallback(async () => {
         setLoading(true);
@@ -62,8 +67,7 @@ export default function AdminUserGovernance() {
         e.preventDefault();
         setError(null);
         setSuccessMsg(null);
-        setCreating(true);
-        try {
+        await runCreate(async () => {
             await apiFetch('/api/users', {
                 method: 'POST',
                 token: jwtToken,
@@ -72,11 +76,7 @@ export default function AdminUserGovernance() {
             setSuccessMsg(`Created ${newUser.role} account "${newUser.username}"`);
             setNewUser(EMPTY_NEW_USER);
             fetchUsers();
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setCreating(false);
-        }
+        });
     };
 
     if (userRole !== 'admin') {
@@ -90,9 +90,9 @@ export default function AdminUserGovernance() {
                 {loading && <span className="text-[9px] text-carbon animate-pulse">Syncing...</span>}
             </div>
 
-            {error && (
+            {displayError && (
                 <div className="p-2 bg-rust/10 border border-rust/30 text-rust rounded">
-                    {error}
+                    {displayError}
                 </div>
             )}
 

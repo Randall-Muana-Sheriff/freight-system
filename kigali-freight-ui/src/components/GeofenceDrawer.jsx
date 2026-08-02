@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { PenLine, ShieldCheck, Trash2 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
+import { useAsyncAction, useKeyedAsyncAction } from '../hooks/useAsyncAction';
 
 export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints, setDispatchTargetMode }) {
   const { userRole, savedGeofences, saveGeofence, deleteGeofence } = useSocket();
   const [newFenceName, setNewFenceName] = useState('');
   const [newFenceSpeedLimit, setNewFenceSpeedLimit] = useState('60');
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-  const [error, setError] = useState(null);
+  const { busy: saving, error: saveError, run: runSave } = useAsyncAction();
+  const { busyKey: deletingId, error: deleteError, run: runDelete } = useKeyedAsyncAction();
+  const error = saveError || deleteError;
 
   // Previously had no try/catch at all — a failed save (network drop,
   // 500, stale-fence-already-deleted race) left the draw-mode form open
@@ -17,31 +18,17 @@ export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, draw
   // (speed-limit geofences).
   const handleSave = async () => {
     if (!newFenceName || drawnPoints.length < 3) return;
-    setSaving(true);
-    setError(null);
-    try {
+    await runSave(async () => {
       await saveGeofence({ name: newFenceName, points: drawnPoints, speedLimitKmh: newFenceSpeedLimit });
       setNewFenceName('');
       setNewFenceSpeedLimit('60');
       setDrawnPoints([]);
       setDrawModeActive(false);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const handleDelete = async (fenceId) => {
-    setError(null);
-    setDeletingId(fenceId);
-    try {
-      await deleteGeofence(fenceId);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDeletingId(null);
-    }
+    await runDelete(fenceId, () => deleteGeofence(fenceId));
   };
 
   return (

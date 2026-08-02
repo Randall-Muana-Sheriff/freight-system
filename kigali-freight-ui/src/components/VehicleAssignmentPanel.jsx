@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { UserCog } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 export default function VehicleAssignmentPanel() {
     const { jwtToken, userRole } = useSocket();
@@ -13,6 +14,8 @@ export default function VehicleAssignmentPanel() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [successMsg, setSuccessMsg] = useState(null);
+    const { busy: assigning, error: assignError, run: runAssign } = useAsyncAction();
+    const displayError = error || assignError;
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -48,7 +51,7 @@ export default function VehicleAssignmentPanel() {
         }
         setError(null);
         setSuccessMsg(null);
-        try {
+        await runAssign(async () => {
             await apiFetch(`/api/vehicles/${selectedVehicle}/assign`, {
                 method: 'PATCH',
                 token: jwtToken,
@@ -58,9 +61,7 @@ export default function VehicleAssignmentPanel() {
             setSelectedVehicle('');
             setSelectedDriver('');
             fetchData();
-        } catch (err) {
-            setError(err.message);
-        }
+        });
     };
 
     if (userRole !== 'admin' && userRole !== 'dispatcher') {
@@ -77,9 +78,9 @@ export default function VehicleAssignmentPanel() {
                 {loading && <span className="text-[9px] text-carbon animate-pulse">Syncing...</span>}
             </div>
 
-            {error && (
+            {displayError && (
                 <div className="p-2 bg-rust/10 border border-rust/30 text-rust rounded">
-                    {error}
+                    {displayError}
                 </div>
             )}
 
@@ -116,9 +117,10 @@ export default function VehicleAssignmentPanel() {
                 </select>
                 <button
                     type="submit"
-                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-bold py-1.5 rounded text-xs uppercase tracking-wide transition-all"
+                    disabled={assigning}
+                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-bold py-1.5 rounded text-xs uppercase tracking-wide transition-all disabled:opacity-50"
                 >
-                    Assign driver to asset
+                    {assigning ? 'Assigning...' : 'Assign driver to asset'}
                 </button>
             </form>
         </div>

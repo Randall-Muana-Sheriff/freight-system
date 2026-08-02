@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Warehouse, MapPin, Pencil, Trash2, X } from 'lucide-react';
 import { createHub, updateHub, deleteHub } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
+import { useAsyncAction, useKeyedAsyncAction } from '../hooks/useAsyncAction';
 
 const EMPTY_FORM = { name: '', code: '' };
 
@@ -13,9 +14,9 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
     const { jwtToken, savedHubs, refreshFeeds } = useSocket();
     const [form, setForm] = useState(EMPTY_FORM);
     const [editingId, setEditingId] = useState(null);
-    const [submitting, setSubmitting] = useState(false);
-    const [deletingId, setDeletingId] = useState(null);
-    const [error, setError] = useState(null);
+    const { busy: submitting, error: submitError, setError: setSubmitError, run: runSubmit } = useAsyncAction();
+    const { busyKey: deletingId, error: deleteError, run: runDelete } = useKeyedAsyncAction();
+    const error = submitError || deleteError;
 
     const resetForm = () => {
         setForm(EMPTY_FORM);
@@ -34,7 +35,6 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
 
         const coords = newHubCoords;
         const editingHub = editingId ? savedHubs.find((h) => h.id === editingId) : null;
@@ -42,16 +42,15 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
         const lng = coords ? coords[1] : editingHub?.lng;
 
         if (!form.name.trim() || !form.code.trim()) {
-            setError('Hub name and code are both required.');
+            setSubmitError('Hub name and code are both required.');
             return;
         }
         if (lat === undefined || lng === undefined) {
-            setError('Pick a location on the map first.');
+            setSubmitError('Pick a location on the map first.');
             return;
         }
 
-        setSubmitting(true);
-        try {
+        await runSubmit(async () => {
             const payload = { name: form.name.trim(), code: form.code.trim(), lat, lng };
             if (editingId) {
                 await updateHub(editingId, payload, jwtToken);
@@ -60,25 +59,15 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
             }
             resetForm();
             refreshFeeds();
-        } catch (err) {
-            setError(err.message || 'Failed to save hub.');
-        } finally {
-            setSubmitting(false);
-        }
+        });
     };
 
     const handleDelete = async (hub) => {
         if (!confirm(`Delete hub "${hub.name}"? This can't be undone.`)) return;
-        setDeletingId(hub.id);
-        setError(null);
-        try {
+        await runDelete(hub.id, async () => {
             await deleteHub(hub.id, jwtToken);
             refreshFeeds();
-        } catch (err) {
-            setError(err.message || 'Failed to delete hub.');
-        } finally {
-            setDeletingId(null);
-        }
+        });
     };
 
     const editingHub = editingId ? savedHubs.find((h) => h.id === editingId) : null;
