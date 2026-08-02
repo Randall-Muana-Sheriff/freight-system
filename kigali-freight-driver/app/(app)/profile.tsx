@@ -1,7 +1,8 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
@@ -29,6 +30,20 @@ function humanizePermission(status?: string): { value: string; tone: Tone } {
 
 function overallLocationStatus(diagnostics: Diagnostics | null) {
   if (!diagnostics) return null;
+  if (!diagnostics.servicesEnabled) {
+    // Distinct from the app-permission checks below: this is the phone's
+    // system-wide GPS/Location toggle. A driver can have granted every
+    // permission this app asks for and still send nothing, because
+    // permissions being "granted" only means the app is allowed to use
+    // location *if* the device is providing any — with the system toggle
+    // off, hasStarted can still read true (the background task is
+    // registered fine) while zero fixes ever actually arrive.
+    return {
+      label: 'Location is off',
+      tone: 'bad' as Tone,
+      detail: "Your phone's Location/GPS is switched off system-wide — dispatch can't see you until it's back on, even though the app itself is allowed to use it.",
+    };
+  }
   const blocked = diagnostics.foregroundStatus === 'denied' || diagnostics.backgroundStatus === 'denied';
   if (blocked) {
     return { label: 'Needs attention', tone: 'bad' as Tone, detail: "Dispatch can't see your location until you allow it in Settings." };
@@ -133,6 +148,45 @@ export default function ProfileScreen() {
   const [approvedDocCount, setApprovedDocCount] = useState(0);
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
 
+  // Temporary — reads back real answers to "is the update mechanism working
+  // at all on this device" (reachability + whether a newer update exists)
+  // instead of guessing from symptoms. Remove once OTA delivery is trusted.
+  const [updateCheck, setUpdateCheck] = useState<{ status: 'checking' | 'done' | 'error' | 'installing'; isAvailable?: boolean; reason?: string; message?: string }>({
+    status: 'checking',
+  });
+
+  const runUpdateCheck = () => {
+    setUpdateCheck({ status: 'checking' });
+    Updates.checkForUpdateAsync()
+      .then((result) =>
+        setUpdateCheck({ status: 'done', isAvailable: result.isAvailable, reason: result.isAvailable ? undefined : result.reason })
+      )
+      .catch((err) => setUpdateCheck({ status: 'error', message: err instanceof Error ? err.message : String(err) }));
+  };
+
+  useEffect(runUpdateCheck, []);
+
+  // Waiting on expo-updates' own background fetch-then-apply-on-next-launch
+  // cycle turned out to be unreliable on at least one real device this
+  // session — a check would correctly report an update as available, yet
+  // it would still be showing as the embedded build after several full
+  // restarts. Doing fetch + reload manually, in the foreground, in
+  // response to a tap removes that timing dependency entirely.
+  const onInstallUpdate = async () => {
+    setUpdateCheck({ status: 'installing' });
+    try {
+      const check = await Updates.checkForUpdateAsync();
+      if (!check.isAvailable) {
+        setUpdateCheck({ status: 'done', isAvailable: false, reason: check.reason });
+        return;
+      }
+      await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    } catch (err) {
+      setUpdateCheck({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
   const loadDiagnostics = async () => {
     setDiagnostics(await getTrackingDiagnostics());
   };
@@ -145,19 +199,23 @@ export default function ProfileScreen() {
     useCallback(() => {
       loadDiagnostics();
       if (!token) return;
-      fetchMyProfile(token).then(setProfile).catch(() => setProfile(null));
-      fetchMyVehicle(token)
-        .then(setVehicle)
-        .catch(() => setVehicle(null));
-      fetchMyCompletedDeliveries(token)
-        .then(setCompletedDeliveries)
-        .catch(() => setCompletedDeliveries([]));
+      // Every catch below intentionally does nothing but swallow the
+      // error — this effect reruns on every tab focus, so a driver who
+      // switches tabs while briefly offline would otherwise have their
+      // name, vehicle, verification badge, and delivery history wiped
+      // back to "loading"/"none" sentinels on every single refetch,
+      // even though each of those loaded fine moments earlier. Leaving
+      // state untouched on failure keeps the last-known-good data on
+      // screen until a refetch actually succeeds.
+      fetchMyProfile(token).then(setProfile).catch(() => {});
+      fetchMyVehicle(token).then(setVehicle).catch(() => {});
+      fetchMyCompletedDeliveries(token).then(setCompletedDeliveries).catch(() => {});
       fetchMyDocuments(token)
         .then((data) => {
           setDocumentsVerified(data.verified);
           setApprovedDocCount(data.checklist.filter((d) => d.status === 'approved').length);
         })
-        .catch(() => setDocumentsVerified(null));
+        .catch(() => {});
     }, [token])
   );
 
@@ -395,6 +453,29 @@ export default function ProfileScreen() {
         <Ionicons name="log-out-outline" size={16} color={theme.colors.danger} />
         <Text style={styles.logoutText}>Sign out</Text>
       </TouchableOpacity>
+
+      <Text style={styles.diagnosticFooter}>
+        {Updates.isEmbeddedLaunch ? 'embedded build' : 'ota update'} · {Updates.updateId ? Updates.updateId.slice(0, 8) : 'no update id'} · channel: {Updates.channel ?? 'n/a'} · runtime: {Updates.runtimeVersion ?? 'n/a'}
+        {'\n'}
+        update check:{' '}
+        {updateCheck.status === 'checking'
+          ? 'checking…'
+          : updateCheck.status === 'error'
+            ? `failed — ${updateCheck.message}`
+            : updateCheck.status === 'installing'
+              ? 'downloading and installing…'
+              : updateCheck.isAvailable
+                ? 'newer update found'
+                : `none pending (${updateCheck.reason ?? 'unknown reason'})`}
+      </Text>
+
+      <TouchableOpacity onPress={() => void onInstallUpdate()} disabled={updateCheck.status === 'installing'} style={styles.updateButton} activeOpacity={0.8}>
+        {updateCheck.status === 'installing' ? (
+          <ActivityIndicator color={theme.colors.primary} size="small" />
+        ) : (
+          <Text style={styles.updateButtonText}>Check &amp; install update now</Text>
+        )}
+      </TouchableOpacity>
     </ScreenShell>
     <ImageViewerModal url={viewingPhoto} onClose={() => setViewingPhoto(null)} />
     <ToastOverlay message={pingToast?.message ?? null} icon={pingToast?.icon ?? 'alert-outline'} onHide={() => setPingToast(null)} />
@@ -530,4 +611,23 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   logoutText: { color: theme.colors.danger, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  diagnosticFooter: {
+    color: theme.colors.muted,
+    fontSize: 9,
+    lineHeight: 13,
+    textAlign: 'center',
+    marginTop: 16,
+    fontFamily: theme.fonts.mono,
+    opacity: 0.6,
+  },
+  updateButton: {
+    alignSelf: 'center',
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  updateButtonText: { color: theme.colors.muted, fontSize: 10, fontFamily: theme.fonts.mono, opacity: 0.8 },
 });

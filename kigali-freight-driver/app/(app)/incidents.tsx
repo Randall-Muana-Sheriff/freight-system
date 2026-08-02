@@ -218,21 +218,13 @@ export default function IncidentsScreen() {
       <Text style={styles.historyLabel}>Your recent reports</Text>
       {myIncidents === undefined && !incidentsLoadFailed ? (
         <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 12 }} />
-      ) : incidentsLoadFailed ? (
-        <TouchableOpacity style={styles.emptyHistory} onPress={loadIncidents}>
-          <Ionicons name="refresh-outline" size={18} color={theme.colors.danger} />
-          <Text style={[styles.emptyHistoryText, { color: theme.colors.danger }]}>
-            Couldn&apos;t load your reports. Tap to try again.
-          </Text>
-        </TouchableOpacity>
-      ) : myIncidents && myIncidents.length === 0 ? (
-        <View style={styles.emptyHistory}>
-          <Ionicons name="document-text-outline" size={18} color={theme.colors.muted} />
-          <Text style={styles.emptyHistoryText}>Nothing reported yet.</Text>
-        </View>
-      ) : (
+      ) : myIncidents && myIncidents.length > 0 ? (
+        // Checked before incidentsLoadFailed: a report list that already
+        // loaded successfully once must stay on screen through a later
+        // failed refresh (e.g. connection dropped on this tab's next
+        // focus) instead of being replaced by the retry prompt below.
         <View>
-          {(myIncidents ?? []).map((item) => {
+          {myIncidents.map((item) => {
             const { title: reportTitle, body } = splitReport(item.description);
             const meta = STATUS_META[item.status];
             return (
@@ -251,6 +243,18 @@ export default function IncidentsScreen() {
               </View>
             );
           })}
+        </View>
+      ) : incidentsLoadFailed ? (
+        <TouchableOpacity style={styles.emptyHistory} onPress={loadIncidents}>
+          <Ionicons name="refresh-outline" size={18} color={theme.colors.danger} />
+          <Text style={[styles.emptyHistoryText, { color: theme.colors.danger }]}>
+            Couldn&apos;t load your reports. Tap to try again.
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.emptyHistory}>
+          <Ionicons name="document-text-outline" size={18} color={theme.colors.muted} />
+          <Text style={styles.emptyHistoryText}>Nothing reported yet.</Text>
         </View>
       )}
     </ScreenShell>

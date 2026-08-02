@@ -70,8 +70,10 @@ export default function DashboardScreen() {
       if (!mountedRef.current) return;
       setFullName(profile.fullName);
     } catch {
-      if (!mountedRef.current) return;
-      setFullName(null);
+      // Leave the last-known name in place on failure (e.g. offline) rather
+      // than wiping it — the fallback below would otherwise show the
+      // driver's phone number in place of their name until connectivity
+      // is restored and this refetches successfully.
     }
   };
 
@@ -82,8 +84,10 @@ export default function DashboardScreen() {
       if (!mountedRef.current) return;
       setAssignments(rows.map(toDriverAssignmentCard));
     } catch {
-      if (!mountedRef.current) return;
-      setAssignments([]);
+      // Leave the last-known assignments on screen on failure (e.g.
+      // offline) instead of wiping them — an empty list here reads as
+      // "you have no jobs," which isn't true, it's just that this
+      // particular refresh didn't get through.
     }
   };
 
@@ -105,8 +109,9 @@ export default function DashboardScreen() {
       if (!mountedRef.current) return;
       setDocumentsVerified(data.verified);
     } catch {
-      if (!mountedRef.current) return;
-      setDocumentsVerified(null);
+      // Leave the last-known verification state on failure — see
+      // loadAssignments above for why a failed refresh shouldn't overwrite
+      // already-known good data with a "not verified" sentinel.
     }
   };
 
@@ -117,8 +122,9 @@ export default function DashboardScreen() {
       if (!mountedRef.current) return;
       setVehicle(data);
     } catch {
-      if (!mountedRef.current) return;
-      setVehicle(null);
+      // Leave the last-known vehicle on failure — setting this to `null`
+      // renders the "No vehicle assigned" warning below even for a driver
+      // who has one, purely because this one refresh didn't get through.
     }
   };
 
@@ -129,8 +135,8 @@ export default function DashboardScreen() {
       if (!mountedRef.current) return;
       setCompletedDeliveries(rows);
     } catch {
-      if (!mountedRef.current) return;
-      setCompletedDeliveries([]);
+      // Leave the last-known delivery history on failure — see
+      // loadAssignments above.
     }
   };
 

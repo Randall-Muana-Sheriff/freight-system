@@ -192,10 +192,19 @@ export async function getTrackingDiagnostics() {
   const hasStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
   const foreground = await Location.getForegroundPermissionsAsync();
   const background = await Location.getBackgroundPermissionsAsync();
+  // Distinct from both permission checks above: a driver can grant "Allow
+  // all the time" and still have the device's GPS/Location toggle itself
+  // switched off at the OS level (Settings, not app permissions) — in that
+  // state `hasStarted` stays true and both permissions read "granted," so
+  // without this check tracking looks completely healthy in the app while
+  // silently sending nothing, which is exactly what happened here: it took
+  // a manual check of the phone's system settings to find it.
+  const servicesEnabled = await Location.hasServicesEnabledAsync().catch(() => true);
   return {
     hasStarted,
     foregroundStatus: foreground.status,
     backgroundStatus: background.status,
+    servicesEnabled,
   };
 }
 

@@ -138,7 +138,11 @@ export default function DocumentsScreen() {
 
       {loading ? (
         <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 16 }} />
-      ) : error ? (
+      ) : error && checklist === null ? (
+        // Only replaces the whole screen with an error when nothing has
+        // ever loaded successfully. If a refresh fails after a checklist
+        // was already shown (e.g. connection dropped), that last-known
+        // checklist stays on screen instead of vanishing behind this text.
         <Text style={styles.errorText}>{error}</Text>
       ) : (
         <>
