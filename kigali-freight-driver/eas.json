@@ -8,20 +8,21 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.71:5000"
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.71:5000",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://5e21622adcd755b5467e80df66490447@o4511835894513664.ingest.us.sentry.io/4511836198862848"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "REPLACE_WITH_REAL_HTTPS_STAGING_API_URL_VIA_EAS_ENV_CREATE",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.inzira.systems",
         "EXPO_PUBLIC_SENTRY_DSN": "https://5e21622adcd755b5467e80df66490447@o4511835894513664.ingest.us.sentry.io/4511836198862848"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "REPLACE_WITH_REAL_HTTPS_PRODUCTION_API_URL_VIA_EAS_ENV_CREATE",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.inzira.systems",
         "EXPO_PUBLIC_SENTRY_DSN": "https://5e21622adcd755b5467e80df66490447@o4511835894513664.ingest.us.sentry.io/4511836198862848"
       }
     }
