@@ -1,8 +1,25 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import { apiFetch, API_BASE, fetchRoutes, fetchGeofences, fetchActiveOrders, fetchIncidents, fetchRecentDeliveries, fetchInFlightOrders, fetchHubs, fetchVehicleTypes, fetchDrivers, setUnauthorizedHandler } from '../utils/api';
+import { attachSocketListeners } from './socketEventHandlers';
 
 const SocketContext = createContext(null);
+
+// The 9 feeds in refreshFeeds below all fetched + set state through the
+// exact same shape: fetch, default to [] on non-array/error, and clear the
+// session on a 401/403 specifically (not just any error). Extracted once
+// rather than repeated per feed.
+async function fetchFeed(fetchFn, token, setState, clearCachedAuth) {
+  try {
+    const data = await fetchFn(token);
+    setState(Array.isArray(data) ? data : []);
+  } catch (error) {
+    if (error?.status === 401 || error?.status === 403) {
+      clearCachedAuth();
+    }
+    setState([]);
+  }
+}
 
 export function SocketProvider({ children }) {
   const [jwtToken, setJwtToken] = useState(() => localStorage.getItem('fleet_token') || '');
@@ -86,87 +103,18 @@ export function SocketProvider({ children }) {
 
   const refreshFeeds = useCallback(async (tokenToUse) => {
     const token = tokenToUse ?? jwtToken;
-    try {
-      const routesData = await fetchRoutes(token);
-      setSavedRoutesList(Array.isArray(routesData) ? routesData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setSavedRoutesList([]);
-    }
-    try {
-      const geofencesData = await fetchGeofences(token);
-      setSavedGeofences(Array.isArray(geofencesData) ? geofencesData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setSavedGeofences([]);
-    }
-    try {
-      const hubsData = await fetchHubs(token);
-      setSavedHubs(Array.isArray(hubsData) ? hubsData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setSavedHubs([]);
-    }
-    try {
-      const vehicleTypesData = await fetchVehicleTypes(token);
-      setSavedVehicleTypes(Array.isArray(vehicleTypesData) ? vehicleTypesData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setSavedVehicleTypes([]);
-    }
-    try {
-      const ordersData = await fetchActiveOrders(token);
-      setActiveOrders(Array.isArray(ordersData) ? ordersData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setActiveOrders([]);
-    }
-    try {
-      const incidentsData = await fetchIncidents(token);
-      setIncidentReports(Array.isArray(incidentsData) ? incidentsData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setIncidentReports([]);
-    }
-    try {
-      const deliveriesData = await fetchRecentDeliveries(token);
-      setRecentDeliveries(Array.isArray(deliveriesData) ? deliveriesData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setRecentDeliveries([]);
-    }
-    try {
-      const inFlightData = await fetchInFlightOrders(token);
-      setInFlightOrders(Array.isArray(inFlightData) ? inFlightData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setInFlightOrders([]);
-    }
-    try {
-      const driversData = await fetchDrivers(token);
-      setSavedDrivers(Array.isArray(driversData) ? driversData : []);
-    } catch (error) {
-      if (error?.status === 401 || error?.status === 403) {
-        clearCachedAuth();
-      }
-      setSavedDrivers([]);
-    }
+    // Sequential, not Promise.all — preserves the exact fetch order this
+    // already ran in; parallelizing these would be a genuine behavior
+    // change (timing, concurrent request count), not just deduplication.
+    await fetchFeed(fetchRoutes, token, setSavedRoutesList, clearCachedAuth);
+    await fetchFeed(fetchGeofences, token, setSavedGeofences, clearCachedAuth);
+    await fetchFeed(fetchHubs, token, setSavedHubs, clearCachedAuth);
+    await fetchFeed(fetchVehicleTypes, token, setSavedVehicleTypes, clearCachedAuth);
+    await fetchFeed(fetchActiveOrders, token, setActiveOrders, clearCachedAuth);
+    await fetchFeed(fetchIncidents, token, setIncidentReports, clearCachedAuth);
+    await fetchFeed(fetchRecentDeliveries, token, setRecentDeliveries, clearCachedAuth);
+    await fetchFeed(fetchInFlightOrders, token, setInFlightOrders, clearCachedAuth);
+    await fetchFeed(fetchDrivers, token, setSavedDrivers, clearCachedAuth);
   }, [clearCachedAuth, jwtToken]);
 
   const driverDirectory = useMemo(() => {
@@ -210,102 +158,17 @@ export function SocketProvider({ children }) {
       transports: ['websocket'],
     });
 
-    newSocket.on('connect', () => setIsConnected(true));
-    newSocket.on('disconnect', () => setIsConnected(false));
-
-    newSocket.on('fleet:snapshot', (arr) => {
-      const assetMap = {};
-      const historyMap = {};
-      arr.forEach((asset) => {
-        assetMap[asset.driverName] = asset;
-        historyMap[asset.driverName] = [[asset.lat, asset.lng]];
-      });
-      setTrackedAssets(assetMap);
-      setRouteHistories(historyMap);
-    });
-
-    newSocket.on('driver:location-update', (data) => {
-      setTrackedAssets((prev) => ({ ...prev, [data.driverName]: data }));
-      setRouteHistories((prev) => {
-        const curr = prev[data.driverName] || [];
-        return { ...prev, [data.driverName]: [...curr, [data.lat, data.lng]] };
-      });
-    });
-
-    newSocket.on('geofence:violation', (v) => {
-      setViolations((prev) => [v, ...prev]);
-      setActiveBreachedDrivers((prev) => ({ ...prev, [v.driverName]: v }));
-    });
-
-    newSocket.on('geofence:exit', (e) => {
-      setActiveBreachedDrivers((prev) => {
-        const copy = { ...prev };
-        delete copy[e.driverName];
-        return copy;
-      });
-    });
-
-    newSocket.on('order:created', (order) => {
-      setActiveOrders((prev) => [order, ...prev]);
-    });
-
-    // An assigned order is no longer PENDING, so it drops out of the
-    // active/unassigned queue rather than being updated in place. It's now
-    // awaiting pickup, so it joins the in-flight (reassignable) set instead.
-    newSocket.on('order:dispatched', ({ driverName, assignedManifest }) => {
-      const dispatchedIds = new Set((assignedManifest || []).map((o) => o.id));
-      setActiveOrders((prev) => prev.filter((o) => !dispatchedIds.has(o.id)));
-      setInFlightOrders((prev) => [
-        ...(assignedManifest || []).map((o) => ({ ...o, assigned_to: driverName })),
-        ...prev,
-      ]);
-    });
-
-    // Dispatcher moved an ASSIGNED order to a different driver without it
-    // ever being picked up.
-    newSocket.on('order:reassigned', ({ orderId, driverName }) => {
-      setInFlightOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, assigned_to: driverName } : o)));
-    });
-
-    // Dispatcher sent an ASSIGNED order back to the dispatch queue with no
-    // driver — order:created (below) re-adds it to activeOrders.
-    newSocket.on('order:unassigned', ({ orderId }) => {
-      setInFlightOrders((prev) => prev.filter((o) => o.id !== orderId));
-    });
-
-    newSocket.on('order:status-updated', (update) => {
-      setOrderActivity((prev) => [update, ...prev].slice(0, 20));
-      // Any status change away from ASSIGNED (picked up, delivered, etc.)
-      // means it's no longer in the reassignable "awaiting pickup" set.
-      if (update.status !== 'ASSIGNED') {
-        setInFlightOrders((prev) => prev.filter((o) => o.id !== update.orderId));
-      }
-      // confirmDelivery includes a photoUrl on this same event — surface it
-      // in the persisted deliveries list immediately, not just the
-      // ephemeral activity feed.
-      if (update.photoUrl) {
-        setRecentDeliveries((prev) => [
-          {
-            id: `live-${update.orderId}-${update.timestamp}`,
-            order_id: update.orderId,
-            driver_name: update.driverName,
-            photo_url: update.photoUrl,
-            cargo_description: update.cargo_description,
-            confirmed_at: update.timestamp,
-            location_flagged: update.locationFlagged,
-            distance_from_target_m: update.distanceFromTargetM,
-          },
-          ...prev,
-        ]);
-      }
-    });
-
-    newSocket.on('incident:reported', (incident) => {
-      setIncidentReports((prev) => [incident, ...prev]);
-    });
-
-    newSocket.on('incident:status-updated', (updated) => {
-      setIncidentReports((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+    attachSocketListeners(newSocket, {
+      setIsConnected,
+      setTrackedAssets,
+      setRouteHistories,
+      setViolations,
+      setActiveBreachedDrivers,
+      setActiveOrders,
+      setInFlightOrders,
+      setOrderActivity,
+      setRecentDeliveries,
+      setIncidentReports,
     });
 
     setSocket(newSocket);
