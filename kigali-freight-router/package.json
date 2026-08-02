@@ -18,7 +18,8 @@
     "restore:db": "node ops/restore-db.js",
     "backup:verify": "node ops/verify-backup.js",
     "backup:prune": "node ops/prune-backups.js",
-    "load:test": "node ops/load-test.js"
+    "load:test": "node ops/load-test.js",
+    "purge:auth-codes": "node ops/purge-expired-auth-codes.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1088.0",

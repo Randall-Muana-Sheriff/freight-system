@@ -1,0 +1,16 @@
+[Unit]
+Description=Run kigali-purge-auth-codes.service daily
+
+[Timer]
+# Offset from kigali-backup.timer's 02:17 so the two don't compete for the
+# same DB connection slot on the same host.
+OnCalendar=*-*-* 03:41:00
+# If the host was off/asleep at 03:41, run once on next boot instead of
+# silently skipping a whole day's purge — a missed day just means the
+# tables stay a little bigger than usual, not a correctness problem, but
+# there's no reason to actually skip it when Persistent is free.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

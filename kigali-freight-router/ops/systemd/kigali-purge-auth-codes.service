@@ -1,0 +1,13 @@
+[Unit]
+Description=Purge expired driver OTP codes and invite codes
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust to wherever the router is actually deployed on the real host.
+WorkingDirectory=/opt/kigali-freight/kigali-freight-router
+EnvironmentFile=/opt/kigali-freight/kigali-freight-router/.env
+ExecStart=/usr/bin/npm run purge:auth-codes
+
+[Install]
+WantedBy=multi-user.target
