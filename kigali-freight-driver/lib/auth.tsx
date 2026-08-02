@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import { setDriverPin, loginDriverPin, logoutDriver, API_BASE, type DriverAuthTokens } from './api';
 import { flushOfflineQueue, getOfflineQueueCount } from './offlineQueue';
 import { registerPushTokenWithBackend } from './pushNotifications';
@@ -26,6 +27,11 @@ type AuthState = {
   username: string | null;
   isReady: boolean;
   pendingSyncCount: number;
+  // Proactive (NetInfo), not the reactive isNetworkFailure() check in
+  // api.ts — that one only learns a request failed after actually
+  // attempting it. This is known ahead of time, so the UI can show a
+  // persistent indicator instead of only reacting to a failed action.
+  isOffline: boolean;
   biometricEnabled: boolean;
   // The two flow-completing calls — everything upstream of these (phone
   // entry, OTP, invite code) is stateless from the session's point of view
@@ -96,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [isOffline, setIsOffline] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
 
   const refreshPendingCount = async () => {
@@ -185,6 +192,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [token]);
 
+  // Proactive complement to the AppState effect above: that one only
+  // catches "the app was backgrounded, then resumed" — a driver who stays
+  // on the trip screen the whole time they're in a signal-dead zone would
+  // otherwise not get their queue flushed until the next foreground event
+  // or their next explicit action. This flushes the moment connectivity
+  // actually returns, whether or not the app was ever backgrounded.
+  // isInternetReachable can be null while NetInfo is still figuring it
+  // out — treated as "assume reachable" (not offline) to avoid flashing a
+  // false offline state on every screen transition.
+  useEffect(() => {
+    let previouslyOffline = false;
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const offline = state.isConnected === false || state.isInternetReachable === false;
+      setIsOffline(offline);
+      if (previouslyOffline && !offline && token) {
+        tryFlushOfflineQueue(token);
+      }
+      previouslyOffline = offline;
+    });
+
+    return () => unsubscribe();
+  }, [token]);
+
   // Shared by both flow-completing steps below — from here on, a driver's
   // `username` (for every existing FK/JWT that already keys off it) is
   // their phone number, exactly as the backend's invite endpoint set it up.
@@ -243,6 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username,
       isReady,
       pendingSyncCount,
+      isOffline,
       biometricEnabled,
       completePinSetup,
       loginWithPin,
@@ -250,7 +281,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       disableBiometric,
       signOut,
     }),
-    [token, role, username, isReady, pendingSyncCount, biometricEnabled]
+    [token, role, username, isReady, pendingSyncCount, isOffline, biometricEnabled]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

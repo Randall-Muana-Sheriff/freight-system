@@ -120,7 +120,7 @@ function formatDeliveredDate(value?: string | null) {
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function ProfileScreen() {
-  const { token, pendingSyncCount, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
+  const { token, pendingSyncCount, isOffline, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [sendingPing, setSendingPing] = useState(false);
@@ -298,6 +298,11 @@ export default function ProfileScreen() {
           <View style={styles.statusRows}>
             <StatusRow label="Location access" {...humanizePermission(diagnostics.foregroundStatus)} />
             <StatusRow label="Background tracking" {...humanizePermission(diagnostics.backgroundStatus)} />
+            <StatusRow
+              label="Network"
+              value={isOffline ? 'Offline' : 'Connected'}
+              tone={isOffline ? 'bad' : 'good'}
+            />
             <StatusRow
               label="Sync queue"
               value={pendingSyncCount === 0 ? 'Up to date' : `${pendingSyncCount} pending`}
