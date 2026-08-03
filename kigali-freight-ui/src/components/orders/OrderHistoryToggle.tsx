@@ -43,15 +43,24 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
                 {open ? 'Hide history' : 'History'}
             </button>
             {open && (
-                <div className="mt-1 space-y-0.5 border-l border-line/15 pl-2">
+                <div className="mt-1 space-y-1.5 border-l border-line/15 pl-2 overflow-x-hidden">
                     {loading ? (
                         <div className="text-steel text-[9px] font-mono">Loading...</div>
                     ) : history && history.length > 0 ? (
                         history.map((h, idx) => (
-                            <div key={idx} className="text-[9px] font-mono text-steel">
-                                {h.previous_status ? `${h.previous_status} → ` : ''}
-                                <span className="text-paper">{h.new_status}</span>
-                                <span className="text-steel/70"> &middot; {resolveDriverName(h.changed_by)} &middot; {new Date(h.changed_at).toLocaleString()}</span>
+                            // Three separate lines, not one run-on string — a full
+                            // "PREVIOUS → NEW · driver · date, time" sentence has no
+                            // good place to wrap in a ~250px sidebar column, so it was
+                            // forcing horizontal scroll instead of wrapping. Splitting
+                            // by meaning (what changed / who / when) means each piece
+                            // wraps independently and never needs to scroll sideways.
+                            <div key={idx} className="text-[9px] font-mono min-w-0">
+                                <div className="text-paper break-words">
+                                    {h.previous_status ? `${h.previous_status} → ` : ''}
+                                    {h.new_status}
+                                </div>
+                                <div className="text-steel/70 break-words">{resolveDriverName(h.changed_by)}</div>
+                                <div className="text-steel/70 break-words">{new Date(h.changed_at).toLocaleString()}</div>
                             </div>
                         ))
                     ) : (
