@@ -14,6 +14,8 @@ import GeofenceDrawer from './GeofenceDrawer';
 import AdminControlPanel from './AdminControlPanel';
 import VehicleAssignmentPanel from './VehicleAssignmentPanel';
 import HubsPanel from './HubsPanel';
+import ResizeHandle from './ResizeHandle';
+import { useResizableWidth } from '../hooks/useResizableWidth';
 
 interface Tab {
     id: string;
@@ -39,12 +41,15 @@ export default function SecondaryPanel() {
     } = useMapInteraction();
     const [activeTab, setActiveTab] = useState('planning');
     const isStaff = userRole === 'admin' || userRole === 'dispatcher';
+    const { width, startResize } = useResizableWidth({ storageKey: 'secondaryPanelWidth', defaultWidth: 380, min: 280, max: 600, edge: 'left' });
 
     const visibleTabs = TABS.filter((t) => !t.staffOnly || isStaff);
     const effectiveTab = visibleTabs.some((t) => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id ?? 'planning');
 
     return (
-        <aside className="w-[380px] shrink-0 bg-panel border-l border-line/10 h-full flex flex-col overflow-hidden">
+        <>
+        <ResizeHandle onMouseDown={startResize} />
+        <aside style={{ width }} className="shrink-0 bg-panel border-l border-line/10 h-full flex flex-col overflow-hidden">
             <div className="flex border-b border-line/10 shrink-0">
                 {visibleTabs.map((tab) => {
                     const Icon = tab.icon;
@@ -116,5 +121,6 @@ export default function SecondaryPanel() {
                 )}
             </div>
         </aside>
+        </>
     );
 }
