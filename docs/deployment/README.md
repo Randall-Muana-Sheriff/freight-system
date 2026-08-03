@@ -53,6 +53,13 @@ repo is built to consume regardless of which you pick:
   around for real R2 (see the comment in `config/r2Client.js`).
 - Set `API_BASE_URL`, `API_DOMAIN`, `APP_DOMAIN` to your real domains from
   step 1.
+- Optional: `ANTHROPIC_API_KEY` enables AI-assisted features (document
+  review triage first — see `services/documentAnalysisService.js`). Get
+  one at console.anthropic.com under Settings → API Keys; that's a
+  separate, pay-as-you-go product from a Claude.ai/Claude Code
+  subscription, not included in it. Leave unset to run without any AI
+  features — every feature that reads this key is written to no-op
+  cleanly (no annotation shown, nothing blocked) rather than fail.
 
 ## 3. Deploy
 

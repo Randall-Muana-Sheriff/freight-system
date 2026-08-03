@@ -1,9 +1,19 @@
+import { createHash } from 'crypto';
 import pool from '../config/db.js';
-import { uploadDriverDocument, toSignedUrl } from '../config/r2Client.js';
+import { uploadDriverDocument, toSignedUrl, assertRealFileType } from '../config/r2Client.js';
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
+import { analyzeDriverDocument } from '../services/documentAnalysisService.js';
 import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
+
+// Below this, a file is essentially certain to not be a legible ID/license/
+// certificate photo — real phone-camera captures of a physical document
+// are virtually always well into the hundreds of KB even compressed. This
+// exists to catch an accidental near-empty capture (a blank frame, a
+// 1x1 test image) before it ever reaches an admin's review queue, not to
+// second-guess a genuinely small-but-legible scan.
+const MIN_DOCUMENT_FILE_SIZE_BYTES = 10 * 1024;
 
 const DOCUMENT_LABELS = {
     national_id: 'National ID',
@@ -12,6 +22,41 @@ const DOCUMENT_LABELS = {
     insurance_certificate: 'Insurance certificate',
     roadworthiness_certificate: 'Roadworthiness certificate',
 };
+
+// Fire-and-forget from uploadDocument below — deliberately not awaited
+// there, so a slow or failed AI call never delays the driver's upload
+// response. analyzeDriverDocument already swallows its own errors and
+// returns null when AI features aren't configured at all; this just adds
+// "don't let a late/duplicate result clobber a newer upload" on top,
+// since a driver can re-upload (rejected -> resubmit) while a previous
+// analysis call for the same row is still in flight.
+async function analyzeAndStoreDocumentInsights({ documentId, buffer, mimeType, documentLabel, username, uploadedAt }) {
+    try {
+        const userResult = await pool.query(`SELECT full_name AS "fullName" FROM users WHERE username = $1`, [username]);
+        const driverFullName = userResult.rows[0]?.fullName || username;
+
+        const analysis = await analyzeDriverDocument({ buffer, mimeType, documentLabel, driverFullName });
+        if (!analysis) return;
+
+        // uploaded_at::text on both sides, not a bare `= $3` against the
+        // JS Date pg already parsed it into — TIMESTAMPTZ keeps
+        // microsecond precision, a JS Date only has millisecond
+        // precision, so round-tripping the RETURNING value through JS and
+        // back lost precision and made this equality silently never
+        // match (0 rows updated, no error, no logged sign anything was
+        // wrong). Comparing text representations sidesteps that entirely.
+        const updateResult = await pool.query(
+            `UPDATE driver_documents SET ai_analysis = $1, ai_analyzed_at = NOW()
+             WHERE id = $2 AND uploaded_at::text = $3::text`,
+            [JSON.stringify(analysis), documentId, uploadedAt]
+        );
+        if (updateResult.rowCount === 0) {
+            console.warn(`⚠️ Document AI analysis computed but not stored — document ${documentId} was re-uploaded before this call finished.`);
+        }
+    } catch (err) {
+        console.error('❌ Failed to store document AI analysis:', err.message);
+    }
+}
 
 export const DriverDocumentController = {
     // GET /api/driver-documents/mine - the driver's own checklist. Always
@@ -82,6 +127,14 @@ export const DriverDocumentController = {
                 });
             }
 
+            if (req.file.buffer.length < MIN_DOCUMENT_FILE_SIZE_BYTES) {
+                return fail(res, {
+                    status: 400,
+                    code: 'DRIVER_DOCUMENT_FILE_TOO_SMALL',
+                    message: 'That file looks empty or unreadable — please retake the photo and try again.',
+                });
+            }
+
             const existing = await pool.query(
                 `SELECT status FROM driver_documents WHERE username = $1 AND document_type = $2`,
                 [username, documentType]
@@ -97,6 +150,28 @@ export const DriverDocumentController = {
                 });
             }
 
+            const fileHash = createHash('sha256').update(req.file.buffer).digest('hex');
+
+            // Same bytes already sitting under a different document type for
+            // this driver — most often an accidental double-submit of the
+            // same photo, occasionally someone trying to pass one document
+            // off as another. Either way it's not worth an admin's time to
+            // catch by eye; block it here with a message that assumes good
+            // faith (retake/re-select) rather than accusing anyone.
+            const duplicate = await pool.query(
+                `SELECT document_type AS "documentType" FROM driver_documents
+                 WHERE username = $1 AND document_type != $2 AND file_hash = $3
+                       AND status IN ('pending', 'approved')`,
+                [username, documentType, fileHash]
+            );
+            if (duplicate.rows.length > 0) {
+                return fail(res, {
+                    status: 400,
+                    code: 'DRIVER_DOCUMENT_DUPLICATE_FILE',
+                    message: `That file is identical to what you submitted for ${DOCUMENT_LABELS[duplicate.rows[0].documentType] || duplicate.rows[0].documentType} — each document needs its own separate photo.`,
+                });
+            }
+
             const fileKey = await uploadDriverDocument({
                 buffer: req.file.buffer,
                 mimeType: req.file.mimetype,
@@ -105,13 +180,14 @@ export const DriverDocumentController = {
             });
 
             const result = await pool.query(
-                `INSERT INTO driver_documents (username, document_type, file_url, status)
-                 VALUES ($1, $2, $3, 'pending')
+                `INSERT INTO driver_documents (username, document_type, file_url, status, file_hash)
+                 VALUES ($1, $2, $3, 'pending', $4)
                  ON CONFLICT (username, document_type)
                  DO UPDATE SET file_url = $3, status = 'pending', rejection_reason = NULL,
-                               reviewed_by = NULL, reviewed_at = NULL, uploaded_at = NOW()
-                 RETURNING id, document_type AS "documentType", file_url AS "fileUrl", status;`,
-                [username, documentType, fileKey]
+                               reviewed_by = NULL, reviewed_at = NULL, uploaded_at = NOW(), file_hash = $4,
+                               ai_analysis = NULL, ai_analyzed_at = NULL
+                 RETURNING id, document_type AS "documentType", file_url AS "fileUrl", status, uploaded_at::text AS "uploadedAt";`,
+                [username, documentType, fileKey, fileHash]
             );
 
             await appendAuditLog({
@@ -121,6 +197,17 @@ export const DriverDocumentController = {
             });
 
             const doc = result.rows[0];
+            const realType = assertRealFileType(req.file.buffer, ['image/jpeg', 'image/png', 'application/pdf']);
+            analyzeAndStoreDocumentInsights({
+                documentId: doc.id,
+                buffer: req.file.buffer,
+                mimeType: realType,
+                documentLabel: DOCUMENT_LABELS[documentType],
+                username,
+                uploadedAt: doc.uploadedAt,
+            });
+            delete doc.uploadedAt;
+
             doc.fileUrl = await toSignedUrl(doc.fileUrl);
             return ok(res, doc, { status: 201 });
         } catch (error) {
@@ -144,7 +231,8 @@ export const DriverDocumentController = {
             const result = await pool.query(
                 `SELECT id, username, document_type AS "documentType", file_url AS "fileUrl", status,
                         rejection_reason AS "rejectionReason", uploaded_at AS "uploadedAt",
-                        reviewed_by AS "reviewedBy", reviewed_at AS "reviewedAt"
+                        reviewed_by AS "reviewedBy", reviewed_at AS "reviewedAt",
+                        ai_analysis AS "aiAnalysis", ai_analyzed_at AS "aiAnalyzedAt"
                  FROM driver_documents
                  ORDER BY (status = 'pending') DESC, uploaded_at DESC;`
             );

@@ -70,6 +70,21 @@ export const appConfig = {
     // via Firebase Cloud Messaging. Push sending is a no-op (logged, not
     // fatal) when unset.
     firebaseServiceAccountPath: optional('FIREBASE_SERVICE_ACCOUNT_PATH'),
+    // Optional: Anthropic API key, shared across every AI-assisted feature
+    // (document analysis first, more to follow) so each one doesn't need
+    // its own credential. Each feature using this must independently
+    // no-op (not crash, not block the real action it's attached to) when
+    // this is unset — see documentAnalysisService.js.
+    anthropicApiKey: optional('ANTHROPIC_API_KEY'),
+    // Optional shared secret appended as a query param on the delivery-
+    // report callback URL configured in Africa's Talking's dashboard
+    // (Settings -> Callback URLs), e.g. .../api/sms/delivery-report?token=X
+    // — the callback has no built-in auth otherwise, so without this
+    // anyone who found the URL could POST fabricated delivery reports.
+    // Left unset, the endpoint still works (delivery visibility matters
+    // more than losing it entirely over a missing secret) but logs a
+    // warning on every call.
+    atDeliveryReportSecret: optional('AT_DELIVERY_REPORT_SECRET'),
     // Optional: Cloudflare R2 (S3-compatible) credentials for storing
     // proof-of-delivery photos. Delivery confirmation photo upload is a
     // no-op (returns a clear error) when unset, rather than crashing.

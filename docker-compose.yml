@@ -122,10 +122,15 @@ services:
       AT_API_KEY: ${AT_API_KEY:-}
       AT_USERNAME: ${AT_USERNAME:-}
       AT_SENDER_ID: ${AT_SENDER_ID:-}
+      AT_DELIVERY_REPORT_SECRET: ${AT_DELIVERY_REPORT_SECRET:-}
       # Push notifications (order-assigned, document approved/rejected).
       # Leave unset for local dev — config/firebaseAdmin.js treats a missing
       # path as "push disabled" rather than failing to boot.
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-}
+      # AI-assisted features (document review triage, more to follow).
+      # Leave unset for local dev — config/anthropicClient.js treats a
+      # missing key as "AI features disabled" rather than failing to boot.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       - "5000:5000"
     depends_on:
