@@ -158,6 +158,33 @@ export async function uploadDeliveryPhoto({ buffer, mimeType, orderId }) {
     return key;
 }
 
+// Uploads a photo attached to a driver-submitted incident report. Keyed
+// by a fresh UUID per report (unlike driver documents, there's no
+// "current" incident photo to overwrite — every report is its own
+// permanent record). Returns the storage KEY (not a URL — see
+// toSignedUrl above).
+export async function uploadIncidentPhoto({ buffer, mimeType }) {
+    const s3 = getClient();
+    if (!s3) {
+        throw new Error('Incident photo storage is not configured on this server.');
+    }
+
+    const realType = assertRealFileType(buffer, ['image/jpeg', 'image/png']);
+    const extension = realType === 'image/png' ? 'png' : 'jpg';
+    const key = `incident-reports/${randomUUID()}.${extension}`;
+
+    await s3.send(
+        new PutObjectCommand({
+            Bucket: appConfig.r2.bucketName,
+            Key: key,
+            Body: buffer,
+            ContentType: realType,
+        })
+    );
+
+    return key;
+}
+
 // Uploads a driver's compliance document (ID, license, registration,
 // insurance, roadworthiness certificate). Keyed by username + type so a
 // re-upload after rejection overwrites the same storage path rather than

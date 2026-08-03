@@ -319,12 +319,74 @@ export async function updateOrderStatus(token: string, orderId: number, status: 
   });
 }
 
-export async function reportIncident(token: string, payload: { orderId?: number; title: string; description: string }) {
+export type IncidentReportResult = {
+  id: number;
+  description: string;
+  status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+  severity: 'low' | 'medium' | 'high' | null;
+  nearestHub: { name: string; distanceKm: number } | null;
+};
+
+// Photo-first: a driver who just had something go wrong can attach a
+// photo and skip typing entirely — the backend drafts the report from
+// the image. When a photo is present this goes out as multipart via
+// expo-file-system's native File.upload() (see confirmDelivery above for
+// why, not fetch+FormData); a plain text-only report is simpler as a
+// normal JSON POST, so it stays on apiFetch instead of paying for
+// multipart overhead it doesn't need.
+export async function reportIncident(
+  token: string,
+  payload: {
+    orderId?: number;
+    title?: string;
+    description?: string;
+    lat?: number;
+    lng?: number;
+    photo?: { uri: string; fileName?: string; mimeType?: string };
+  }
+): Promise<IncidentReportResult> {
+  if (payload.photo) {
+    const file = new File(payload.photo.uri);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('Network request failed (upload timed out)')), 30000);
+    });
+
+    const parameters: Record<string, string> = {};
+    if (payload.orderId != null) parameters.orderId = String(payload.orderId);
+    if (payload.title) parameters.title = payload.title;
+    if (payload.description) parameters.description = payload.description;
+    if (payload.lat != null) parameters.lat = String(payload.lat);
+    if (payload.lng != null) parameters.lng = String(payload.lng);
+
+    try {
+      const result = await Promise.race([
+        file.upload(`${API_BASE}/api/incidents`, {
+          uploadType: UploadType.MULTIPART,
+          fieldName: 'photo',
+          mimeType: payload.photo.mimeType || 'image/jpeg',
+          headers: { Authorization: `Bearer ${token}` },
+          parameters,
+        }),
+        timeout,
+      ]);
+      return parseUploadResult(result) as IncidentReportResult;
+    } finally {
+      clearTimeout(timeoutId!);
+    }
+  }
+
   return apiFetch('/api/incidents', {
     method: 'POST',
     token,
-    body: payload,
-  });
+    body: {
+      orderId: payload.orderId,
+      title: payload.title,
+      description: payload.description,
+      lat: payload.lat,
+      lng: payload.lng,
+    },
+  }) as Promise<IncidentReportResult>;
 }
 
 export type MyIncident = {
@@ -332,6 +394,8 @@ export type MyIncident = {
   order_id: number | null;
   description: string;
   status: 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
+  severity?: 'low' | 'medium' | 'high' | null;
+  photo_url?: string | null;
   resolved_at: string | null;
   created_at: string;
 };

@@ -113,7 +113,7 @@ describe('offlineQueue', () => {
 
     it('flushOfflineQueue sends every queued action and empties the queue on full success', async () => {
         mockUpdateOrderStatus.mockResolvedValue(undefined);
-        mockReportIncident.mockResolvedValue(undefined);
+        mockReportIncident.mockResolvedValue({ id: 1, description: 'Delay\n\nTraffic', status: 'OPEN', severity: null, nearestHub: null });
 
         await enqueueOfflineAction({ type: 'status-update', orderId: 1, status: 'PICKED_UP', createdAt: '2026-01-01T00:00:00Z' });
         await enqueueOfflineAction({ type: 'incident-report', payload: { title: 'Delay', description: 'Traffic' }, createdAt: '2026-01-01T00:00:01Z' });

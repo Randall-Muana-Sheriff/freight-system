@@ -1,15 +1,25 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { ToastOverlay } from '../../components/ToastOverlay';
 import { ActionSheet } from '../../components/ActionSheet';
 import { theme } from '../../lib/theme';
-import { reportIncident, isNetworkFailure, fetchMyIncidents, type MyIncident } from '../../lib/api';
+import {
+  reportIncident,
+  isNetworkFailure,
+  fetchMyIncidents,
+  fetchDriverAssignments,
+  type MyIncident,
+  type IncidentReportResult,
+  type DriverAssignment,
+} from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { enqueueOfflineAction } from '../../lib/offlineQueue';
+import { enqueueOfflineAction, persistIncidentPhotoForQueue } from '../../lib/offlineQueue';
 
 // Picked from the Incident title field itself (tapping it opens this list)
 // so a driver in a stressful moment (right after an accident, standing next
@@ -39,8 +49,38 @@ function splitReport(description: string) {
   return { title: first, body: rest.join('\n\n') };
 }
 
+// Display-only — the backend independently re-derives this from the
+// verified order it looks up server-side (see stagePhraseForStatus in
+// incidentController.js), so a mismatch here is never a security issue,
+// just cosmetic. Kept in sync in wording, not in trust.
+function stagePhrase(status: string) {
+  switch (status.toUpperCase()) {
+    case 'ASSIGNED':
+      return 'heading to pick up';
+    case 'PICKED_UP':
+    case 'IN_TRANSIT':
+      return 'in transit with';
+    case 'ARRIVED':
+      return 'heading to deliver';
+    default:
+      return null;
+  }
+}
+
 function formatReportDate(value: string) {
   return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// A "high" severity result gets distinctly different framing (matches
+// what the AI is actually flagging) plus nearest-hub guidance whenever
+// it's available — the immediate, real-time payoff of this feature, not
+// something a driver has to wait for a dispatcher to relay back.
+function buildSuccessToast(result: IncidentReportResult): Toast {
+  const hubNote = result.nearestHub ? ` Nearest hub: ${result.nearestHub.name} (${result.nearestHub.distanceKm}km).` : '';
+  if (result.severity === 'high') {
+    return { icon: 'alert-circle', message: `Report sent — marked urgent, dispatch has been alerted.${hubNote}` };
+  }
+  return { icon: 'checkmark-circle-outline', message: `Report sent — dispatch has been notified.${hubNote}` };
 }
 
 export default function IncidentsScreen() {
@@ -59,9 +99,40 @@ export default function IncidentsScreen() {
   const descriptionRef = useRef<TextInput>(null);
   const [myIncidents, setMyIncidents] = useState<MyIncident[] | undefined>(undefined);
   const [incidentsLoadFailed, setIncidentsLoadFailed] = useState(false);
+  // Photo-first: a driver can attach a photo and send with little or no
+  // typing — the backend drafts a title/description from it. Title and
+  // description are no longer hard-required on their own, only "at least
+  // one of {description, photo}" is — see onSubmit.
+  const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [pickingPhotoSource, setPickingPhotoSource] = useState(false);
+  // Reporting is never blocked without an active job — a driver with
+  // nothing assigned right now can still always reach dispatch. This is
+  // purely additive: when there IS an active assignment, attach which one
+  // and what stage it's at, so the report reads as "in transit with the
+  // rice bags order" instead of floating with no context. Auto-selected
+  // when there's exactly one; a driver can always pick a different one
+  // (or none, via "Unrelated to a job") if more than one, or clear it.
+  const [activeAssignments, setActiveAssignments] = useState<DriverAssignment[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
+  const [pickingAssignment, setPickingAssignment] = useState(false);
 
-  const titleMissing = showErrors && !title.trim();
-  const descriptionMissing = showErrors && !description.trim();
+  const descriptionMissing = showErrors && !description.trim() && !photo;
+  const selectedAssignment = activeAssignments.find((a) => a.id === selectedOrderId) || null;
+
+  const loadActiveAssignments = useCallback(async () => {
+    if (!token) return;
+    try {
+      const rows = await fetchDriverAssignments(token);
+      setActiveAssignments(rows);
+      setSelectedOrderId((current) => {
+        if (current && rows.some((r) => r.id === current)) return current;
+        return rows.length === 1 ? rows[0].id : null;
+      });
+    } catch {
+      // Best-effort — reporting must never depend on this succeeding, it
+      // only adds optional context when it's available.
+    }
+  }, [token]);
 
   const loadIncidents = useCallback(async () => {
     if (!token) return;
@@ -84,7 +155,8 @@ export default function IncidentsScreen() {
   useFocusEffect(
     useCallback(() => {
       loadIncidents();
-    }, [loadIncidents])
+      loadActiveAssignments();
+    }, [loadIncidents, loadActiveAssignments])
   );
 
   const onPickQuickIssue = (issue: string) => {
@@ -109,34 +181,100 @@ export default function IncidentsScreen() {
     setTimeout(() => titleRef.current?.focus(), 300);
   };
 
+  const onTakePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setToast({ icon: 'camera-outline', message: 'Allow camera access to attach a photo.' });
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
+    if (result.canceled || !result.assets?.[0]) return;
+    setPhoto(result.assets[0]);
+    setToast(null);
+  };
+
+  const onPickPhotoFromLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setToast({ icon: 'images-outline', message: 'Allow photo library access to attach a photo.' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
+    if (result.canceled || !result.assets?.[0]) return;
+    setPhoto(result.assets[0]);
+    setToast(null);
+  };
+
+  const onChoosePhotoSource = (source: 'camera' | 'library') => {
+    setPickingPhotoSource(false);
+    if (source === 'camera') {
+      onTakePhoto();
+    } else {
+      onPickPhotoFromLibrary();
+    }
+  };
+
+  // Best-effort only — a safety report must never be blocked by a
+  // location permission prompt or a slow GPS fix. Returns null on
+  // anything short of a clean, already-granted read, and the backend
+  // treats missing coordinates as "no nearest-hub guidance", not an error.
+  const getBestEffortLocation = async (): Promise<{ lat: number; lng: number } | null> => {
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== 'granted') return null;
+      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      return { lat: position.coords.latitude, lng: position.coords.longitude };
+    } catch {
+      return null;
+    }
+  };
+
   const onSubmit = async () => {
     if (!token) return;
-    if (!title.trim() || !description.trim()) {
+    if (!description.trim() && !photo) {
       setShowErrors(true);
-      setToast({ icon: 'alert-circle-outline', message: 'Add a title and a few details before sending.' });
+      setToast({ icon: 'alert-circle-outline', message: 'Add a few details or attach a photo before sending.' });
       return;
     }
 
     setSending(true);
     setToast(null);
+    // Best-effort, never blocks — see getBestEffortLocation.
+    const location = await getBestEffortLocation();
+    const trimmedTitle = title.trim() || undefined;
+    const trimmedDescription = description.trim() || undefined;
+
     try {
-      await reportIncident(token, { title: title.trim(), description: description.trim() });
+      const result = await reportIncident(token, {
+        orderId: selectedOrderId ?? undefined,
+        title: trimmedTitle,
+        description: trimmedDescription,
+        lat: location?.lat,
+        lng: location?.lng,
+        photo: photo ? { uri: photo.uri, fileName: photo.fileName ?? undefined, mimeType: photo.mimeType } : undefined,
+      });
       setTitle('');
       setIsCustomTitle(false);
       setDescription('');
+      setPhoto(null);
       setShowErrors(false);
-      setToast({ icon: 'checkmark-circle-outline', message: 'Report sent — dispatch has been notified.' });
+      setToast(buildSuccessToast(result));
       loadIncidents();
     } catch (error) {
       if (isNetworkFailure(error)) {
+        const localPhotoUri = photo ? persistIncidentPhotoForQueue(photo.uri, photo.fileName || 'incident-photo.jpg') : undefined;
         await enqueueOfflineAction({
           type: 'incident-report',
-          payload: { title: title.trim(), description: description.trim() },
+          payload: { orderId: selectedOrderId ?? undefined, title: trimmedTitle, description: trimmedDescription, lat: location?.lat, lng: location?.lng },
+          localPhotoUri,
+          photoFileName: photo?.fileName ?? undefined,
+          photoMimeType: photo?.mimeType,
           createdAt: new Date().toISOString(),
         });
         setTitle('');
         setIsCustomTitle(false);
         setDescription('');
+        setPhoto(null);
         setShowErrors(false);
         setToast({ icon: 'cloud-offline-outline', message: "Saved offline — it'll send as soon as you're back in range." });
       } else {
@@ -159,9 +297,28 @@ export default function IncidentsScreen() {
         subtitle="Let dispatch know about a delay, breakdown, or anything blocking your delivery."
       />
 
-      <Text style={styles.label}>Incident title</Text>
+      {activeAssignments.length > 0 && (
+        <TouchableOpacity style={styles.assignmentChip} activeOpacity={0.8} onPress={() => setPickingAssignment(true)}>
+          <Ionicons name="cube-outline" size={16} color={theme.colors.primary} />
+          <View style={{ flex: 1 }}>
+            {selectedAssignment ? (
+              <>
+                <Text style={styles.assignmentChipTitle} numberOfLines={1}>
+                  Reporting about: {selectedAssignment.cargo_description || `Order #${selectedAssignment.id}`}
+                </Text>
+                <Text style={styles.assignmentChipDetail}>{stagePhrase(selectedAssignment.status || '') || 'Assigned'}</Text>
+              </>
+            ) : (
+              <Text style={styles.assignmentChipTitle}>Not linked to a specific job</Text>
+            )}
+          </View>
+          <Text style={styles.assignmentChipChange}>Change</Text>
+        </TouchableOpacity>
+      )}
+
+      <Text style={styles.label}>Incident title (optional)</Text>
       {isCustomTitle ? (
-        <View style={[styles.input, styles.selectInput, titleMissing && styles.inputError]}>
+        <View style={[styles.input, styles.selectInput]}>
           <TextInput
             ref={titleRef}
             placeholder="Describe the issue"
@@ -181,18 +338,13 @@ export default function IncidentsScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <TouchableOpacity
-          style={[styles.input, styles.selectInput, titleMissing && styles.inputError]}
-          activeOpacity={0.8}
-          onPress={() => setPickingIssue(true)}
-        >
+        <TouchableOpacity style={[styles.input, styles.selectInput]} activeOpacity={0.8} onPress={() => setPickingIssue(true)}>
           <Text style={title ? styles.selectValue : styles.selectPlaceholder}>{title || 'Select an issue'}</Text>
           <Ionicons name="chevron-down" size={16} color={theme.colors.muted} />
         </TouchableOpacity>
       )}
-      {titleMissing ? <Text style={styles.fieldError}>Add a short title.</Text> : null}
 
-      <Text style={styles.label}>Details</Text>
+      <Text style={styles.label}>Details (optional if you attach a photo)</Text>
       <TextInput
         ref={descriptionRef}
         placeholder="What happened, where, and what support is needed?"
@@ -205,7 +357,29 @@ export default function IncidentsScreen() {
           setToast(null);
         }}
       />
-      {descriptionMissing ? <Text style={styles.fieldError}>Add a few details.</Text> : null}
+      {descriptionMissing ? <Text style={styles.fieldError}>Add a few details or attach a photo below.</Text> : null}
+
+      <Text style={styles.label}>Photo (optional)</Text>
+      {photo ? (
+        <View style={styles.photoPreviewWrap}>
+          <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
+          <TouchableOpacity style={styles.photoRemoveButton} activeOpacity={0.85} onPress={() => setPhoto(null)}>
+            <Ionicons name="close" size={16} color={theme.colors.paper} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.photoAttachButton}
+          activeOpacity={0.8}
+          onPress={() => {
+            setToast(null);
+            setPickingPhotoSource(true);
+          }}
+        >
+          <Ionicons name="camera-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.photoAttachText}>Attach a photo — we&apos;ll help draft the report</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity activeOpacity={0.9} style={styles.button} onPress={onSubmit} disabled={sending}>
         <Ionicons name="warning-outline" size={16} color={theme.colors.paper} />
@@ -237,6 +411,12 @@ export default function IncidentsScreen() {
                     <Text style={styles.historyTitle} numberOfLines={1}>{reportTitle}</Text>
                     <Text style={[styles.historyStatusText, { color: meta.color }]}>{meta.label}</Text>
                   </View>
+                  {item.severity === 'high' ? (
+                    <View style={styles.severityBadge}>
+                      <Ionicons name="alert-circle" size={10} color={theme.colors.danger} />
+                      <Text style={styles.severityBadgeText}>Marked urgent</Text>
+                    </View>
+                  ) : null}
                   {body ? <Text style={styles.historyBody} numberOfLines={2}>{body}</Text> : null}
                   <Text style={styles.historyDate}>{formatReportDate(item.created_at)}</Text>
                 </View>
@@ -273,6 +453,42 @@ export default function IncidentsScreen() {
           onPress: () => onPickQuickIssue(issue.label),
         })),
         { key: 'other', label: 'Other', icon: 'create-outline' as const, onPress: onPickOtherIssue },
+      ]}
+    />
+
+    <ActionSheet
+      visible={pickingAssignment}
+      title="Which job is this about?"
+      onCancel={() => setPickingAssignment(false)}
+      options={[
+        ...activeAssignments.map((a) => ({
+          key: String(a.id),
+          label: a.cargo_description || `Order #${a.id}`,
+          icon: 'cube-outline' as const,
+          onPress: () => {
+            setSelectedOrderId(a.id);
+            setPickingAssignment(false);
+          },
+        })),
+        {
+          key: 'none',
+          label: 'Unrelated to a job',
+          icon: 'close-circle-outline' as const,
+          onPress: () => {
+            setSelectedOrderId(null);
+            setPickingAssignment(false);
+          },
+        },
+      ]}
+    />
+
+    <ActionSheet
+      visible={pickingPhotoSource}
+      title="Attach a photo"
+      onCancel={() => setPickingPhotoSource(false)}
+      options={[
+        { key: 'camera', label: 'Take photo', icon: 'camera-outline' as const, onPress: () => onChoosePhotoSource('camera') },
+        { key: 'library', label: 'Choose from library', icon: 'images-outline' as const, onPress: () => onChoosePhotoSource('library') },
       ]}
     />
     </>
@@ -334,4 +550,56 @@ const styles = StyleSheet.create({
   historyStatusText: { fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase' },
   historyBody: { color: theme.colors.muted, fontSize: 12, lineHeight: 17, marginTop: 2, fontFamily: theme.fonts.body },
   historyDate: { color: theme.colors.muted, fontSize: 10, fontFamily: theme.fonts.mono, marginTop: 3 },
+  severityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginTop: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: theme.radius.pill,
+    backgroundColor: `${theme.colors.danger}1A`,
+  },
+  severityBadgeText: { color: theme.colors.danger, fontSize: 9, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.5 },
+  assignmentChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: theme.radius.md,
+    backgroundColor: `${theme.colors.primary}14`,
+    borderWidth: 1,
+    borderColor: `${theme.colors.primary}40`,
+    padding: 12,
+    marginBottom: 16,
+  },
+  assignmentChipTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  assignmentChipDetail: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.body, marginTop: 1, textTransform: 'capitalize' },
+  assignmentChipChange: { color: theme.colors.primary, fontSize: 11, fontFamily: theme.fonts.bodySemiBold },
+  photoAttachButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.surface2,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderStyle: 'dashed',
+    padding: 13,
+    marginBottom: 16,
+  },
+  photoAttachText: { color: theme.colors.muted, fontSize: 13, fontFamily: theme.fonts.body, flex: 1 },
+  photoPreviewWrap: { marginBottom: 16, borderRadius: theme.radius.md, overflow: 'hidden' },
+  photoPreview: { width: '100%', height: 180, backgroundColor: theme.colors.surface2 },
+  photoRemoveButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
 });

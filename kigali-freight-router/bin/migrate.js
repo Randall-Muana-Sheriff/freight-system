@@ -35,6 +35,7 @@ const MIGRATIONS = [
     { id: 'add_otp_codes.sql', destructive: false },
     { id: 'add_driver_document_hash.sql', destructive: false },
     { id: 'add_driver_document_ai_analysis.sql', destructive: false },
+    { id: 'add_incident_photo_and_ai_triage.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

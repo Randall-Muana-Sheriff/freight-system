@@ -13,7 +13,14 @@ export type PendingDriverAction =
     }
   | {
       type: 'incident-report';
-      payload: { orderId?: number; title: string; description: string };
+      payload: { orderId?: number; title?: string; description?: string; lat?: number; lng?: number };
+      // Same reasoning as delivery-photo's localFileUri below — only set
+      // when the report had a photo attached, pointing into this app's
+      // own persistent storage rather than expo-image-picker's ephemeral
+      // cache location.
+      localPhotoUri?: string;
+      photoFileName?: string;
+      photoMimeType?: string;
       createdAt: string;
     }
   | {
@@ -62,6 +69,18 @@ export function persistDeliveryPhotoForQueue(sourceUri: string, fileName: string
   return destination.uri;
 }
 
+// Same purpose as persistDeliveryPhotoForQueue above, separate directory
+// so the two queues' leftover files are easy to tell apart on disk.
+export function persistIncidentPhotoForQueue(sourceUri: string, fileName: string): string {
+  const targetDir = new Directory(Paths.document, 'pending-incident-photos');
+  if (!targetDir.exists) targetDir.create({ intermediates: true });
+
+  const source = new File(sourceUri);
+  const destination = new File(targetDir, `${Date.now()}-${fileName}`);
+  source.copy(destination);
+  return destination.uri;
+}
+
 export async function enqueueOfflineAction(action: PendingDriverAction) {
   const queue = await readQueue();
   queue.push(action);
@@ -97,7 +116,13 @@ export async function flushOfflineQueue(token: string) {
         if (item.type === 'status-update') {
           await updateOrderStatus(token, item.orderId, item.status);
         } else if (item.type === 'incident-report') {
-          await reportIncident(token, item.payload);
+          await reportIncident(token, {
+            ...item.payload,
+            photo: item.localPhotoUri
+              ? { uri: item.localPhotoUri, fileName: item.photoFileName, mimeType: item.photoMimeType }
+              : undefined,
+          });
+          if (item.localPhotoUri) new File(item.localPhotoUri).delete();
         } else if (item.type === 'delivery-photo') {
           await confirmDelivery(
             token,

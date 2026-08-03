@@ -175,6 +175,14 @@ export interface Incident {
     status: string;
     driver_name?: string;
     created_at?: string;
+    resolved_at?: string | null;
+    photo_url?: string | null;
+    lat?: number | null;
+    lng?: number | null;
+    severity?: 'low' | 'medium' | 'high' | null;
+    aiAnalysis?: { suspectedInjury?: boolean; vehicleDriveable?: boolean; summary?: string } | null;
+    orderCargoDescription?: string | null;
+    orderStatus?: string | null;
     [key: string]: unknown;
 }
 
