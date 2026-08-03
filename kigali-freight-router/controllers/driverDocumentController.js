@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import pool from '../config/db.js';
+import { io } from '../server.js';
 import { uploadDriverDocument, toSignedUrl, assertRealFileType } from '../config/r2Client.js';
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
@@ -287,6 +288,19 @@ export const DriverDocumentController = {
                 actionType: status === 'approved' ? 'DRIVER_DOCUMENT_APPROVED' : 'DRIVER_DOCUMENT_REJECTED',
                 description: `${await describeDriver(doc.username)}'s ${label} marked ${status}`,
                 username: req.user?.username || 'System',
+            });
+
+            // Push (above) reaches the driver even with the app closed;
+            // this also feeds the in-app Alerts live feed for whenever
+            // they have it open, same broadcast-then-client-filters
+            // pattern order:status-updated and incident:status-updated
+            // already use.
+            io.emit('document:status-updated', {
+                username: doc.username,
+                documentType: doc.documentType,
+                status: doc.status,
+                label,
+                rejectionReason: status === 'rejected' ? rejectionReason || null : null,
             });
 
             sendPushToUser(doc.username, {

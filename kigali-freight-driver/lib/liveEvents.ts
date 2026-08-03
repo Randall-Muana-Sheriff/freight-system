@@ -80,16 +80,54 @@ export function useLiveDriverEvents() {
     // this event specifically so this filter is exact — no local cache of
     // "known order IDs" to keep in sync, which would otherwise miss a job
     // assigned moments ago and not yet refreshed.
+    // initiatedByDriver skips the case where this driver is the one who
+    // just tapped the status button themselves — the trip screen already
+    // reflects that immediately, so a notification about your own action
+    // is noise, not news. Only a dispatcher/admin changing something on
+    // this driver's behalf (initiatedByDriver: false) is genuinely new
+    // information they wouldn't otherwise know.
     socket.on('order:status-updated', (payload) => {
-      if (payload.assignedTo !== username) return;
+      if (payload.assignedTo !== username || payload.initiatedByDriver) return;
       const cargo = payload.cargo_description || 'Your shipment';
       const status = String(payload.status || '').toLowerCase();
       setEvents((current) => [
         buildNotification(
-          status === 'delivered' ? 'Delivery confirmed' : 'Trip status updated',
-          `${cargo} is now ${status}.`,
-          'success',
+          'Dispatch updated your trip',
+          `${cargo} was set to ${status} by dispatch.`,
+          'info',
           payload.timestamp
+        ),
+        ...current,
+      ].slice(0, 20));
+    });
+
+    socket.on('document:status-updated', (payload) => {
+      if (payload.username !== username) return;
+      const approved = payload.status === 'approved';
+      setEvents((current) => [
+        buildNotification(
+          approved ? 'Document approved' : 'Document needs attention',
+          approved
+            ? `Your ${payload.label} was approved.`
+            : `Your ${payload.label} was rejected${payload.rejectionReason ? `: ${payload.rejectionReason}` : '.'}`,
+          approved ? 'success' : 'warning'
+        ),
+        ...current,
+      ].slice(0, 20));
+    });
+
+    socket.on('incident:status-updated', (payload) => {
+      if (payload.driver_name !== username) return;
+      const [reportTitle] = String(payload.description || '').split('\n\n');
+      const status = String(payload.status || '').toUpperCase();
+      if (status !== 'ACKNOWLEDGED' && status !== 'RESOLVED') return;
+      setEvents((current) => [
+        buildNotification(
+          status === 'RESOLVED' ? 'Report resolved' : 'Report seen by dispatch',
+          status === 'RESOLVED'
+            ? `Your report "${reportTitle}" has been marked resolved.`
+            : `Dispatch is looking into "${reportTitle}".`,
+          status === 'RESOLVED' ? 'success' : 'info'
         ),
         ...current,
       ].slice(0, 20));

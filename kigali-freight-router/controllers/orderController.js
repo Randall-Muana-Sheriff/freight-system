@@ -675,6 +675,13 @@ export const OrderController = {
                 status: updatedOrder.status,
                 cargo_description: updatedOrder.cargo_description,
                 assignedTo,
+                // Lets the driver app's own alert feed skip notifying a
+                // driver about a status change they just made themselves —
+                // that's not new information, the trip screen already
+                // reflects it immediately. Only a dispatcher/admin-driven
+                // change (this same value false) is something the assigned
+                // driver wouldn't otherwise know about.
+                initiatedByDriver: requesterRole === 'driver',
                 timestamp: new Date().toISOString()
             });
 
@@ -795,6 +802,7 @@ export const OrderController = {
                 photoUrl,
                 locationFlagged,
                 distanceFromTargetM,
+                initiatedByDriver: String(req.user?.role || '').toLowerCase() === 'driver',
                 timestamp: new Date().toISOString(),
             });
 
