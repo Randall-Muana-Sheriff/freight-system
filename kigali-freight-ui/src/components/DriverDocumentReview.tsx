@@ -4,12 +4,27 @@
 // backend separately block dispatch until every document here is
 // approved — this is where that approval actually happens.
 import { useState, useEffect, useCallback } from 'react';
-import { FileCheck, Check, X, Eye } from 'lucide-react';
+import { FileCheck, Check, X, Eye, RotateCcw, Sparkles, ShieldCheck } from 'lucide-react';
 import { fetchDriverDocuments, updateDriverDocumentStatus } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 
 type DocumentType = 'national_id' | 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'roadworthiness_certificate';
 type DocumentStatus = 'approved' | 'rejected' | 'pending' | 'not_submitted';
+
+// Purely an admin-facing triage aid — see documentAnalysisService.js.
+// Never changes what buttons render or what status means; an admin's own
+// Approve/Reject/Revoke click is still the only thing that actually
+// decides anything here.
+interface DocumentAiAnalysis {
+    documentTypeMatches: boolean;
+    extractedName: string;
+    nameMatchesAccount: boolean;
+    expiryDate: string;
+    isExpired: boolean;
+    legible: boolean;
+    summary: string;
+    confidence: 'high' | 'medium' | 'low';
+}
 
 interface DriverDocument {
     id: number;
@@ -18,6 +33,26 @@ interface DriverDocument {
     status: DocumentStatus;
     rejectionReason?: string;
     fileUrl?: string;
+    aiAnalysis?: DocumentAiAnalysis | null;
+}
+
+// Short, unambiguous verdict tags computed straight from the model's
+// boolean fields — deliberately NOT restated as prose here. `summary`
+// below is the model's own natural-language write-up of the same
+// findings, in complete sentences instead of fragments; tags give the
+// one-glance scan, summary gives the detail — two tiers, not one list
+// repeating the same finding in different words.
+function aiVerdictTags(analysis: DocumentAiAnalysis): string[] {
+    const tags: string[] = [];
+    if (!analysis.documentTypeMatches) tags.push('Wrong document type');
+    if (analysis.isExpired) tags.push(analysis.expiryDate ? `Expired ${analysis.expiryDate}` : 'Expired');
+    if (analysis.extractedName && !analysis.nameMatchesAccount) tags.push('Name mismatch');
+    if (!analysis.legible) tags.push('Illegible');
+    return tags;
+}
+
+function aiHasIssues(analysis: DocumentAiAnalysis): boolean {
+    return aiVerdictTags(analysis).length > 0;
 }
 
 const REQUIRED_TYPES: DocumentType[] = ['national_id', 'drivers_license', 'vehicle_registration', 'insurance_certificate', 'roadworthiness_certificate'];
@@ -86,6 +121,54 @@ export default function DriverDocumentReview() {
         }
     };
 
+    // Separate from handleDecision above (rather than just also allowing
+    // 'rejected' from the pending buttons) because the stakes are
+    // different: a pending document has never granted anything yet, but
+    // revoking an approved one actively pulls this driver back out of
+    // "verified" — assignOrderBundle/reassignOrder recompute that live off
+    // every document's current status, so the effect is immediate. The
+    // confirm() step exists specifically so that's a deliberate choice,
+    // not a misclick.
+    const handleRevoke = async (id: number, driverLabel: string, docLabel: string) => {
+        const confirmed = window.confirm(
+            `${docLabel} for ${driverLabel} is already approved. Revoking it will mark them unverified again until they resubmit and it's re-approved. Continue?`
+        );
+        if (!confirmed) return;
+
+        const rejectionReason = window.prompt('Reason for revoking this approval (shown to the driver):');
+        if (rejectionReason === null) return; // cancelled the prompt
+
+        setError(null);
+        setDecidingId(id);
+        try {
+            await updateDriverDocumentStatus(id, 'rejected', rejectionReason, jwtToken);
+            void load();
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setDecidingId(null);
+        }
+    };
+
+    // The one-click payoff of the whole feature: the AI already wrote the
+    // exact reason ("name mismatch...", "wrong document type...") — an
+    // admin agreeing with it shouldn't have to retype what's already on
+    // screen into a window.prompt(). Still one explicit confirm, since
+    // rejecting is still a real decision the AI doesn't get to make alone.
+    const handleRejectWithAiReason = async (id: number, reason: string) => {
+        if (!window.confirm(`Reject this document using the AI's finding as the reason?\n\n"${reason}"`)) return;
+        setError(null);
+        setDecidingId(id);
+        try {
+            await updateDriverDocumentStatus(id, 'rejected', reason, jwtToken);
+            void load();
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setDecidingId(null);
+        }
+    };
+
     if (userRole !== 'admin') {
         return null;
     }
@@ -93,6 +176,7 @@ export default function DriverDocumentReview() {
     const byDriver = groupByDriver(rows);
     const drivers = Object.keys(byDriver).sort();
     const pendingCount = rows.filter((r) => r.status === 'pending').length;
+    const flaggedCount = rows.filter((r) => r.status === 'pending' && r.aiAnalysis && aiHasIssues(r.aiAnalysis)).length;
 
     return (
         <section>
@@ -101,9 +185,17 @@ export default function DriverDocumentReview() {
                     <FileCheck size={15} strokeWidth={2.5} className="text-steel" />
                     <h2 className="text-sm font-bold tracking-tight text-paper font-sans">Driver document verification</h2>
                 </div>
-                {pendingCount > 0 && (
-                    <span className="bg-hazard/15 text-hazard rounded-full px-2 py-0.5 text-[10px] font-bold font-mono">{pendingCount} pending review</span>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {flaggedCount > 0 && (
+                        <span className="flex items-center gap-1 bg-rust/15 text-rust rounded-full px-2 py-0.5 text-[10px] font-bold font-mono">
+                            <Sparkles size={9} strokeWidth={2.5} />
+                            {flaggedCount} AI-flagged
+                        </span>
+                    )}
+                    {pendingCount > 0 && (
+                        <span className="bg-hazard/15 text-hazard rounded-full px-2 py-0.5 text-[10px] font-bold font-mono">{pendingCount} pending review</span>
+                    )}
+                </div>
             </div>
 
             {error && (
@@ -122,12 +214,63 @@ export default function DriverDocumentReview() {
                             {REQUIRED_TYPES.map((type) => {
                                 const doc = byDriver[username][type];
                                 const status: DocumentStatus = doc?.status || 'not_submitted';
+                                const analysis = status === 'pending' ? doc?.aiAnalysis : null;
+                                const tags = analysis ? aiVerdictTags(analysis) : null;
+                                const hasIssues = analysis ? aiHasIssues(analysis) : null;
+                                // Rail color communicates AI status at a glance, before reading
+                                // any text — null (no analysis yet, or AI disabled) stays the
+                                // same neutral border every other row already has.
+                                const railClass = hasIssues === null ? 'border-line/10' : hasIssues ? 'border-l-rust' : 'border-l-tarp';
                                 return (
-                                    <div key={type} className="flex items-center justify-between gap-2 bg-ink/60 rounded border border-line/10 px-2.5 py-2 text-[11px] font-mono">
+                                    <div key={type} className={`relative flex items-start justify-between gap-2 bg-ink/60 rounded border ${railClass} ${hasIssues !== null ? 'border-l-[3px]' : ''} px-2.5 py-2 text-[11px] font-mono`}>
                                         <div className="min-w-0">
                                             <div className="text-paper truncate">{LABELS[type]}</div>
                                             {status === 'rejected' && doc?.rejectionReason ? (
-                                                <div className="text-[9px] text-rust mt-0.5 truncate">Reason: {doc.rejectionReason}</div>
+                                                <div className="text-[9px] text-rust mt-0.5">Reason: {doc.rejectionReason}</div>
+                                            ) : null}
+                                            {analysis && tags !== null && hasIssues !== null ? (
+                                                <div className="mt-1 space-y-1">
+                                                    {hasIssues ? (
+                                                        <>
+                                                            {tags.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {tags.map((tag) => (
+                                                                        <span key={tag} className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-rust/15 text-rust">
+                                                                            {tag}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            <div className="flex items-start gap-1 text-steel leading-snug">
+                                                                <Sparkles size={8} strokeWidth={2.5} className="shrink-0 mt-0.5 text-rust" />
+                                                                <span>{analysis.summary}</span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                disabled={decidingId === doc!.id}
+                                                                onClick={() => void handleRejectWithAiReason(doc!.id, analysis.summary)}
+                                                                className="text-[9px] text-rust underline decoration-dotted hover:text-hazard disabled:opacity-50"
+                                                            >
+                                                                Reject with this reason
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <div className="flex items-start gap-1 text-tarp leading-snug">
+                                                                <ShieldCheck size={9} strokeWidth={2.5} className="shrink-0 mt-0.5" />
+                                                                <span>{analysis.summary}</span>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                disabled={decidingId === doc!.id}
+                                                                onClick={() => void handleDecision(doc!.id, 'approved')}
+                                                                className="text-[9px] text-tarp underline decoration-dotted hover:text-paper disabled:opacity-50"
+                                                            >
+                                                                Approve
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
                                             ) : null}
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
@@ -165,6 +308,17 @@ export default function DriverDocumentReview() {
                                                         <X size={11} strokeWidth={3} />
                                                     </button>
                                                 </>
+                                            )}
+                                            {status === 'approved' && doc && (
+                                                <button
+                                                    type="button"
+                                                    disabled={decidingId === doc.id}
+                                                    onClick={() => void handleRevoke(doc.id, resolveDriverName(username), LABELS[type])}
+                                                    className="bg-rust/15 hover:bg-rust/25 text-rust rounded p-1 disabled:opacity-50"
+                                                    title="Revoke approval — send back for re-verification"
+                                                >
+                                                    <RotateCcw size={11} strokeWidth={3} />
+                                                </button>
                                             )}
                                         </div>
                                     </div>
