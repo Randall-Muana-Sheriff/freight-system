@@ -29,6 +29,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import hubRoutes from './routes/hubRoutes.js';
 import driverDocumentRoutes from './routes/driverDocumentRoutes.js';
 import geocodeRoutes from './routes/geocodeRoutes.js';
+import smsRoutes from './routes/smsRoutes.js';
 
 const app = express();
 const allowedOrigins = appConfig.corsOrigins;
@@ -139,6 +140,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/hubs', hubRoutes);
 app.use('/api/driver-documents', driverDocumentRoutes);
 app.use('/api/geocode', geocodeRoutes);
+app.use('/api/sms', smsRoutes);
 
 // Anything that reaches here escaped every controller's own try/catch —
 // a malformed JSON body, a multer error thrown before a route handler

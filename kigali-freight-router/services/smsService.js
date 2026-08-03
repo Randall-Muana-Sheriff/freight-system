@@ -65,7 +65,24 @@ export async function sendSms(phoneNumber, message) {
     try {
         const sms = await clientPromise;
         const senderId = process.env.AT_SENDER_ID || undefined;
-        await sendWithRetry(sms, { to: [phoneNumber], message, ...(senderId ? { from: senderId } : {}) });
+        const response = await sendWithRetry(sms, { to: [phoneNumber], message, ...(senderId ? { from: senderId } : {}) });
+
+        // The API call not throwing only means Africa's Talking accepted
+        // the HTTP request — actual per-recipient outcome (accepted for
+        // delivery vs. rejected for insufficient balance, an unregistered
+        // sender ID, a blacklisted number, etc.) is a separate field
+        // inside a 200 response. Treating "didn't throw" as "delivered"
+        // meant a real rejection here would have looked identical to
+        // success in every log we had.
+        const recipient = response?.SMSMessageData?.Recipients?.[0];
+        if (recipient && recipient.status !== 'Success') {
+            console.error(`❌ SMS rejected for ${phoneNumber}: ${recipient.status} (code ${recipient.statusCode})`);
+            console.log(`[smsService] Falling back to log. To ${phoneNumber}: ${message}`);
+            return { sent: false, logged: true, reason: recipient.status };
+        }
+
+        console.log(`[smsService] Sent to ${phoneNumber} — messageId ${recipient?.messageId ?? 'unknown'}, cost ${recipient?.cost ?? 'unknown'}.`);
+
         if (isSandbox()) {
             console.log(`[smsService] Sandbox reported success, but only Kenyan Airtel numbers actually receive it — logging too. To ${phoneNumber}: ${message}`);
             return { sent: true, logged: true };
