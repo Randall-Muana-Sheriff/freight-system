@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { withKioskAccess } from '../middleware/kioskAuthMiddleware.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
@@ -24,7 +25,7 @@ const inviteLimit = rateLimit({
     keyFn: (req) => req.user?.username || req.ip,
 });
 
-router.get('/users', authMiddleware(['admin', 'dispatcher']), AdminController.getUsers);
+router.get('/users', withKioskAccess(['admin', 'dispatcher', 'kiosk']), AdminController.getUsers);
 router.post('/users', authMiddleware(['admin']), adminWriteLimit, AdminController.createUser);
 router.patch('/users/:id/role', authMiddleware(['admin']), adminWriteLimit, AdminController.updateUserRole);
 router.post('/drivers/invite', authMiddleware(['admin', 'dispatcher']), inviteLimit, AdminController.inviteDriver);
@@ -44,5 +45,16 @@ router.patch('/vehicle-types/:id', authMiddleware(['admin', 'dispatcher']), admi
 router.delete('/vehicle-types/:id', authMiddleware(['admin', 'dispatcher']), adminWriteLimit, AdminController.deleteVehicleType);
 router.get('/audit-logs', authMiddleware(['admin']), AdminController.getAuditLogs);
 router.get('/stats', authMiddleware(['admin']), AdminController.getStats);
+
+// Kiosk wall displays are physical hardware, not staff accounts — only an
+// admin provisions or decommissions one, never a dispatcher.
+router.post('/kiosk-devices', authMiddleware(['admin']), adminWriteLimit, AdminController.createKioskDevice);
+router.get('/kiosk-devices', authMiddleware(['admin']), AdminController.listKioskDevices);
+// A device's own self-lookup (its label, for on-screen display) — kiosk
+// role only, deliberately separate from the admin list/create/revoke
+// routes above. Must come before /kiosk-devices/:id so 'me' is never
+// swallowed as an :id param.
+router.get('/kiosk-devices/me', withKioskAccess(['kiosk']), AdminController.getMyKioskDevice);
+router.delete('/kiosk-devices/:id', authMiddleware(['admin']), adminWriteLimit, AdminController.revokeKioskDevice);
 
 export default router;

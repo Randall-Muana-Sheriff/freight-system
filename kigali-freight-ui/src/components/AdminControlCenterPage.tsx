@@ -5,13 +5,14 @@
 // User & Role Governance, and the Audit Log each get the full content width
 // instead of fighting neighbors for space.
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
-import { ArrowLeft, BarChart3, FileCheck, ShieldCheck, ScrollText, Users, Truck, PackageCheck, AlertTriangle, Clock, RefreshCw, UserPlus } from 'lucide-react';
+import { ArrowLeft, BarChart3, FileCheck, ShieldCheck, ScrollText, Users, Truck, PackageCheck, AlertTriangle, Clock, RefreshCw, UserPlus, MonitorPlay } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { fetchAdminStats, fetchFleetPerformanceReport } from '../utils/api';
 import AdminUserGovernance from './AdminUserGovernance';
 import InviteDriverPanel from './InviteDriverPanel';
 import SystemAuditLogs from './SystemAuditLogs';
 import DriverDocumentReview from './DriverDocumentReview';
+import KioskDevicesPanel from './KioskDevicesPanel';
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
 
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'drivers', label: 'Invite driver', icon: UserPlus },
   { id: 'documents', label: 'Document verification', icon: FileCheck },
   { id: 'governance', label: 'User & role governance', icon: ShieldCheck },
+  { id: 'kiosks', label: 'Kiosk displays', icon: MonitorPlay },
   { id: 'audit', label: 'Audit log', icon: ScrollText },
 ];
 
@@ -325,6 +327,7 @@ export default function AdminControlCenterPage() {
             {activeSection === 'drivers' && <InviteDriverPanel />}
             {activeSection === 'documents' && <DriverDocumentReview />}
             {activeSection === 'governance' && <AdminUserGovernance />}
+            {activeSection === 'kiosks' && <KioskDevicesPanel />}
             {activeSection === 'audit' && <SystemAuditLogs />}
           </div>
         </main>

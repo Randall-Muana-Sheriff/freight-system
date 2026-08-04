@@ -2,6 +2,7 @@
 import express from 'express';
 import { FleetController } from '../controllers/fleetController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { withKioskAccess } from '../middleware/kioskAuthMiddleware.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -22,7 +23,7 @@ const telemetryLimit = rateLimit({
 router.post('/telemetry', authMiddleware(['driver']), telemetryLimit, FleetController.reportTelemetry);
 
 // Ensure FleetController.getLiveFleetStatus is fully defined here
-router.get('/telemetry-sheet', authMiddleware(['admin', 'dispatcher']), FleetController.getLiveFleetStatus);
+router.get('/telemetry-sheet', withKioskAccess(['admin', 'dispatcher', 'kiosk']), FleetController.getLiveFleetStatus);
 
 //Historical Breadcrumbs Route
 router.get('/history/:driverName', authMiddleware(['admin', 'dispatcher']), FleetController.getDriverBreadcrumbs);

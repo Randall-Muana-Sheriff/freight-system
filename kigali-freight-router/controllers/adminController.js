@@ -8,6 +8,7 @@ import { normalizePhone, generateInviteCode } from '../utils/phone.js';
 import { sendSms } from '../services/smsService.js';
 import { revokeAllRefreshTokensForUser } from '../services/refreshTokenService.js';
 import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { createKioskDevice, listKioskDevices, revokeKioskDevice } from '../services/kioskAuthService.js';
 
 const INVITE_CODE_TTL_HOURS = 48;
 
@@ -713,6 +714,75 @@ export const AdminController = {
                 code: 'ADMIN_STATS_FETCH_FAILED',
                 message: errorMessage(error, 'Failed to fetch statistics.'),
             });
+        }
+    },
+
+    // POST /api/admin/kiosk-devices - provisions a wall-display device
+    // (control room, dispatch desk, warehouse). The raw token is only ever
+    // returned here, once — same one-time-reveal pattern as inviteDriver's
+    // invite code — the dashboard's job is to show it to whoever's setting
+    // up the physical screen so they can paste it into that device's browser.
+    createKioskDevice: async (req, res) => {
+        const { label } = req.body || {};
+        if (typeof label !== 'string' || label.trim().length < 2 || label.trim().length > 100) {
+            return fail(res, { status: 400, code: 'ADMIN_KIOSK_INVALID_LABEL', message: 'Label must be 2 to 100 characters long.' });
+        }
+
+        try {
+            const { device, token } = await createKioskDevice(label.trim());
+
+            await appendAuditLog({
+                actionType: 'KIOSK_DEVICE_CREATED',
+                description: `Provisioned kiosk device "${device.label}"`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, { id: device.id, label: device.label, createdAt: device.createdAt, token }, { status: 201 });
+        } catch (error) {
+            return fail(res, { status: 500, code: 'ADMIN_KIOSK_CREATE_FAILED', message: errorMessage(error, 'Failed to provision kiosk device.') });
+        }
+    },
+
+    // GET /api/kiosk-devices/me - a device's own self-lookup, kiosk-role
+    // only. verifyKioskToken already fetched the label as part of the same
+    // query that checks revocation (see kioskAuthMiddleware), so this is
+    // just handing back what's already on req.user — no extra DB hit.
+    getMyKioskDevice: async (req, res) => {
+        return ok(res, { label: req.user?.label || null });
+    },
+
+    // GET /api/admin/kiosk-devices - never returns the token itself (only
+    // its hash is stored anyway) — just enough for an admin to see what's
+    // out there and revoke anything that's lost or decommissioned.
+    listKioskDevices: async (req, res) => {
+        try {
+            const devices = await listKioskDevices();
+            return ok(res, devices);
+        } catch (error) {
+            return fail(res, { status: 500, code: 'ADMIN_KIOSK_LIST_FAILED', message: errorMessage(error, 'Failed to fetch kiosk devices.') });
+        }
+    },
+
+    // DELETE /api/admin/kiosk-devices/:id - cuts the device off immediately
+    // for any new REST call (an already-open socket connection may linger
+    // until its next reconnect, an accepted tradeoff for a wall display).
+    revokeKioskDevice: async (req, res) => {
+        const { id } = req.params;
+        try {
+            const revoked = await revokeKioskDevice(id);
+            if (!revoked) {
+                return fail(res, { status: 404, code: 'ADMIN_KIOSK_NOT_FOUND', message: 'Kiosk device not found or already revoked.' });
+            }
+
+            await appendAuditLog({
+                actionType: 'KIOSK_DEVICE_REVOKED',
+                description: `Revoked kiosk device #${id}`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, { revoked: true });
+        } catch (error) {
+            return fail(res, { status: 500, code: 'ADMIN_KIOSK_REVOKE_FAILED', message: errorMessage(error, 'Failed to revoke kiosk device.') });
         }
     },
 };

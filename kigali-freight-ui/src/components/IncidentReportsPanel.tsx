@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ClipboardList, Eye, CheckCheck, AlertTriangle, Sparkles, Package } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { updateIncidentStatus } from '../utils/api';
+import { isUrgentIncident } from '../utils/incidentSeverity';
 
 const RESOLVED_VISIBLE_MS = 30 * 60 * 1000;
 
@@ -83,7 +84,7 @@ export default function IncidentReportsPanel() {
                         const [title, ...rest] = String(incident.description || '').split('\n\n');
                         const status = incident.status || 'OPEN';
                         const meta = STATUS_META[status] || STATUS_META.OPEN;
-                        const isUrgent = incident.severity === 'high' && status !== 'RESOLVED';
+                        const isUrgent = isUrgentIncident(incident);
                         return (
                             <div
                                 key={incident.id}

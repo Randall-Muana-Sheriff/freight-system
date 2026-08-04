@@ -186,4 +186,12 @@ export interface Incident {
     [key: string]: unknown;
 }
 
+export interface KioskDevice {
+    id: number;
+    label: string;
+    createdAt: string;
+    revokedAt?: string | null;
+    lastSeenAt?: string | null;
+}
+
 export type LatLng = [number, number];

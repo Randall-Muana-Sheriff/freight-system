@@ -13,6 +13,7 @@ import type {
     StaffUser,
     SavedRoute,
     Geofence,
+    KioskDevice,
 } from '../types';
 
 export const API_BASE = getApiBase();
@@ -329,4 +330,32 @@ export async function updateDriverDocumentStatus(id: number, status: string, rej
         token,
         body: { status, rejectionReason },
     });
+}
+
+// Control-room/dispatch-desk/warehouse wall displays — admin-provisioned,
+// read-only devices authenticated with their own long-lived, revocable
+// token (not a staff login). See services/kioskAuthService.js.
+export interface CreateKioskDeviceResult extends KioskDevice {
+    token: string;
+}
+
+export async function createKioskDevice(label: string, token: string): Promise<CreateKioskDeviceResult> {
+    return apiFetch('/api/kiosk-devices', { method: 'POST', token, body: { label } }) as Promise<CreateKioskDeviceResult>;
+}
+
+export async function listKioskDevices(token: string): Promise<KioskDevice[]> {
+    return apiFetch('/api/kiosk-devices', { method: 'GET', token }) as Promise<KioskDevice[]>;
+}
+
+export async function revokeKioskDevice(id: number, token: string) {
+    return apiFetch(`/api/kiosk-devices/${id}`, { method: 'DELETE', token });
+}
+
+// Called by the kiosk device itself — its own label (for on-screen
+// display) plus a side effect: verifying this token also bumps
+// last_seen_at server-side, so a periodic call here doubles as a
+// heartbeat that keeps the admin panel's "last seen" honest for a
+// long-running session that otherwise only talks over the socket.
+export async function fetchMyKioskDevice(token: string): Promise<{ label: string | null }> {
+    return apiFetch('/api/kiosk-devices/me', { method: 'GET', token }) as Promise<{ label: string | null }>;
 }

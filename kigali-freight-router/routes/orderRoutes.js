@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { OrderController } from '../controllers/orderController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { withKioskAccess } from '../middleware/kioskAuthMiddleware.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = Router();
@@ -39,12 +40,12 @@ const uploadLimit = rateLimit({
 
 // Manifest & Tracking Routes
 router.post('/', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.createOrder);
-router.get('/active', authMiddleware(['admin', 'dispatcher']), OrderController.getActiveOrders);
+router.get('/active', withKioskAccess(['admin', 'dispatcher', 'kiosk']), OrderController.getActiveOrders);
 router.get('/driver/assignments', authMiddleware(['admin', 'driver', 'dispatcher']), OrderController.getDriverAssignments);
 router.get('/driver/completed', authMiddleware(['admin', 'driver', 'dispatcher']), OrderController.getMyCompletedDeliveries);
 router.get('/pooling', authMiddleware(['admin', 'dispatcher']), OrderController.getBatchedOrders);
-router.get('/deliveries/recent', authMiddleware(['admin', 'dispatcher']), OrderController.getRecentDeliveries);
-router.get('/in-flight', authMiddleware(['admin', 'dispatcher']), OrderController.getInFlightOrders);
+router.get('/deliveries/recent', withKioskAccess(['admin', 'dispatcher', 'kiosk']), OrderController.getRecentDeliveries);
+router.get('/in-flight', withKioskAccess(['admin', 'dispatcher', 'kiosk']), OrderController.getInFlightOrders);
 
 // NOTE: /:id must come after the more specific static routes above
 // (/active, /driver/assignments, /pooling), or Express would match
