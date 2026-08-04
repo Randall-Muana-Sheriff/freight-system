@@ -259,14 +259,14 @@ export function AuthFlow() {
           title={deviceSeenBefore ? 'Enter your number.' : "What's your number?"}
           subtitle={
             deviceSeenBefore
-              ? "We'll send a quick verification code to confirm it's you."
-              : 'Dispatch will verify your number before you can access the platform.'
+              ? "We'll text a quick code to confirm it's you."
+              : "We'll text you a code to confirm it's really you."
           }
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={
             <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 17 }}>
-              Your number must be registered with dispatch.{'\n'}Contact your fleet manager if you need access.
+              Your number needs to already be registered with dispatch — contact them if you&apos;re not set up yet.
             </Text>
           }
         >
@@ -290,7 +290,7 @@ export function AuthFlow() {
         <AuthScreen
           eyebrow="Verification"
           title="Check your messages."
-          subtitle={`6-digit code sent to +250 ${nationalNumberDisplay(phoneDigits)}.`}
+          subtitle={`We sent a 6-digit code to +250 ${nationalNumberDisplay(phoneDigits)}.`}
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={
@@ -318,7 +318,7 @@ export function AuthFlow() {
         <AuthScreen
           eyebrow="Dispatch issued"
           title="Enter your invite code."
-          subtitle="Your fleet manager sent a 6-character code when they added you to the platform."
+          subtitle="Dispatch sent you a 6-character code when they set up your account."
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={
@@ -365,7 +365,7 @@ export function AuthFlow() {
         <AuthScreen
           eyebrow="Security"
           title="Confirm your PIN."
-          subtitle="Enter the same PIN again to confirm."
+          subtitle="Type it once more to make sure it matches."
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={<StartOverFooter onStartOver={resetFlow} />}
@@ -379,7 +379,7 @@ export function AuthFlow() {
         <AuthScreen
           eyebrow="Driver access"
           title="Enter your PIN."
-          subtitle="Enter your 4-digit PIN to access the dispatch portal."
+          subtitle="Welcome back — enter your PIN to continue."
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={
@@ -396,7 +396,7 @@ export function AuthFlow() {
 
     case 'biometric':
       return (
-        <AuthScreen eyebrow="Optional" title="Enable biometric login." subtitle="Sign in with your fingerprint — faster than typing your PIN at the start of every shift.">
+        <AuthScreen eyebrow="Optional" title="Enable biometric login." subtitle="Faster than typing your PIN every time you start a shift.">
           <BiometricPrompt onEnable={onEnableBiometric} onSkip={enterApp} />
         </AuthScreen>
       );
