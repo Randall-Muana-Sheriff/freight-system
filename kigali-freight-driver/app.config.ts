@@ -1,7 +1,16 @@
 import type { ExpoConfig } from 'expo/config';
 
+// Set by eas.json's "development" build profile only. Gives the dev
+// client its own app identifier and name so it installs as a separate
+// icon alongside the real preview/production build on the same physical
+// device, instead of silently replacing it — both can then sit on the
+// phone at once: one for actively developing against local Metro (Fast
+// Refresh, instant JS changes), one for testing what a real driver
+// actually gets.
+const IS_DEV_CLIENT = process.env.APP_VARIANT === 'development';
+
 const config: ExpoConfig = {
-  name: 'Kigali Freight Driver',
+  name: IS_DEV_CLIENT ? 'Kigali Freight Driver (Dev)' : 'Kigali Freight Driver',
   slug: 'kigali-freight-driver',
   scheme: 'kigali-freight-driver',
   // Bumped for the Expo SDK 54→57 upgrade (React Native 0.81→0.86 and
@@ -41,10 +50,10 @@ const config: ExpoConfig = {
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: false,
-    bundleIdentifier: 'com.muana.kigalifreightdriver',
+    bundleIdentifier: IS_DEV_CLIENT ? 'com.muana.kigalifreightdriver.dev' : 'com.muana.kigalifreightdriver',
   },
   android: {
-    package: 'com.muana.kigalifreightdriver',
+    package: IS_DEV_CLIENT ? 'com.muana.kigalifreightdriver.dev' : 'com.muana.kigalifreightdriver',
     // Edge-to-edge is mandatory (no opt-out) as of Android 16 / this SDK —
     // the old edgeToEdgeEnabled toggle was removed since there's nothing
     // left to toggle.

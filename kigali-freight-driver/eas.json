@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "APP_VARIANT": "development",
         "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.71:5000",
         "EXPO_PUBLIC_SENTRY_DSN": "https://5e21622adcd755b5467e80df66490447@o4511835894513664.ingest.us.sentry.io/4511836198862848"
       }
