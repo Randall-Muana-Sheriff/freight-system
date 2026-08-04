@@ -24,17 +24,42 @@ export function OtpBoxes({
   const inputRefs = useRef<(TextInput | null)[]>([]);
   const chars = Array.from({ length }, (_, i) => value[i] || '');
 
-  const setCharAt = (index: number, rawChar: string) => {
-    const char = mode === 'alphanumeric' ? rawChar.slice(-1).toUpperCase() : rawChar.replace(/[^0-9]/g, '').slice(-1);
-    const next = chars.slice();
-    next[index] = char;
-    onChange(next.join(''));
+  const sanitize = (raw: string) =>
+    mode === 'alphanumeric' ? raw.toUpperCase().replace(/[^A-Z0-9]/g, '') : raw.replace(/[^0-9]/g, '');
 
-    if (char && index < length - 1) {
-      inputRefs.current[index + 1]?.focus();
+  const commit = (next: string[]) => {
+    onChange(next.join(''));
+    if (next.every((c) => c)) onComplete(next.join(''));
+  };
+
+  const setCharAt = (index: number, rawText: string) => {
+    const clean = sanitize(rawText);
+
+    // A paste (or SMS-autofill) delivers more than one character at once —
+    // maxLength is set to the full code length precisely so this isn't
+    // truncated to a single character before it ever reaches here.
+    // Distribute it across this box and the ones after it, the way every
+    // real OTP input handles a pasted code, instead of silently discarding
+    // everything past the first character.
+    if (clean.length > 1) {
+      const next = chars.slice();
+      let cursor = index;
+      for (const ch of clean) {
+        if (cursor >= length) break;
+        next[cursor] = ch;
+        cursor += 1;
+      }
+      commit(next);
+      inputRefs.current[Math.min(cursor, length - 1)]?.focus();
+      return;
     }
-    if (next.every((c) => c)) {
-      onComplete(next.join(''));
+
+    const next = chars.slice();
+    next[index] = clean;
+    commit(next);
+
+    if (clean && index < length - 1) {
+      inputRefs.current[index + 1]?.focus();
     }
   };
 
@@ -57,9 +82,20 @@ export function OtpBoxes({
             onChangeText={(text) => setCharAt(index, text)}
             onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)}
             keyboardType={mode === 'numeric' ? 'number-pad' : 'default'}
+            // Hints the OS to suggest the SMS code it just received above
+            // the keyboard (iOS's QuickType bar / Android's Autofill) —
+            // only meaningful for the numeric, SMS-delivered OTP, not the
+            // dispatcher-issued invite code.
+            textContentType={mode === 'numeric' ? 'oneTimeCode' : 'none'}
+            autoComplete={mode === 'numeric' ? 'sms-otp' : 'off'}
             autoCapitalize={mode === 'alphanumeric' ? 'characters' : 'none'}
             autoCorrect={false}
-            maxLength={1}
+            // Deliberately not 1 — see the paste-handling comment above.
+            // The box only ever *displays* a single character (its value
+            // is always exactly one character from the parent's string),
+            // this just stops the native input from truncating a
+            // multi-character paste before onChangeText ever sees it.
+            maxLength={length}
             autoFocus={index === 0}
             selectTextOnFocus
             style={[styles.box, char ? styles.boxFilled : null, error ? styles.boxError : null]}
