@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Coding Standards
+# Inzira v2.0 — Coding Standards
 
 ---
 
@@ -533,7 +533,7 @@ export function calculateEta({ driverLat, driverLng, destLat, destLng, speedKmh 
 
 ### README (Per App)
 ```
-# kigali-freight-router
+# inzira-router
 ## Quick Start
 ## Environment Variables
 ## API Reference (link to 06-api-spec.md)

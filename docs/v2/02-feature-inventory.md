@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Feature Inventory
+# Inzira v2.0 — Feature Inventory
 
 ---
 

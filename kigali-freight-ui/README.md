@@ -1,4 +1,4 @@
-# Kigali Freight UI Frontend
+# Inzira UI Frontend
 
 React + Vite command center for fleet monitoring, geofence operations, dispatching, and admin workflows.
 

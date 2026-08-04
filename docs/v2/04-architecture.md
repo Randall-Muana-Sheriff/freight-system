@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Current Architecture
+# Inzira v2.0 — Current Architecture
 
 ---
 

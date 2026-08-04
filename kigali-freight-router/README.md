@@ -1,6 +1,6 @@
-# Kigali Freight Router Backend
+# Inzira Router Backend
 
-Backend API and realtime telemetry engine for the Kigali Freight system.
+Backend API and realtime telemetry engine for the Inzira system.
 
 ## Overview
 

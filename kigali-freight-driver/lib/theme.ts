@@ -1,4 +1,4 @@
-// Kigali Freight driver app visual system, per the dispatcher-provided
+// Inzira driver app visual system, per the dispatcher-provided
 // design handoff: Electric Jade on a deep navy-black ground, with layered
 // surfaces for elevation instead of one flat dark background. Gold is
 // reserved for earnings/highlight metrics only, red for safety/emergency

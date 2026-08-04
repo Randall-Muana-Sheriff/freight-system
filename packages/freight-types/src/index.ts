@@ -1,5 +1,5 @@
 /**
- * @freight/types - Shared TypeScript types & Zod schemas for Kigali Freight
+ * @freight/types - Shared TypeScript types & Zod schemas for Inzira
  *
  * This package is the single source of truth for all API contracts.
  * Import from here to get type-safe request/response types across all apps.

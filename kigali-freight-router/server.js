@@ -106,7 +106,7 @@ async function dispatchExternalAlert(message) {
       await fetch(ALERT_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'kigali-freight-router', message }),
+        body: JSON.stringify({ source: 'inzira-router', message }),
       });
       return;
     }

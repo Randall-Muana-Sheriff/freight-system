@@ -1,4 +1,4 @@
-# Kigali Freight
+# Inzira
 
 A freight/logistics platform for Kigali: real-time fleet tracking, dispatch,
 and delivery confirmation across three applications sharing one backend.

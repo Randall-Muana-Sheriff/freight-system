@@ -83,7 +83,7 @@ export const DriverAuthController = {
                 [phone, hashCode(code), expiresAt]
             );
 
-            await sendSms(phone, `Your Kigali Freight verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
+            await sendSms(phone, `Your Inzira verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
 
             return ok(res, { accepted: true });
         } catch (error) {
@@ -190,7 +190,7 @@ export const DriverAuthController = {
                 staffId: user.staffId,
                 fullName: user.fullName,
                 role: 'Freight Driver',
-                fleet: 'Kigali Central',
+                fleet: 'Inzira Central',
                 vehicle: vehicleResult.rows[0] || null,
             });
         } catch (error) {

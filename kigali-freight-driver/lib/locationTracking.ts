@@ -150,7 +150,7 @@ async function attemptStartLocationUpdates(retriesLeft = 2): Promise<void> {
       distanceInterval: 0,
       showsBackgroundLocationIndicator: true, // iOS: the blue status bar pill while tracking in background
       foregroundService: {
-        notificationTitle: 'Kigali Freight Driver',
+        notificationTitle: 'Inzira Driver',
         notificationBody: 'Sharing your location with dispatch during your active shift.',
         notificationColor: '#0F6FFF',
       },

@@ -14,7 +14,7 @@
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
-    "db:migrate": "turbo run db:migrate --filter=kigali-freight-router",
+    "db:migrate": "turbo run db:migrate --filter=inzira-router",
     "docker:build": "turbo run docker:build",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"

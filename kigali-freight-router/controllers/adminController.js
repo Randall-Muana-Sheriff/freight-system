@@ -207,7 +207,7 @@ export const AdminController = {
 
             const smsResult = await sendSms(
                 phone,
-                `Welcome to Kigali Freight. Your driver invite code is ${inviteCode}. It expires in ${INVITE_CODE_TTL_HOURS} hours.`
+                `Welcome to Inzira. Your driver invite code is ${inviteCode}. It expires in ${INVITE_CODE_TTL_HOURS} hours.`
             );
 
             await appendAuditLog({

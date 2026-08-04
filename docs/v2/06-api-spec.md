@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — API Specification
+# Inzira v2.0 — API Specification
 
 ---
 
@@ -877,7 +877,7 @@
   "success": true,
   "data": {
     "status": "ok",
-    "service": "kigali-freight-router",
+    "service": "inzira-router",
     "uptimeSeconds": "integer"
   }
 }

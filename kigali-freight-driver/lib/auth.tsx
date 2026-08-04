@@ -87,7 +87,7 @@ async function confirmBiometric(): Promise<boolean> {
     if (!hasHardware || !isEnrolled) return true;
 
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock Kigali Freight',
+      promptMessage: 'Unlock Inzira',
       cancelLabel: 'Use PIN instead',
     });
     return result.success;

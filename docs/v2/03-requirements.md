@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Functional Requirements (Extracted from v1 Implementation)
+# Inzira v2.0 — Functional Requirements (Extracted from v1 Implementation)
 
 ---
 

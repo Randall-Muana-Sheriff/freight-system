@@ -10,7 +10,7 @@ import type { ExpoConfig } from 'expo/config';
 const IS_DEV_CLIENT = process.env.APP_VARIANT === 'development';
 
 const config: ExpoConfig = {
-  name: IS_DEV_CLIENT ? 'Kigali Freight Driver (Dev)' : 'Kigali Freight Driver',
+  name: IS_DEV_CLIENT ? 'Inzira Driver (Dev)' : 'Inzira Driver',
   slug: 'kigali-freight-driver',
   scheme: 'kigali-freight-driver',
   // Bumped for the Expo SDK 54→57 upgrade (React Native 0.81→0.86 and
@@ -50,10 +50,18 @@ const config: ExpoConfig = {
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: false,
-    bundleIdentifier: IS_DEV_CLIENT ? 'com.muana.kigalifreightdriver.dev' : 'com.muana.kigalifreightdriver',
+    // The dev-client variant gets the new "Inzira" branding on its
+    // identifier since it's never been built/registered anywhere yet —
+    // the production identifier stays com.muana.kigalifreightdriver for
+    // now, deliberately deferred as its own future cutover (see the
+    // Inzira rebrand plan): changing it forces every currently-installed
+    // copy of the real app to be reinstalled and needs a new Firebase
+    // app registration, which isn't worth doing as a side effect of
+    // fixing the dev build.
+    bundleIdentifier: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.kigalifreightdriver',
   },
   android: {
-    package: IS_DEV_CLIENT ? 'com.muana.kigalifreightdriver.dev' : 'com.muana.kigalifreightdriver',
+    package: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.kigalifreightdriver',
     // Edge-to-edge is mandatory (no opt-out) as of Android 16 / this SDK —
     // the old edgeToEdgeEnabled toggle was removed since there's nothing
     // left to toggle.
@@ -76,7 +84,7 @@ const config: ExpoConfig = {
     [
       'expo-local-authentication',
       {
-        faceIDPermission: 'Kigali Freight Driver uses Face ID to quickly and securely unlock the app with your existing PIN-based session.',
+        faceIDPermission: 'Inzira Driver uses Face ID to quickly and securely unlock the app with your existing PIN-based session.',
       },
     ],
     [
@@ -91,8 +99,8 @@ const config: ExpoConfig = {
     [
       'expo-image-picker',
       {
-        photosPermission: 'Kigali Freight Driver needs access to your photos to attach a proof-of-delivery image.',
-        cameraPermission: 'Kigali Freight Driver needs camera access to take a proof-of-delivery photo.',
+        photosPermission: 'Inzira Driver needs access to your photos to attach a proof-of-delivery image.',
+        cameraPermission: 'Inzira Driver needs camera access to take a proof-of-delivery photo.',
         // The app only ever picks still photos, never records video — the
         // plugin requests microphone access by default (for video capture)
         // regardless, which was previously an unnecessary permission with
@@ -104,9 +112,9 @@ const config: ExpoConfig = {
       'expo-location',
       {
         locationAlwaysAndWhenInUsePermission:
-          'Kigali Freight Driver needs your location to keep dispatchers updated on your position, even while the app is in the background during an active shift.',
+          'Inzira Driver needs your location to keep dispatchers updated on your position, even while the app is in the background during an active shift.',
         locationWhenInUsePermission:
-          'Kigali Freight Driver needs your location to keep dispatchers updated on your position during deliveries.',
+          'Inzira Driver needs your location to keep dispatchers updated on your position during deliveries.',
         isAndroidBackgroundLocationEnabled: true,
         isAndroidForegroundServiceEnabled: true,
       },

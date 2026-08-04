@@ -58,9 +58,9 @@ export function AuthScreen({
       >
         <View style={styles.brandRow}>
           <View style={styles.logoBadge}>
-            <Ionicons name="car-sport" size={18} color={theme.colors.primary} />
+            <Ionicons name="navigate-outline" size={18} color={theme.colors.primary} />
           </View>
-          <Text style={styles.wordmark}>Kigali Freight</Text>
+          <Text style={styles.wordmark}>Inzira</Text>
         </View>
 
         <Text style={styles.eyebrow}>{eyebrow}</Text>

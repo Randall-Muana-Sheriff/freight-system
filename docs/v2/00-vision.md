@@ -1,10 +1,10 @@
-# Kigali Freight v2.0 — Vision Document
+# Inzira v2.0 — Vision Document
 
 ---
 
-## What Is Kigali Freight?
+## What Is Inzira?
 
-**Kigali Freight** is an end-to-end logistics and fleet management platform designed for the Kigali, Rwanda metropolitan area. It consists of three interconnected applications:
+**Inzira** is an end-to-end logistics and fleet management platform designed for the Kigali, Rwanda metropolitan area. It consists of three interconnected applications:
 
 | Application | Technology | Purpose |
 |-------------|------------|---------|

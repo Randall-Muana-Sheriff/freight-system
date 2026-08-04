@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Roadmap
+# Inzira v2.0 — Roadmap
 
 ---
 

@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Module Specifications
+# Inzira v2.0 — Module Specifications
 
 ---
 

@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Database Design
+# Inzira v2.0 — Database Design
 
 ---
 

@@ -10,7 +10,7 @@ router.get('/health', (req, res) => {
         success: true,
         data: {
             status: 'ok',
-            service: 'kigali-freight-router',
+            service: 'inzira-router',
             uptimeSeconds: Math.round(process.uptime()),
         },
     });

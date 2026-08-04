@@ -1,6 +1,6 @@
-# Kigali Freight Driver App
+# Inzira Driver App
 
-Driver-focused mobile client for the Kigali Freight system. Built with Expo, TypeScript, and expo-router.
+Driver-focused mobile client for the Inzira system. Built with Expo, TypeScript, and expo-router.
 
 ## What it does
 
@@ -18,14 +18,14 @@ Driver-focused mobile client for the Kigali Freight system. Built with Expo, Typ
 - expo-router
 - TypeScript
 - SecureStore for auth token storage
-- REST API integration with the Kigali Freight backend
+- REST API integration with the Inzira backend
 
 ## Prerequisites
 
 - Node.js 18+
 - Expo CLI or `npx expo`
 - Android Studio, Xcode, or Expo Go for local testing
-- The Kigali Freight backend running and reachable from the device/emulator
+- The Inzira backend running and reachable from the device/emulator
 
 ## Setup
 

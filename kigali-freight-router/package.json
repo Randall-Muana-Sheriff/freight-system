@@ -1,5 +1,5 @@
 {
-  "name": "kigali-freight-router",
+  "name": "inzira-router",
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
@@ -35,8 +35,10 @@
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
+    "otplib": "^13.4.1",
     "pg": "^8.11.5",
     "prom-client": "^15.1.3",
+    "qrcode": "^1.5.4",
     "redis": "^4.6.13",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",

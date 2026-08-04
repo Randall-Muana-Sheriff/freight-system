@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Architectural Review & Rebuild Strategy
+# Inzira v2.0 — Architectural Review & Rebuild Strategy
 
 *Prepared as Senior Software Architect — July 2025*
 
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-The Kigali Freight monorepo is a **logistics/fleet management system** with three interconnected applications. The codebase demonstrates solid domain knowledge (spatial queries, VRP, real-time telemetry) but suffers from **architectural drift, inconsistent patterns, and critical integration gaps**.
+The Inzira monorepo is a **logistics/fleet management system** with three interconnected applications. The codebase demonstrates solid domain knowledge (spatial queries, VRP, real-time telemetry) but suffers from **architectural drift, inconsistent patterns, and critical integration gaps**.
 
 **Current Maturity:**
 | App | Status | Readiness |

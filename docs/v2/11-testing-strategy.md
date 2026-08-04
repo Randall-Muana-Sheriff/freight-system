@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Testing Strategy
+# Inzira v2.0 — Testing Strategy
 
 ---
 

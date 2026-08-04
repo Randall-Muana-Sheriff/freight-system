@@ -1,4 +1,4 @@
-# Kigali Freight v2.0 — Prioritized Backlog
+# Inzira v2.0 — Prioritized Backlog
 
 ---
 

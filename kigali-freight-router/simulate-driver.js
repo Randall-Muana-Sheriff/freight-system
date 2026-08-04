@@ -15,7 +15,7 @@ const kigaliRouteCoordinates = [
 ];
 
 socket.on('connect', () => {
-    console.log("⚡ Connected to the Kigali Freight Router Gateway!");
+    console.log("⚡ Connected to the Inzira Router Gateway!");
     
     // Register driver to the network
     socket.emit('driver:register-active', {

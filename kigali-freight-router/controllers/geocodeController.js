@@ -31,7 +31,7 @@ export const GeocodeController = {
                 bounded: '0',
             });
             const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-                headers: { 'User-Agent': 'KigaliFreightDispatch/1.0 (internal dispatch tool)' },
+                headers: { 'User-Agent': 'InziraDispatch/1.0 (internal dispatch tool)' },
             });
             const data = await response.json();
             const results = Array.isArray(data)
