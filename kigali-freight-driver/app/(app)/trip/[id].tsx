@@ -209,7 +209,7 @@ export default function TripDetailScreen() {
   return (
     <>
     <ScreenShell>
-      <SectionHeader eyebrow="Waybill" title={`Trip #${id}`} subtitle="Update the job state, review route notes, and keep the dispatcher informed." />
+      <SectionHeader eyebrow="Waybill" title={`Trip #${id}`} />
 
       {loading ? <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 16 }} /> : null}
       {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}

@@ -13,7 +13,7 @@ export default function AlertsScreen() {
     <ScreenShell>
       <View style={styles.headerRow}>
         <View style={styles.headerTextWrap}>
-          <SectionHeader eyebrow="Live feed" title="Alerts" subtitle="Updates on your own trips and safety events, as they happen." />
+          <SectionHeader eyebrow="Live feed" title="Alerts" />
         </View>
         {events.length > 0 ? (
           <TouchableOpacity style={styles.clearButton} activeOpacity={0.8} onPress={clearEvents} hitSlop={8}>

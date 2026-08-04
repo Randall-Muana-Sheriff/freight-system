@@ -265,7 +265,7 @@ export default function ProfileScreen() {
   return (
     <>
     <ScreenShell>
-      <SectionHeader eyebrow="Operator" title="Profile" subtitle="Account, location sharing, and security." />
+      <SectionHeader eyebrow="Operator" title="Profile" />
 
       <View style={styles.identityCard}>
         <View style={styles.avatar}>
@@ -453,28 +453,37 @@ export default function ProfileScreen() {
         <Text style={styles.logoutText}>Sign out</Text>
       </TouchableOpacity>
 
-      <Text style={styles.diagnosticFooter}>
-        {Updates.isEmbeddedLaunch ? 'embedded build' : 'ota update'} · {Updates.updateId ? Updates.updateId.slice(0, 8) : 'no update id'} · channel: {Updates.channel ?? 'n/a'} · runtime: {Updates.runtimeVersion ?? 'n/a'}
-        {'\n'}
-        update check:{' '}
-        {updateCheck.status === 'checking'
-          ? 'checking…'
-          : updateCheck.status === 'error'
-            ? `failed — ${updateCheck.message}`
-            : updateCheck.status === 'installing'
-              ? 'downloading and installing…'
-              : updateCheck.isAvailable
-                ? 'newer update found'
-                : `none pending (${updateCheck.reason ?? 'unknown reason'})`}
-      </Text>
+      {/* Embedded/OTA build diagnostics only mean anything for a real
+          preview/production build with an actual update channel — a
+          dev-client build loads JS straight from Metro, so isEmbeddedLaunch/
+          updateId/channel and "check & install update" are all meaningless
+          (or actively confusing) noise here. */}
+      {!__DEV__ && (
+        <>
+          <Text style={styles.diagnosticFooter}>
+            {Updates.isEmbeddedLaunch ? 'embedded build' : 'ota update'} · {Updates.updateId ? Updates.updateId.slice(0, 8) : 'no update id'} · channel: {Updates.channel ?? 'n/a'} · runtime: {Updates.runtimeVersion ?? 'n/a'}
+            {'\n'}
+            update check:{' '}
+            {updateCheck.status === 'checking'
+              ? 'checking…'
+              : updateCheck.status === 'error'
+                ? `failed — ${updateCheck.message}`
+                : updateCheck.status === 'installing'
+                  ? 'downloading and installing…'
+                  : updateCheck.isAvailable
+                    ? 'newer update found'
+                    : `none pending (${updateCheck.reason ?? 'unknown reason'})`}
+          </Text>
 
-      <TouchableOpacity onPress={() => void onInstallUpdate()} disabled={updateCheck.status === 'installing'} style={styles.updateButton} activeOpacity={0.8}>
-        {updateCheck.status === 'installing' ? (
-          <ActivityIndicator color={theme.colors.primary} size="small" />
-        ) : (
-          <Text style={styles.updateButtonText}>Check &amp; install update now</Text>
-        )}
-      </TouchableOpacity>
+          <TouchableOpacity onPress={() => void onInstallUpdate()} disabled={updateCheck.status === 'installing'} style={styles.updateButton} activeOpacity={0.8}>
+            {updateCheck.status === 'installing' ? (
+              <ActivityIndicator color={theme.colors.primary} size="small" />
+            ) : (
+              <Text style={styles.updateButtonText}>Check &amp; install update now</Text>
+            )}
+          </TouchableOpacity>
+        </>
+      )}
     </ScreenShell>
     <ImageViewerModal url={viewingPhoto} onClose={() => setViewingPhoto(null)} />
     <ToastOverlay toast={pingToast} onHide={() => setPingToast(null)} />
