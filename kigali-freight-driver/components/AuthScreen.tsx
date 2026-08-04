@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../lib/theme';
-import { ToastOverlay } from './ToastOverlay';
+import { ToastOverlay, type Toast } from './ToastOverlay';
 
 // Everything — brand mark, title, fields, button — lives inside one
 // ScrollView wrapped by KeyboardAvoidingView. The previous version had a
@@ -33,7 +33,7 @@ export function AuthScreen({
   eyebrow: string;
   title: string;
   subtitle: string;
-  toast?: { icon: keyof typeof Ionicons.glyphMap; message: string } | null;
+  toast?: Toast | null;
   onDismissToast?: () => void;
   children: ReactNode;
   footer?: ReactNode;
@@ -72,7 +72,7 @@ export function AuthScreen({
         {footer ? <View style={styles.footer}>{footer}</View> : null}
       </ScrollView>
 
-      <ToastOverlay message={toast?.message ?? null} icon={toast?.icon ?? 'alert-circle-outline'} onHide={onDismissToast ?? (() => {})} />
+      <ToastOverlay toast={toast ?? null} onHide={onDismissToast ?? (() => {})} />
     </KeyboardAvoidingView>
   );
 }

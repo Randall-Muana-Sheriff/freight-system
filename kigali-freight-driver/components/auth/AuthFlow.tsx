@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
-import type { Ionicons } from '@expo/vector-icons';
 import { AuthScreen, AuthField, AuthButton } from '../AuthScreen';
 import { OtpBoxes } from './OtpBoxes';
 import { PinPad } from './PinPad';
@@ -11,10 +10,9 @@ import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { getRememberedPhone } from '../../lib/tokenStore';
 import { requestDriverOtp, verifyDriverOtp, verifyDriverInvite, type DriverInviteResult } from '../../lib/api';
+import type { Toast } from '../ToastOverlay';
 
 type Step = 'phone' | 'otp' | 'invite' | 'reveal' | 'pin-set' | 'pin-confirm' | 'pin-login' | 'biometric';
-
-type Toast = { icon: keyof typeof Ionicons.glyphMap; message: string } | null;
 
 function formatPhoneDisplay(digits: string) {
   if (digits.length <= 3) return digits;
@@ -91,7 +89,7 @@ export function AuthFlow() {
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState<Toast>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
 
   useEffect(() => {
     getRememberedPhone().then((phone) => {
@@ -106,7 +104,7 @@ export function AuthFlow() {
 
   const onSubmitPhone = async () => {
     if (!isCompletePhone(phoneDigits)) {
-      setToast({ icon: 'alert-circle-outline', message: 'Enter your full phone number.' });
+      setToast({ icon: 'alert-circle-outline', message: 'Enter your full phone number.', tone: 'warning' });
       return;
     }
     setLoading(true);
@@ -116,7 +114,7 @@ export function AuthFlow() {
       setOtpValue('');
       setStep('otp');
     } catch (error) {
-      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not send a code.' });
+      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not send a code.', tone: 'error' });
     } finally {
       setLoading(false);
     }
@@ -140,7 +138,7 @@ export function AuthFlow() {
     } catch (error) {
       setOtpError(true);
       setOtpValue('');
-      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'That code is incorrect.' });
+      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'That code is incorrect.', tone: 'error' });
       setTimeout(() => setOtpError(false), 400);
     } finally {
       setLoading(false);
@@ -153,7 +151,7 @@ export function AuthFlow() {
       setResent(true);
       setTimeout(() => setResent(false), 2500);
     } catch (error) {
-      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not resend the code.' });
+      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not resend the code.', tone: 'error' });
     }
   };
 
@@ -169,7 +167,7 @@ export function AuthFlow() {
     } catch (error) {
       setInviteError(true);
       setInviteValue('');
-      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'That code is incorrect or expired.' });
+      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'That code is incorrect or expired.', tone: 'error' });
       setTimeout(() => setInviteError(false), 400);
     } finally {
       setLoading(false);
@@ -185,7 +183,7 @@ export function AuthFlow() {
   const onPinConfirmComplete = async (pin: string) => {
     if (pin !== firstPin) {
       setPinError(true);
-      setToast({ icon: 'alert-circle-outline', message: "PINs don't match — try again." });
+      setToast({ icon: 'alert-circle-outline', message: "PINs don't match — try again.", tone: 'warning' });
       setTimeout(() => {
         setPinError(false);
         setPinValue('');
@@ -206,7 +204,7 @@ export function AuthFlow() {
         setStep('biometric');
       }
     } catch (error) {
-      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not save your PIN.' });
+      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not save your PIN.', tone: 'error' });
       setPinValue('');
       setStep('pin-set');
     } finally {
@@ -223,7 +221,7 @@ export function AuthFlow() {
       enterApp();
     } catch (error) {
       setPinError(true);
-      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Incorrect PIN.' });
+      setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Incorrect PIN.', tone: 'error' });
       setTimeout(() => {
         setPinError(false);
         setPinValue('');

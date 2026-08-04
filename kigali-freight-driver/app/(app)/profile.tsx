@@ -5,7 +5,7 @@ import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
-import { ToastOverlay } from '../../components/ToastOverlay';
+import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
 import { ImageViewerModal } from '../../components/ImageViewerModal';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
@@ -13,7 +13,6 @@ import { fetchMyProfile, fetchMyVehicle, fetchMyCompletedDeliveries, fetchMyDocu
 import { getTrackingDiagnostics, sendTestLocationPing } from '../../lib/locationTracking';
 
 type Diagnostics = Awaited<ReturnType<typeof getTrackingDiagnostics>>;
-type Toast = { icon: keyof typeof Ionicons.glyphMap; message: string };
 type Tone = 'good' | 'bad' | 'neutral';
 
 const TONE_COLOR: Record<Tone, string> = {
@@ -237,9 +236,9 @@ export default function ProfileScreen() {
       const result = await sendTestLocationPing(token);
       await loadDiagnostics();
       if (result.ok) {
-        setPingToast({ icon: 'checkmark-circle-outline', message: `Sent — dispatch now sees you at ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.` });
+        setPingToast({ icon: 'checkmark-circle-outline', message: `Sent — dispatch now sees you at ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.`, tone: 'success' });
       } else {
-        setPingToast({ icon: 'alert-circle-outline', message: result.error });
+        setPingToast({ icon: 'alert-circle-outline', message: result.error, tone: 'error' });
       }
     } finally {
       setSendingPing(false);
@@ -478,7 +477,7 @@ export default function ProfileScreen() {
       </TouchableOpacity>
     </ScreenShell>
     <ImageViewerModal url={viewingPhoto} onClose={() => setViewingPhoto(null)} />
-    <ToastOverlay message={pingToast?.message ?? null} icon={pingToast?.icon ?? 'alert-outline'} onHide={() => setPingToast(null)} />
+    <ToastOverlay toast={pingToast} onHide={() => setPingToast(null)} />
     </>
   );
 }

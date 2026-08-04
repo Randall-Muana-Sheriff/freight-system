@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenShell } from '../../../components/ScreenShell';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { ActionSheet } from '../../../components/ActionSheet';
-import { ToastOverlay } from '../../../components/ToastOverlay';
+import { ToastOverlay, type Toast } from '../../../components/ToastOverlay';
 import { theme } from '../../../lib/theme';
 import { useAuth } from '../../../lib/auth';
 import * as ImagePicker from 'expo-image-picker';
@@ -41,7 +41,6 @@ function statusOrderIndex(status?: string): number {
 }
 
 type ActionStatus = 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED';
-type Toast = { icon: keyof typeof Ionicons.glyphMap; message: string };
 
 const ACTION_STEPS: Record<ActionStatus, { icon: keyof typeof Ionicons.glyphMap; label: string; helper: string }> = {
   IN_TRANSIT: {
@@ -104,11 +103,12 @@ export default function TripDetailScreen() {
           status,
           createdAt: new Date().toISOString(),
         });
-        setToast({ icon: 'cloud-offline-outline', message: `Trip #${id} will sync when the connection returns.` });
+        setToast({ icon: 'cloud-offline-outline', message: `Trip #${id} will sync when the connection returns.`, tone: 'info' });
       } else {
         setToast({
           icon: 'alert-circle-outline',
           message: error instanceof Error ? error.message : 'Could not update trip status.',
+          tone: 'error',
         });
       }
     } finally {
@@ -147,17 +147,18 @@ export default function TripDetailScreen() {
             mimeType: asset.mimeType || 'image/jpeg',
             createdAt: new Date().toISOString(),
           });
-          setToast({ icon: 'cloud-offline-outline', message: `Delivery photo for #${id} will upload when the connection returns.` });
+          setToast({ icon: 'cloud-offline-outline', message: `Delivery photo for #${id} will upload when the connection returns.`, tone: 'info' });
         } catch {
           // Persisting/queueing the photo itself failed (e.g. out of
           // storage) — this is the one case with no safe offline path,
           // so say so plainly rather than a generic error.
-          setToast({ icon: 'alert-circle-outline', message: 'Could not save the photo for later. Please try again once you have a connection.' });
+          setToast({ icon: 'alert-circle-outline', message: 'Could not save the photo for later. Please try again once you have a connection.', tone: 'error' });
         }
       } else {
         setToast({
           icon: 'alert-circle-outline',
           message: error instanceof Error ? error.message : 'Could not confirm delivery. Please try again once you have a connection.',
+          tone: 'error',
         });
       }
     } finally {
@@ -168,7 +169,7 @@ export default function TripDetailScreen() {
   const onTakeDeliveryPhoto = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      setToast({ icon: 'camera-outline', message: 'Allow camera access to take a delivery confirmation photo.' });
+      setToast({ icon: 'camera-outline', message: 'Allow camera access to take a delivery confirmation photo.', tone: 'warning' });
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: false });
@@ -179,7 +180,7 @@ export default function TripDetailScreen() {
   const onPickDeliveryPhotoFromLibrary = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setToast({ icon: 'images-outline', message: 'Allow photo library access to select a proof-of-delivery picture.' });
+      setToast({ icon: 'images-outline', message: 'Allow photo library access to select a proof-of-delivery picture.', tone: 'warning' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, allowsEditing: false });
@@ -341,7 +342,7 @@ export default function TripDetailScreen() {
       ]}
     />
 
-    <ToastOverlay message={toast?.message ?? null} icon={toast?.icon ?? 'alert-outline'} onHide={() => setToast(null)} />
+    <ToastOverlay toast={toast} onHide={() => setToast(null)} />
     </>
   );
 }

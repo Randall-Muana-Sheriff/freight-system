@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
-import { ToastOverlay } from '../../components/ToastOverlay';
+import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
 import { ActionSheet } from '../../components/ActionSheet';
 import { theme } from '../../lib/theme';
 import {
@@ -32,8 +32,6 @@ const QUICK_ISSUES: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = 
   { label: 'Traffic delay', icon: 'time-outline' },
   { label: 'Route blocked', icon: 'trail-sign-outline' },
 ];
-
-type Toast = { icon: keyof typeof Ionicons.glyphMap; message: string };
 
 const STATUS_META: Record<MyIncident['status'], { label: string; color: string; icon: keyof typeof Ionicons.glyphMap }> = {
   OPEN: { label: 'Awaiting review', color: theme.colors.warning, icon: 'time-outline' },
@@ -76,11 +74,18 @@ function formatReportDate(value: string) {
 // it's available — the immediate, real-time payoff of this feature, not
 // something a driver has to wait for a dispatcher to relay back.
 function buildSuccessToast(result: IncidentReportResult): Toast {
-  const hubNote = result.nearestHub ? ` Nearest hub: ${result.nearestHub.name} (${result.nearestHub.distanceKm}km).` : '';
+  // The nearest-hub distance is supplementary guidance, not the pass/fail
+  // verdict on the report itself — kept as a separate `note` (rendered in
+  // its own neutral color/row by ToastOverlay) rather than folded into the
+  // main sentence, so it reads as "here's some extra help" and not as
+  // part of whether the report succeeded.
+  const note = result.nearestHub ? `Nearest hub: ${result.nearestHub.name} (${result.nearestHub.distanceKm}km)` : undefined;
   if (result.severity === 'high') {
-    return { icon: 'alert-circle', message: `Report sent — marked urgent, dispatch has been alerted.${hubNote}` };
+    // The report still sent successfully — "warning" here means "this is
+    // urgent, pay attention," not "something went wrong."
+    return { icon: 'alert-circle', message: 'Report sent — marked urgent, dispatch has been alerted.', tone: 'warning', note };
   }
-  return { icon: 'checkmark-circle-outline', message: `Report sent — dispatch has been notified.${hubNote}` };
+  return { icon: 'checkmark-circle-outline', message: 'Report sent — dispatch has been notified.', tone: 'success', note };
 }
 
 export default function IncidentsScreen() {
@@ -184,7 +189,7 @@ export default function IncidentsScreen() {
   const onTakePhoto = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      setToast({ icon: 'camera-outline', message: 'Allow camera access to attach a photo.' });
+      setToast({ icon: 'camera-outline', message: 'Allow camera access to attach a photo.', tone: 'warning' });
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
@@ -196,7 +201,7 @@ export default function IncidentsScreen() {
   const onPickPhotoFromLibrary = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setToast({ icon: 'images-outline', message: 'Allow photo library access to attach a photo.' });
+      setToast({ icon: 'images-outline', message: 'Allow photo library access to attach a photo.', tone: 'warning' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
@@ -233,7 +238,7 @@ export default function IncidentsScreen() {
     if (!token) return;
     if (!description.trim() && !photo) {
       setShowErrors(true);
-      setToast({ icon: 'alert-circle-outline', message: 'Add a few details or attach a photo before sending.' });
+      setToast({ icon: 'alert-circle-outline', message: 'Add a few details or attach a photo before sending.', tone: 'warning' });
       return;
     }
 
@@ -276,11 +281,12 @@ export default function IncidentsScreen() {
         setDescription('');
         setPhoto(null);
         setShowErrors(false);
-        setToast({ icon: 'cloud-offline-outline', message: "Saved offline — it'll send as soon as you're back in range." });
+        setToast({ icon: 'cloud-offline-outline', message: "Saved offline — it'll send as soon as you're back in range.", tone: 'info' });
       } else {
         setToast({
           icon: 'alert-circle-outline',
           message: error instanceof Error ? error.message : 'Failed to send incident report.',
+          tone: 'error',
         });
       }
     } finally {
@@ -439,7 +445,7 @@ export default function IncidentsScreen() {
       )}
     </ScreenShell>
 
-    <ToastOverlay message={toast?.message ?? null} icon={toast?.icon ?? 'alert-outline'} onHide={() => setToast(null)} />
+    <ToastOverlay toast={toast} onHide={() => setToast(null)} />
 
     <ActionSheet
       visible={pickingIssue}

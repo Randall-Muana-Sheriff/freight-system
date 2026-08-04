@@ -6,12 +6,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { ActionSheet } from '../../components/ActionSheet';
-import { ToastOverlay } from '../../components/ToastOverlay';
+import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { fetchMyDocuments, uploadDriverDocument, type DriverDocumentStatus, type DocumentType } from '../../lib/api';
-
-type Toast = { icon: keyof typeof Ionicons.glyphMap; message: string };
 
 const DOCUMENT_ICON: Record<DocumentType, keyof typeof Ionicons.glyphMap> = {
   national_id: 'card-outline',
@@ -78,6 +76,7 @@ export default function DocumentsScreen() {
       setToast({
         icon: 'alert-circle-outline',
         message: err instanceof Error ? err.message : 'Could not upload this document. Try again.',
+        tone: 'error',
       });
     } finally {
       setUploadingType(null);
@@ -87,7 +86,7 @@ export default function DocumentsScreen() {
   const onTakePhoto = async (documentType: DocumentType) => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      setToast({ icon: 'camera-outline', message: 'Allow camera access to take a photo of this document.' });
+      setToast({ icon: 'camera-outline', message: 'Allow camera access to take a photo of this document.', tone: 'warning' });
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
@@ -98,7 +97,7 @@ export default function DocumentsScreen() {
   const onPickFromLibrary = async (documentType: DocumentType) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      setToast({ icon: 'images-outline', message: 'Allow photo library access to select a clear picture of this document.' });
+      setToast({ icon: 'images-outline', message: 'Allow photo library access to select a clear picture of this document.', tone: 'warning' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
@@ -231,7 +230,7 @@ export default function DocumentsScreen() {
       ]}
     />
 
-    <ToastOverlay message={toast?.message ?? null} icon={toast?.icon ?? 'alert-outline'} onHide={() => setToast(null)} />
+    <ToastOverlay toast={toast} onHide={() => setToast(null)} />
     </>
   );
 }
