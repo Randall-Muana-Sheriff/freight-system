@@ -123,7 +123,17 @@ export const DriverAuthController = {
             }
 
             if (hashCode(code) !== otpRow.code_hash) {
-                await pool.query(`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1`, [otpRow.id]);
+                const updateResult = await pool.query(
+                    `UPDATE otp_codes SET attempts = attempts + 1 WHERE id = $1 RETURNING attempts`,
+                    [otpRow.id]
+                );
+                // Fires exactly once per code, right as it gets locked out (the
+                // guard above already short-circuits any further guesses against
+                // it as "expired"). A delivery failure here should never affect
+                // the verify response, which is why this isn't awaited.
+                if (updateResult.rows[0].attempts >= OTP_MAX_ATTEMPTS) {
+                    sendSms(phone, 'Multiple incorrect codes were entered on your Inzira account. If this wasn\'t you, contact dispatch.').catch(() => {});
+                }
                 return fail(res, { status: 401, code: 'DRIVER_AUTH_OTP_INVALID', message: 'That code is incorrect.' });
             }
 

@@ -47,12 +47,34 @@ export type DriverAssignment = {
   updated_at?: string;
 };
 
+// The rate-limit middleware already computes the exact remaining wait as
+// Retry-After (seconds); this just turns that into a phrase a driver can
+// actually act on ("in 4 minutes") instead of guessing how long "later" is.
+function formatRetryAfter(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes <= 0) {
+    const secs = Math.max(seconds, 1);
+    return `${secs} second${secs === 1 ? '' : 's'}`;
+  }
+  if (seconds === 0) {
+    return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  return `${minutes} minute${minutes === 1 ? '' : 's'} and ${seconds} second${seconds === 1 ? '' : 's'}`;
+}
+
 async function parseResponse(response: Response) {
   const contentType = response.headers.get('content-type') || '';
   const payload = contentType.includes('application/json') ? await response.json() : null;
   const acceptedResponse = response.status === 202;
 
   if (!response.ok && !acceptedResponse) {
+    if (response.status === 429) {
+      const retryAfterSeconds = parseInt(response.headers.get('Retry-After') || '', 10);
+      if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+        throw new Error(`Too many attempts. Try again in ${formatRetryAfter(retryAfterSeconds)}.`);
+      }
+    }
     const message = payload?.error?.message || payload?.error || payload?.message || `Request failed with status ${response.status}`;
     throw new Error(message);
   }
