@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,6 +15,18 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../lib/theme';
 import { ToastOverlay, type Toast } from './ToastOverlay';
+
+// Pre-rendered PNGs rather than inline SVG/gradient components:
+// react-native-svg and expo-linear-gradient aren't dependencies here, and
+// adding either would mean a native rebuild just for static brand
+// visuals. Both images are rendered once (via a headless-Chrome capture
+// of the exact same CSS/SVG used on the web dashboard) so mobile and web
+// share one brand moment instead of two independently-drawn looks.
+const wordmark = require('../assets/inzira-wordmark.png');
+// The same soft jade radial glow the web dashboard's login screen uses
+// behind its wordmark — this screen was otherwise a flat solid color
+// with no atmosphere of its own.
+const authBackground = require('../assets/auth-bg.png');
 
 // Everything — brand mark, title, fields, button — lives inside one
 // ScrollView wrapped by KeyboardAvoidingView. The previous version had a
@@ -47,33 +60,33 @@ export function AuthScreen({
     // this shrinks it again), which is what left a gap exposing the
     // system's default background the moment a field was focused. iOS has
     // no equivalent OS-level behavior, so it still needs this.
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.root}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <View style={styles.screen}>
+      <Image source={authBackground} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.root}
       >
-        <View style={styles.brandRow}>
-          <View style={styles.logoBadge}>
-            <Ionicons name="navigate-outline" size={18} color={theme.colors.primary} />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.brandRow}>
+            <Image source={wordmark} style={styles.wordmarkImage} resizeMode="contain" />
           </View>
-          <Text style={styles.wordmark}>Inzira</Text>
-        </View>
 
-        <Text style={styles.eyebrow}>{eyebrow}</Text>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+          <Text style={styles.eyebrow}>{eyebrow}</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
 
-        <View style={styles.fields}>{children}</View>
+          <View style={styles.fields}>{children}</View>
 
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
-      </ScrollView>
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
+        </ScrollView>
 
-      <ToastOverlay toast={toast ?? null} onHide={onDismissToast ?? (() => {})} />
-    </KeyboardAvoidingView>
+        <ToastOverlay toast={toast ?? null} onHide={onDismissToast ?? (() => {})} />
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -153,18 +166,13 @@ export function AuthButton({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: theme.colors.bg },
+  // Fallback fill in case the background image hasn't decoded yet — avoids
+  // a flash of the system's default white before it appears.
+  screen: { flex: 1, backgroundColor: theme.colors.bg },
+  root: { flex: 1 },
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 26, paddingVertical: 40 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 32 },
-  logoBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: `${theme.colors.primary}22`,
-  },
-  wordmark: { color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  brandRow: { alignItems: 'center', marginBottom: 36 },
+  wordmarkImage: { width: 190, height: 85 },
   eyebrow: {
     color: theme.colors.primary,
     fontSize: 11,
