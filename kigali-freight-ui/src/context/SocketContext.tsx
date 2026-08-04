@@ -14,7 +14,13 @@ interface SocketContextValue {
   jwtToken: string;
   userRole: string;
   authError: string;
-  login: (credentials: { username: string; password: string }) => Promise<boolean>;
+  login: (credentials: { username: string; password: string }) => Promise<'success' | 'mfa_required' | 'failed'>;
+  // True between a login that returned 'mfa_required' and a successful/
+  // abandoned verifyMfa call — AuthForm uses this to know whether to show
+  // the second (6-digit code) step instead of the username/password form.
+  mfaPending: boolean;
+  verifyMfa: (payload: { code?: string; recoveryCode?: string }) => Promise<boolean>;
+  cancelMfa: () => void;
   logout: () => void;
   showAdminCenter: boolean;
   setShowAdminCenter: (value: boolean) => void;
@@ -72,6 +78,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [jwtToken, setJwtToken] = useState(() => localStorage.getItem('fleet_token') || '');
   const [userRole, setUserRole] = useState(() => localStorage.getItem('fleet_role') || '');
   const [authError, setAuthError] = useState('');
+  // Held only in memory, never localStorage — it's a 5-minute-lived,
+  // single-purpose token, not a session credential worth persisting
+  // across a reload.
+  const [mfaSessionToken, setMfaSessionToken] = useState('');
 
   // Whole-app view switch, not a socket/data concern — but this context is
   // already the one thing every screen (including the deeply-nested Admin
@@ -250,27 +260,67 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     }
   }, [isConnected, jwtToken, connectSocket, disconnectSocket]);
 
+  // Shared by a plain login success and a post-MFA verify success — both
+  // end the same way: real tokens in hand, feeds refreshed, socket
+  // connected.
+  const finalizeLogin = useCallback((token: string, role: UserRole | undefined) => {
+    setJwtToken(token);
+    setUserRole(role || 'dispatcher');
+    localStorage.setItem('fleet_token', token);
+    localStorage.setItem('fleet_role', role || 'dispatcher');
+    void refreshFeeds(token);
+    connectSocket(token);
+  }, [refreshFeeds, connectSocket]);
+
   const login = useCallback(async ({ username, password }: { username: string; password: string }) => {
     setAuthError('');
 
     try {
-      const data = await apiFetch('/api/auth/login', { method: 'POST', body: { username, password } }) as { token?: string; role?: UserRole; error?: string };
+      const data = await apiFetch('/api/auth/login', { method: 'POST', body: { username, password } }) as {
+        token?: string; role?: UserRole; mfaRequired?: boolean; mfaSessionToken?: string; error?: string;
+      };
+      if (data.mfaRequired && data.mfaSessionToken) {
+        setMfaSessionToken(data.mfaSessionToken);
+        return 'mfa_required' as const;
+      }
       if (data.token) {
-        setJwtToken(data.token);
-        setUserRole(data.role || 'dispatcher');
-        localStorage.setItem('fleet_token', data.token);
-        localStorage.setItem('fleet_role', data.role || 'dispatcher');
-        void refreshFeeds(data.token);
-        connectSocket(data.token);
-        return true;
+        finalizeLogin(data.token, data.role);
+        return 'success' as const;
       }
       setAuthError(data.error || 'Authentication failed');
+      return 'failed' as const;
+    } catch (err) {
+      setAuthError((err as Error).message || 'Network error connecting to auth server');
+      return 'failed' as const;
+    }
+  }, [finalizeLogin]);
+
+  const verifyMfa = useCallback(async ({ code, recoveryCode }: { code?: string; recoveryCode?: string }) => {
+    setAuthError('');
+    try {
+      const data = await apiFetch('/api/auth/mfa/verify-login', {
+        method: 'POST',
+        body: { mfaSessionToken, code, recoveryCode },
+      }) as { token?: string; role?: UserRole; error?: string };
+      if (data.token) {
+        finalizeLogin(data.token, data.role);
+        setMfaSessionToken('');
+        return true;
+      }
+      setAuthError(data.error || 'Incorrect code.');
       return false;
     } catch (err) {
       setAuthError((err as Error).message || 'Network error connecting to auth server');
       return false;
     }
-  }, [refreshFeeds, connectSocket]);
+  }, [mfaSessionToken, finalizeLogin]);
+
+  // Lets the login form back out of the MFA step (e.g. "use a different
+  // account") without leaving a stale session token sitting in memory.
+  const cancelMfa = useCallback(() => {
+    setMfaSessionToken('');
+    setAuthError('');
+  }, []);
 
   const logout = useCallback(() => {
     disconnectSocket();
@@ -324,6 +374,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const value: SocketContextValue = {
     jwtToken, userRole, authError, login, logout,
+    mfaPending: Boolean(mfaSessionToken), verifyMfa, cancelMfa,
     showAdminCenter, setShowAdminCenter,
     viewingImage, setViewingImage,
     isConnected, toggleNetworkStream,

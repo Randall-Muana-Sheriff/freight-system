@@ -359,3 +359,36 @@ export async function revokeKioskDevice(id: number, token: string) {
 export async function fetchMyKioskDevice(token: string): Promise<{ label: string | null }> {
     return apiFetch('/api/kiosk-devices/me', { method: 'GET', token }) as Promise<{ label: string | null }>;
 }
+
+// Opt-in TOTP MFA (authenticator-app codes) for a staff account's own
+// login — see kigali-freight-router/services/totpService.js. The login
+// call itself and its second-step verification live in SocketContext.tsx
+// (matching how plain login already works there), not here — these three
+// are purely the self-service enroll/confirm/disable actions used by
+// TopCommandBar's account menu.
+export interface MyAccount {
+    username: string;
+    role: string;
+    mfaEnabled: boolean;
+}
+
+export async function fetchMyAccount(token: string): Promise<MyAccount> {
+    return apiFetch('/api/auth/me', { method: 'GET', token }) as Promise<MyAccount>;
+}
+
+export interface MfaEnrollResult {
+    qrCodeDataUrl: string;
+    manualEntrySecret: string;
+}
+
+export async function enrollMfa(token: string): Promise<MfaEnrollResult> {
+    return apiFetch('/api/auth/mfa/enroll', { method: 'POST', token }) as Promise<MfaEnrollResult>;
+}
+
+export async function confirmMfa(code: string, token: string): Promise<{ recoveryCodes: string[] }> {
+    return apiFetch('/api/auth/mfa/confirm', { method: 'POST', token, body: { code } }) as Promise<{ recoveryCodes: string[] }>;
+}
+
+export async function disableMfa(password: string, token: string) {
+    return apiFetch('/api/auth/mfa/disable', { method: 'POST', token, body: { password } });
+}

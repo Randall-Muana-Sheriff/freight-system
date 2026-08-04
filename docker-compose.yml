@@ -131,6 +131,10 @@ services:
       # Leave unset for local dev — config/anthropicClient.js treats a
       # missing key as "AI features disabled" rather than failing to boot.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Encrypts TOTP MFA secrets at rest. Leave unset for local dev — the
+      # MFA enroll endpoint returns a clear error rather than failing to
+      # boot, since MFA is opt-in per account (see appConfig.js).
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
     ports:
       - "5000:5000"
     depends_on:

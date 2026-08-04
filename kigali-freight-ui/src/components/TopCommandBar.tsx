@@ -1,9 +1,10 @@
 // src/components/TopCommandBar.tsx
-import { useState, type ComponentType } from 'react';
-import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck } from 'lucide-react';
+import { useState, useEffect, type ComponentType } from 'react';
+import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck, Copy, Check } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
-import { apiFetch } from '../utils/api';
+import { apiFetch, fetchMyAccount, enrollMfa, confirmMfa, disableMfa, type MfaEnrollResult } from '../utils/api';
 import { classifyFreshness, useNow } from '../utils/telemetryFreshness';
+import { InziraMark } from './InziraMark';
 
 function ChangePasswordForm({ jwtToken }: { jwtToken: string }) {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -63,6 +64,197 @@ function ChangePasswordForm({ jwtToken }: { jwtToken: string }) {
     );
 }
 
+// Opt-in TOTP MFA for the account's own login — enroll (QR + confirm),
+// view recovery codes exactly once, or disable (password-gated). Placed
+// right alongside ChangePasswordForm in the same account-menu dropdown;
+// this is self-service on your own account only, not something an admin
+// sets for someone else.
+type MfaStep = 'loading' | 'off' | 'enrolling' | 'confirming' | 'recovery-codes' | 'on' | 'disabling';
+
+function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
+    const [step, setStep] = useState<MfaStep>('loading');
+    const [enrollment, setEnrollment] = useState<MfaEnrollResult | null>(null);
+    const [code, setCode] = useState('');
+    const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+    const [copied, setCopied] = useState(false);
+    const [disablePassword, setDisablePassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+        fetchMyAccount(jwtToken)
+            .then((account) => setStep(account.mfaEnabled ? 'on' : 'off'))
+            .catch(() => setStep('off'));
+    }, [jwtToken]);
+
+    const startEnroll = async () => {
+        setError(null);
+        setSubmitting(true);
+        try {
+            const result = await enrollMfa(jwtToken);
+            setEnrollment(result);
+            setStep('confirming');
+        } catch (err) {
+            setError((err as Error).message || 'Could not start MFA enrollment.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleConfirm = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSubmitting(true);
+        try {
+            const result = await confirmMfa(code, jwtToken);
+            setRecoveryCodes(result.recoveryCodes);
+            setCode('');
+            setStep('recovery-codes');
+        } catch (err) {
+            setError((err as Error).message || 'Incorrect code.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDisable = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSubmitting(true);
+        try {
+            await disableMfa(disablePassword, jwtToken);
+            setDisablePassword('');
+            setStep('off');
+        } catch (err) {
+            setError((err as Error).message || 'Could not disable MFA.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const copyRecoveryCodes = () => {
+        void navigator.clipboard?.writeText(recoveryCodes.join('\n'));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (step === 'loading') return null;
+
+    return (
+        <div className="p-3 border-t border-line/10 space-y-2">
+            <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Two-factor authentication</div>
+            {error && <div className="text-[10px] text-rust">{error}</div>}
+
+            {step === 'off' && (
+                <>
+                    <p className="text-[10px] text-steel leading-relaxed">Add a code from an authenticator app to your login, on top of your password.</p>
+                    <button
+                        type="button"
+                        onClick={() => void startEnroll()}
+                        disabled={submitting}
+                        className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                    >
+                        {submitting ? 'Starting...' : 'Enable'}
+                    </button>
+                </>
+            )}
+
+            {step === 'confirming' && enrollment && (
+                <form onSubmit={(e) => void handleConfirm(e)} className="space-y-2">
+                    <p className="text-[10px] text-steel leading-relaxed">Scan this with Google Authenticator, Authy, or 1Password:</p>
+                    <img src={enrollment.qrCodeDataUrl} alt="MFA QR code" className="w-32 h-32 mx-auto rounded bg-paper p-1.5" />
+                    <p className="text-[9px] text-steel text-center">Can&apos;t scan? Enter this manually: <span className="font-mono text-carbon break-all">{enrollment.manualEntrySecret}</span></p>
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="6-digit code"
+                        required
+                        maxLength={6}
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                        className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper text-center tracking-[0.3em] font-mono focus:outline-none focus:border-route transition-colors"
+                    />
+                    <button
+                        type="submit"
+                        disabled={submitting || code.length !== 6}
+                        className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                    >
+                        {submitting ? 'Confirming...' : 'Confirm'}
+                    </button>
+                </form>
+            )}
+
+            {step === 'recovery-codes' && (
+                <div className="space-y-2">
+                    <div className="p-2 bg-hazard/10 border border-hazard/30 rounded text-[10px] text-hazard leading-relaxed">
+                        Save these recovery codes now — each works once, and this is the only time they&apos;ll be shown. Use one if you lose your authenticator device.
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 font-mono text-[10px] text-paper bg-ink rounded p-2">
+                        {recoveryCodes.map((rc) => <div key={rc}>{rc}</div>)}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={copyRecoveryCodes}
+                        className="w-full flex items-center justify-center gap-1.5 border border-line/15 rounded py-1.5 text-[10px] font-bold text-steel hover:text-paper uppercase tracking-wide transition-colors"
+                    >
+                        {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
+                        {copied ? 'Copied' : 'Copy all'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setStep('on')}
+                        className="w-full bg-route hover:bg-route-deep rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                    >
+                        Done
+                    </button>
+                </div>
+            )}
+
+            {step === 'on' && (
+                <>
+                    <p className="text-[10px] text-tarp font-bold">Enabled</p>
+                    <button
+                        type="button"
+                        onClick={() => setStep('disabling')}
+                        className="w-full border border-rust/30 text-rust hover:bg-rust/10 rounded py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors"
+                    >
+                        Disable
+                    </button>
+                </>
+            )}
+
+            {step === 'disabling' && (
+                <form onSubmit={(e) => void handleDisable(e)} className="space-y-2">
+                    <input
+                        type="password"
+                        placeholder="Current password"
+                        required
+                        value={disablePassword}
+                        onChange={(e) => setDisablePassword(e.target.value)}
+                        className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                    />
+                    <div className="flex gap-1.5">
+                        <button
+                            type="button"
+                            onClick={() => { setStep('on'); setError(null); setDisablePassword(''); }}
+                            className="flex-1 border border-line/15 rounded py-1.5 text-[10px] font-bold text-steel hover:text-paper uppercase tracking-wide transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="flex-1 bg-rust hover:bg-rust/80 disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-paper uppercase tracking-wide transition-colors"
+                        >
+                            {submitting ? 'Disabling...' : 'Confirm'}
+                        </button>
+                    </div>
+                </form>
+            )}
+        </div>
+    );
+}
+
 interface StatChipProps {
     icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
     label: string;
@@ -97,11 +289,11 @@ export default function TopCommandBar() {
     return (
         <header className="h-16 shrink-0 bg-panel border-b border-line/10 flex items-center justify-between px-5 gap-4 relative z-30">
             <div className="flex items-center gap-3 shrink-0">
-                <div className="w-9 h-9 rounded-md bg-route/15 border border-route/35 flex items-center justify-center">
-                    <span className="text-route font-mono font-black text-xs">KF</span>
+                <div className="w-9 h-9 rounded-md bg-route/15 border border-route/35 flex items-center justify-center text-route">
+                    <InziraMark size={24} />
                 </div>
                 <div className="hidden sm:block">
-                    <h1 className="text-sm font-bold tracking-tight text-paper leading-tight">Kigali Freight</h1>
+                    <h1 className="text-sm font-bold tracking-tight text-paper leading-tight">Inzira</h1>
                     <p className="text-[9px] text-steel uppercase font-mono tracking-wider">Dispatch Control</p>
                 </div>
             </div>
@@ -155,8 +347,9 @@ export default function TopCommandBar() {
                     {menuOpen && (
                         <>
                             <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
-                            <div className="absolute right-0 top-full mt-2 w-60 bg-panel border border-line/15 rounded-md shadow-xl z-40 overflow-hidden">
+                            <div className="absolute right-0 top-full mt-2 w-60 bg-panel border border-line/15 rounded-md shadow-xl z-40 max-h-[80vh] overflow-y-auto">
                                 <ChangePasswordForm jwtToken={jwtToken} />
+                                <TwoFactorSection jwtToken={jwtToken} />
                                 <button
                                     onClick={logout}
                                     className="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] font-bold text-rust hover:bg-rust/10 uppercase tracking-wide border-t border-line/10 transition-colors"

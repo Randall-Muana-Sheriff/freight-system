@@ -99,4 +99,12 @@ export const appConfig = {
         bucketName: optional('R2_BUCKET_NAME'),
         publicUrlBase: optional('R2_PUBLIC_URL_BASE'),
     },
+    // Optional: encrypts TOTP secrets at rest (services/totpService.js).
+    // Deliberately NOT required() like JWT_SECRET — this is an opt-in
+    // feature (nobody has MFA enabled until they turn it on themselves),
+    // so an existing deployment without this set yet must keep booting
+    // normally. The MFA enroll endpoint returns a clear error instead of
+    // silently proceeding when this is unset, rather than the whole
+    // server refusing to start over a feature nobody's using yet.
+    totpEncryptionKey: optional('TOTP_ENCRYPTION_KEY'),
 };

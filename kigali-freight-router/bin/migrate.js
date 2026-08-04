@@ -38,6 +38,7 @@ const MIGRATIONS = [
     { id: 'add_incident_photo_and_ai_triage.sql', destructive: false },
     { id: 'add_kiosk_devices.sql', destructive: false },
     { id: 'add_kiosk_devices_last_seen.sql', destructive: false },
+    { id: 'add_totp_mfa.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';
