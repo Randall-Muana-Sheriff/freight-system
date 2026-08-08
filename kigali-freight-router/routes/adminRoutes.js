@@ -46,6 +46,9 @@ router.delete('/vehicle-types/:id', authMiddleware(['admin', 'dispatcher']), adm
 router.get('/audit-logs', authMiddleware(['admin']), AdminController.getAuditLogs);
 router.get('/stats', authMiddleware(['admin']), AdminController.getStats);
 
+router.get('/settings/dispatch-contact', authMiddleware(['admin']), AdminController.getDispatchContact);
+router.patch('/settings/dispatch-contact', authMiddleware(['admin']), adminWriteLimit, AdminController.updateDispatchContact);
+
 // Kiosk wall displays are physical hardware, not staff accounts — only an
 // admin provisions or decommissions one, never a dispatcher.
 router.post('/kiosk-devices', authMiddleware(['admin']), adminWriteLimit, AdminController.createKioskDevice);

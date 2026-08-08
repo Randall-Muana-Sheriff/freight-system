@@ -37,6 +37,17 @@ router.get('/ready', async (req, res) => {
     }
 });
 
+// Unauthenticated on purpose: the driver app needs this on its pre-login
+// PIN screens, before any session token exists, and it's just a phone
+// number — nothing sensitive enough to warrant gating it behind auth.
+router.get('/dispatch-contact', async (req, res) => {
+    const result = await pool.query('SELECT dispatch_phone_number FROM system_settings WHERE id = 1');
+    res.json({
+        success: true,
+        data: { phoneNumber: result.rows[0]?.dispatch_phone_number || null },
+    });
+});
+
 router.get('/metrics', async (req, res) => {
     // Scraped by machines (Prometheus), not signed-in users, so this checks
     // a static bearer token rather than the usual JWT authMiddleware. No

@@ -618,6 +618,42 @@ export const AdminController = {
         }
     },
 
+    // GET /api/settings/dispatch-contact - the admin-facing read of the same
+    // value systemRoutes.js's public /dispatch-contact endpoint exposes to
+    // the driver app, so an admin can see what's actually configured.
+    getDispatchContact: async (req, res) => {
+        try {
+            const result = await pool.query('SELECT dispatch_phone_number FROM system_settings WHERE id = 1');
+            return ok(res, { phoneNumber: result.rows[0]?.dispatch_phone_number || null });
+        } catch (error) {
+            return fail(res, { status: 500, code: 'DISPATCH_CONTACT_FETCH_FAILED', message: errorMessage(error, 'Failed to load dispatch contact.') });
+        }
+    },
+
+    updateDispatchContact: async (req, res) => {
+        const { phoneNumber } = req.body || {};
+        // An empty/omitted number clears it (drivers just see the plain,
+        // non-tappable text again) rather than being rejected outright.
+        if (phoneNumber === '' || phoneNumber == null) {
+            try {
+                await pool.query('UPDATE system_settings SET dispatch_phone_number = NULL WHERE id = 1');
+                return ok(res, { phoneNumber: null });
+            } catch (error) {
+                return fail(res, { status: 500, code: 'DISPATCH_CONTACT_UPDATE_FAILED', message: errorMessage(error, 'Failed to update dispatch contact.') });
+            }
+        }
+        const normalized = normalizePhone(phoneNumber);
+        if (!normalized) {
+            return fail(res, { status: 400, code: 'DISPATCH_CONTACT_INVALID', message: 'Enter a valid Rwandan mobile number.' });
+        }
+        try {
+            await pool.query('UPDATE system_settings SET dispatch_phone_number = $1 WHERE id = 1', [normalized]);
+            return ok(res, { phoneNumber: normalized });
+        } catch (error) {
+            return fail(res, { status: 500, code: 'DISPATCH_CONTACT_UPDATE_FAILED', message: errorMessage(error, 'Failed to update dispatch contact.') });
+        }
+    },
+
     // DELETE /api/vehicle-types/:id - safe to remove freely: this is a
     // plain reference list, not a foreign key, so retiring a type here
     // never touches vehicles already registered with it (they keep their
