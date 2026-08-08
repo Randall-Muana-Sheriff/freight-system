@@ -11,6 +11,16 @@ interface OrderRowProps {
     onAssigned: () => void;
 }
 
+// A left-border accent rather than a second text badge next to the
+// existing status badge — this card already shows one badge (status);
+// stacking a second same-style badge right beside it would read as one
+// crowded, hard-to-parse label instead of two distinct signals.
+const PRIORITY_BORDER: Record<'high' | 'normal' | 'low', string> = {
+    high: 'border-l-rust',
+    normal: 'border-l-carbon',
+    low: 'border-l-steel/40',
+};
+
 export default function OrderRow({ order, drivers, jwtToken, onAssigned }: OrderRowProps) {
     const { resolveDriverName } = useSocket();
     const [selectedDriver, setSelectedDriver] = useState('');
@@ -43,12 +53,21 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
         }
     };
 
+    const priority = order.priority || 'normal';
+
     return (
-        <div className="bg-ink/60 p-2.5 rounded border border-line/10 space-y-2">
+        <div className={`bg-ink/60 p-2.5 rounded border border-line/10 border-l-4 ${PRIORITY_BORDER[priority]} space-y-2`}>
             <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
                     <div className="text-paper font-bold text-[11px] truncate">{order.cargo_description}</div>
-                    <div className="text-[9px] text-steel font-mono">{order.origin_hub_name} &middot; {order.weight_kg} kg</div>
+                    <div className="text-[9px] text-steel font-mono">
+                        {order.origin_hub_name} &middot; {order.weight_kg} kg
+                        {priority !== 'normal' && (
+                            <span className={priority === 'high' ? 'text-rust' : 'text-steel'}>
+                                {' '}&middot; {priority === 'high' ? 'High priority' : 'Low priority'}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 <span className="shrink-0 text-[9px] font-mono font-bold uppercase text-hazard bg-hazard/10 border border-hazard/30 rounded px-1.5 py-0.5">
                     {order.status}

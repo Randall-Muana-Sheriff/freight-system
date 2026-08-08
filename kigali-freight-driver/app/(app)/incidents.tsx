@@ -8,6 +8,7 @@ import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
 import { ActionSheet } from '../../components/ActionSheet';
+import { SafetyChecklistCard } from '../../components/SafetyChecklistCard';
 import { theme } from '../../lib/theme';
 import {
   reportIncident,
@@ -302,6 +303,8 @@ export default function IncidentsScreen() {
         title="Report an issue"
         subtitle="Let dispatch know about a delay, breakdown, or anything blocking your delivery."
       />
+
+      <SafetyChecklistCard />
 
       {activeAssignments.length > 0 && (
         <TouchableOpacity style={styles.assignmentChip} activeOpacity={0.8} onPress={() => setPickingAssignment(true)}>

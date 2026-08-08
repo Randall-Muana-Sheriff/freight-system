@@ -1,10 +1,11 @@
 // src/components/TopCommandBar.tsx
 import { useState, useEffect, type ComponentType } from 'react';
-import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck, Copy, Check } from 'lucide-react';
+import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck, Copy, Check, Bell, Image as ImageIcon } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { apiFetch, fetchMyAccount, enrollMfa, confirmMfa, disableMfa, type MfaEnrollResult } from '../utils/api';
 import { classifyFreshness, useNow } from '../utils/telemetryFreshness';
 import { InziraMark } from './InziraMark';
+import OrderHistoryToggle from './orders/OrderHistoryToggle';
 
 function ChangePasswordForm({ jwtToken }: { jwtToken: string }) {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -278,6 +279,122 @@ function StatChip({ icon: Icon, label, value, tone = 'text-paper' }: StatChipPro
 // block + separate UserProfile card. Session identity, connection health,
 // and the top-line KPIs all live here now so they're visible regardless of
 // which secondary tab a dispatcher has open.
+// Previously two always-visible feeds squeezed inside OrdersPanel (a
+// ~112px scrollable box each), competing for space with the actual
+// order-creation form and dispatch queue right next to them. Both were
+// already fed by live socket state (orderActivity/recentDeliveries in
+// SocketContext), which is exactly what a notification-bell pattern is
+// for — glanceable, not something that needs permanent screen real
+// estate. Moved here since this header is shown on every dashboard view,
+// not just the order-creation panel.
+const NOTIF_LAST_SEEN_KEY = 'inzira_notif_last_seen_at';
+
+function NotificationBell() {
+    const { jwtToken, orderActivity, recentDeliveries, setViewingImage, resolveDriverName } = useSocket();
+    const [open, setOpen] = useState(false);
+    // Persisted to localStorage rather than kept as a plain in-memory
+    // count — a page refresh remounts this component from scratch, which
+    // reset a bare useState count back to 0 while recentDeliveries (fetched
+    // fresh from the backend on every load) didn't reset with it, so the
+    // badge came back showing things already seen in the previous session.
+    // Comparing against a stored timestamp instead survives the reload,
+    // and also stays correct if either feed ever evicts old entries — a
+    // simple item count doesn't handle a list shrinking, a timestamp
+    // comparison doesn't care.
+    const [lastSeenAt, setLastSeenAt] = useState(() => localStorage.getItem(NOTIF_LAST_SEEN_KEY) || '');
+    const unseenCount =
+        orderActivity.filter((a) => a.timestamp > lastSeenAt).length +
+        recentDeliveries.filter((d) => d.confirmed_at > lastSeenAt).length;
+
+    const toggle = () => {
+        setOpen((v) => !v);
+        const now = new Date().toISOString();
+        localStorage.setItem(NOTIF_LAST_SEEN_KEY, now);
+        setLastSeenAt(now);
+    };
+
+    return (
+        <div className="relative">
+            <button
+                onClick={toggle}
+                title="Recent activity"
+                aria-label="Recent activity"
+                aria-expanded={open}
+                className="relative flex items-center px-2 py-1.5 rounded-md border border-line/15 text-steel hover:text-paper transition-colors"
+            >
+                <Bell size={14} strokeWidth={2.5} />
+                {unseenCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rust text-paper text-[9px] font-bold flex items-center justify-center leading-none">
+                        {unseenCount > 9 ? '9+' : unseenCount}
+                    </span>
+                )}
+            </button>
+            {open && (
+                <>
+                    <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-panel border border-line/15 rounded-md shadow-xl z-40 max-h-[80vh] overflow-y-auto p-3 space-y-3">
+                        {orderActivity.length === 0 && recentDeliveries.length === 0 ? (
+                            <div className="text-[10px] text-steel text-center py-4">No recent activity yet.</div>
+                        ) : (
+                            <>
+                                {orderActivity.length > 0 && (
+                                    <div className="space-y-1">
+                                        <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Recent activity</div>
+                                        <div className="space-y-1">
+                                            {orderActivity.map((a, idx) => (
+                                                <div key={`${a.orderId}-${a.timestamp}-${idx}`} className="flex justify-between text-[10px] font-mono text-steel">
+                                                    <span className="truncate max-w-[180px]">#{a.orderId} {a.cargo_description}</span>
+                                                    <span className="text-carbon font-bold">{a.status}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {recentDeliveries.length > 0 && (
+                                    <div className="space-y-1 pt-2 border-t border-line/10">
+                                        <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Recent deliveries &middot; proof of delivery</div>
+                                        <div className="space-y-1">
+                                            {recentDeliveries.map((d) => (
+                                                <div key={d.id} className={`flex justify-between items-center p-1.5 rounded border text-[10px] ${d.location_flagged ? 'bg-hazard/10 border-hazard/40' : 'bg-ink/60 border-line/10'}`}>
+                                                    <div className="min-w-0">
+                                                        <div className="text-paper truncate max-w-[160px] flex items-center gap-1">
+                                                            {d.location_flagged && (
+                                                                <span title={`Confirmed ${Math.round(d.distance_from_target_m || 0)}m from the delivery point`}>
+                                                                    <AlertTriangle size={10} strokeWidth={2.5} className="text-hazard shrink-0" />
+                                                                </span>
+                                                            )}
+                                                            #{d.order_id} {d.cargo_description}
+                                                        </div>
+                                                        <div className="text-steel font-mono">
+                                                            {resolveDriverName(d.driver_name)} &middot; {new Date(d.confirmed_at).toLocaleTimeString()}
+                                                            {d.location_flagged && <span className="text-hazard"> &middot; {Math.round(d.distance_from_target_m || 0)}m off</span>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="shrink-0 flex flex-col items-end gap-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setViewingImage(d.photo_url)}
+                                                            className="flex items-center gap-1 bg-tarp/15 border border-tarp/40 text-tarp rounded px-2 py-1 font-bold uppercase"
+                                                        >
+                                                            <ImageIcon size={10} strokeWidth={2.5} />
+                                                            Photo
+                                                        </button>
+                                                        <OrderHistoryToggle orderId={d.order_id} jwtToken={jwtToken} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 export default function TopCommandBar() {
     const { userRole, jwtToken, isConnected, toggleNetworkStream, logout, trackedAssets, violations, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -332,6 +449,8 @@ export default function TopCommandBar() {
                         {userRole}
                     </span>
                 )}
+
+                <NotificationBell />
 
                 <div className="relative">
                     <button

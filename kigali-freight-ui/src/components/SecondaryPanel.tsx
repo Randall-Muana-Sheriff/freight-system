@@ -4,7 +4,7 @@
 // equal visual weight below the constantly-used operational panels, so
 // reaching, say, vehicle registration meant scrolling past everything else.
 import { useState, type ComponentType } from 'react';
-import { Map, Truck } from 'lucide-react';
+import { Map, Truck, History } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useMapInteraction } from '../context/MapInteractionContext';
 import DispatchPanel from './DispatchPanel';
@@ -26,6 +26,7 @@ interface Tab {
 
 const TABS: Tab[] = [
     { id: 'planning', label: 'Planning', icon: Map },
+    { id: 'history', label: 'History', icon: History },
     { id: 'fleet', label: 'Fleet', icon: Truck, staffOnly: true },
 ];
 
@@ -41,14 +42,15 @@ export default function SecondaryPanel() {
     } = useMapInteraction();
     const [activeTab, setActiveTab] = useState('planning');
     const isStaff = userRole === 'admin' || userRole === 'dispatcher';
-    const { width, startResize } = useResizableWidth({ storageKey: 'secondaryPanelWidth', defaultWidth: 380, min: 280, max: 600, edge: 'left' });
+    const { width, collapsed, toggleCollapse, startResize } = useResizableWidth({ storageKey: 'secondaryPanelWidth', defaultWidth: 380, min: 280, max: 600, edge: 'left' });
 
     const visibleTabs = TABS.filter((t) => !t.staffOnly || isStaff);
     const effectiveTab = visibleTabs.some((t) => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id ?? 'planning');
 
     return (
         <>
-        <ResizeHandle onMouseDown={startResize} />
+        <ResizeHandle onMouseDown={startResize} collapsed={collapsed} onToggleCollapse={toggleCollapse} panelSide="right" />
+        {!collapsed && (
         <aside style={{ width }} className="shrink-0 bg-panel border-l border-line/10 h-full flex flex-col overflow-hidden">
             <div className="flex border-b border-line/10 shrink-0">
                 {visibleTabs.map((tab) => {
@@ -85,18 +87,6 @@ export default function SecondaryPanel() {
                             setStopTargetMode={setStopTargetMode}
                             newStopCoords={newStopCoords}
                         />
-                        <RoutesPanel
-                            routes={savedRoutes}
-                            routesLoading={routesLoading}
-                            playbackCoords={playbackCoords}
-                            playbackIndex={playbackIndex}
-                            isPlaying={isPlaying}
-                            selectedPlaybackRoute={selectedPlaybackRoute}
-                            loadRouteForPlayback={loadRouteForPlayback}
-                            togglePlaybackPlay={togglePlaybackPlay}
-                            onLoadBreadcrumbs={(driverName, hours) => void onLoadBreadcrumbs(driverName, hours)}
-                            breadcrumbsLoading={breadcrumbsLoading}
-                        />
                         <GeofenceDrawer
                             drawModeActive={drawModeActive}
                             setDrawModeActive={setDrawModeActive}
@@ -105,6 +95,21 @@ export default function SecondaryPanel() {
                             setDispatchTargetMode={setDispatchTargetMode}
                         />
                     </>
+                )}
+
+                {effectiveTab === 'history' && (
+                    <RoutesPanel
+                        routes={savedRoutes}
+                        routesLoading={routesLoading}
+                        playbackCoords={playbackCoords}
+                        playbackIndex={playbackIndex}
+                        isPlaying={isPlaying}
+                        selectedPlaybackRoute={selectedPlaybackRoute}
+                        loadRouteForPlayback={loadRouteForPlayback}
+                        togglePlaybackPlay={togglePlaybackPlay}
+                        onLoadBreadcrumbs={(driverName, hours) => void onLoadBreadcrumbs(driverName, hours)}
+                        breadcrumbsLoading={breadcrumbsLoading}
+                    />
                 )}
 
                 {effectiveTab === 'fleet' && isStaff && (
@@ -121,6 +126,7 @@ export default function SecondaryPanel() {
                 )}
             </div>
         </aside>
+        )}
         </>
     );
 }

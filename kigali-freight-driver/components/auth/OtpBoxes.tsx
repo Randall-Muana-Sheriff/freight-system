@@ -1,11 +1,22 @@
 import { useRef } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../../lib/theme';
 
 // Shared by the OTP step (6 numeric digits) and the invite-code step (6
-// uppercase alphanumeric characters) — same box-per-character UX, auto
-// advance/backspace, and auto-submit once every box is filled, just with a
+// uppercase alphanumeric characters) — same box-per-character look, just a
 // different keyboard/character filter.
+//
+// One real, single TextInput drives everything; the boxes underneath it are
+// purely a visual rendering of substrings of that one value. An earlier
+// version used a separate controlled TextInput per box with manual
+// .focus()-shuffling between them on each keystroke — that's a well-known
+// source of dropped/misplaced characters in React Native: the imperative
+// focus() call can fire before the state update from the previous
+// onChangeText has actually committed, so a keystroke typed in that window
+// lands on a stale box or gets lost entirely. A real driver hit exactly
+// this typing at normal speed, not just fast paste/autofill. Routing every
+// keystroke through one input removes the race outright — there's no
+// focus-shifting left to race.
 export function OtpBoxes({
   length,
   mode = 'numeric',
@@ -21,86 +32,55 @@ export function OtpBoxes({
   onComplete: (value: string) => void;
   error?: boolean;
 }) {
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRef = useRef<TextInput>(null);
   const chars = Array.from({ length }, (_, i) => value[i] || '');
+  const activeIndex = Math.min(value.length, length - 1);
 
   const sanitize = (raw: string) =>
     mode === 'alphanumeric' ? raw.toUpperCase().replace(/[^A-Z0-9]/g, '') : raw.replace(/[^0-9]/g, '');
 
-  const commit = (next: string[]) => {
-    onChange(next.join(''));
-    if (next.every((c) => c)) onComplete(next.join(''));
-  };
-
-  const setCharAt = (index: number, rawText: string) => {
-    const clean = sanitize(rawText);
-
-    // A paste (or SMS-autofill) delivers more than one character at once —
-    // maxLength is set to the full code length precisely so this isn't
-    // truncated to a single character before it ever reaches here.
-    // Distribute it across this box and the ones after it, the way every
-    // real OTP input handles a pasted code, instead of silently discarding
-    // everything past the first character.
-    if (clean.length > 1) {
-      const next = chars.slice();
-      let cursor = index;
-      for (const ch of clean) {
-        if (cursor >= length) break;
-        next[cursor] = ch;
-        cursor += 1;
-      }
-      commit(next);
-      inputRefs.current[Math.min(cursor, length - 1)]?.focus();
-      return;
-    }
-
-    const next = chars.slice();
-    next[index] = clean;
-    commit(next);
-
-    if (clean && index < length - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const onKeyPress = (index: number, key: string) => {
-    if (key === 'Backspace' && !chars[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+  const onChangeText = (raw: string) => {
+    const clean = sanitize(raw).slice(0, length);
+    onChange(clean);
+    if (clean.length === length) onComplete(clean);
   };
 
   return (
     <View>
-      <View style={styles.row}>
-        {chars.map((char, index) => (
-          <TextInput
-            key={index}
-            ref={(ref) => {
-              inputRefs.current[index] = ref;
-            }}
-            value={char}
-            onChangeText={(text) => setCharAt(index, text)}
-            onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)}
-            keyboardType={mode === 'numeric' ? 'number-pad' : 'default'}
-            // Hints the OS to suggest the SMS code it just received above
-            // the keyboard (iOS's QuickType bar / Android's Autofill) —
-            // only meaningful for the numeric, SMS-delivered OTP, not the
-            // dispatcher-issued invite code.
-            textContentType={mode === 'numeric' ? 'oneTimeCode' : 'none'}
-            autoComplete={mode === 'numeric' ? 'sms-otp' : 'off'}
-            autoCapitalize={mode === 'alphanumeric' ? 'characters' : 'none'}
-            autoCorrect={false}
-            // Deliberately not 1 — see the paste-handling comment above.
-            // The box only ever *displays* a single character (its value
-            // is always exactly one character from the parent's string),
-            // this just stops the native input from truncating a
-            // multi-character paste before onChangeText ever sees it.
-            maxLength={length}
-            autoFocus={index === 0}
-            selectTextOnFocus
-            style={[styles.box, char ? styles.boxFilled : null, error ? styles.boxError : null]}
-          />
-        ))}
+      <View style={styles.inputWrap}>
+        <View style={styles.row} pointerEvents="none">
+          {chars.map((char, index) => (
+            <View
+              key={index}
+              style={[
+                styles.box,
+                char ? styles.boxFilled : null,
+                error ? styles.boxError : null,
+                index === activeIndex && !error ? styles.boxActive : null,
+              ]}
+            >
+              <Text style={styles.boxText}>{char}</Text>
+            </View>
+          ))}
+        </View>
+        <TextInput
+          ref={inputRef}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType={mode === 'numeric' ? 'number-pad' : 'default'}
+          // Hints the OS to suggest the SMS code it just received above
+          // the keyboard (iOS's QuickType bar / Android's Autofill) —
+          // only meaningful for the numeric, SMS-delivered OTP, not the
+          // dispatcher-issued invite code.
+          textContentType={mode === 'numeric' ? 'oneTimeCode' : 'none'}
+          autoComplete={mode === 'numeric' ? 'sms-otp' : 'off'}
+          autoCapitalize={mode === 'alphanumeric' ? 'characters' : 'none'}
+          autoCorrect={false}
+          maxLength={length}
+          autoFocus
+          caretHidden
+          style={[StyleSheet.absoluteFill, styles.hiddenInput]}
+        />
       </View>
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${(chars.filter(Boolean).length / length) * 100}%` }]} />
@@ -112,6 +92,12 @@ export function OtpBoxes({
 const BOX_SIZE = 44;
 
 const styles = StyleSheet.create({
+  inputWrap: { position: 'relative' },
+  // Transparent and exactly overlaying the visual row (combined with
+  // StyleSheet.absoluteFill above), so tapping any box focuses this the
+  // same way tapping a real input would — it's the only thing actually
+  // receiving keystrokes/paste/autofill.
+  hiddenInput: { opacity: 0 },
   row: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
   box: {
     width: BOX_SIZE,
@@ -120,13 +106,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface2,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
-    color: theme.colors.text,
-    fontSize: 20,
-    fontFamily: theme.fonts.bodySemiBold,
-    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  boxFilled: { borderColor: theme.colors.primary, color: theme.colors.primary },
+  boxActive: { borderColor: theme.colors.primary },
+  boxFilled: { borderColor: theme.colors.primary },
   boxError: { borderColor: theme.colors.danger },
+  boxText: { color: theme.colors.text, fontSize: 20, fontFamily: theme.fonts.bodySemiBold, textAlign: 'center' },
   progressTrack: {
     height: 3,
     borderRadius: 2,

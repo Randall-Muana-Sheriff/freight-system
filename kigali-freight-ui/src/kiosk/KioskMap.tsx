@@ -81,7 +81,13 @@ export default function KioskMap({ trackedAssets, routeHistories, savedHubs, res
     return (
         <MapContainer center={KIGALI_CENTER} zoom={12} className="h-full w-full" zoomControl={false} attributionControl={false}>
             <MapSizeFix />
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+            {/* dark_nolabels, not dark_all (used elsewhere in this codebase's
+                own FleetMap): at a glance-from-across-the-room viewing
+                distance, dozens of small neighborhood-name labels are pure
+                noise competing with the fleet/hub markers that actually
+                matter here — a dispatcher working up close benefits from
+                those labels, an unattended wall display doesn't. */}
+            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png" />
 
             {savedHubs.map((hub) => (
                 <Marker key={`hub-${hub.id}`} position={[hub.lat, hub.lng]} icon={hubIcon}>

@@ -6,10 +6,9 @@
 // into src/components/orders/ — pure code movement, no behavior changes;
 // each one now lives, and is readable, on its own.
 import { useState, useEffect, useCallback } from 'react';
-import { PackagePlus, MapPin, ImageIcon, AlertTriangle } from 'lucide-react';
+import { PackagePlus, MapPin } from 'lucide-react';
 import { createOrder, fetchDrivers } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
-import OrderHistoryToggle from './orders/OrderHistoryToggle';
 import BatchSuggestions from './orders/BatchSuggestions';
 import OrderRow from './orders/OrderRow';
 import InFlightRow from './orders/InFlightRow';
@@ -22,14 +21,20 @@ interface OrdersPanelProps {
     clearPickedDeliveryCoords: () => void;
 }
 
-const EMPTY_ORDER = { cargoDescription: '', weightKg: '', hubId: '', recipientName: '', recipientPhone: '' };
+const EMPTY_ORDER = { cargoDescription: '', weightKg: '', hubId: '', recipientName: '', recipientPhone: '', priority: 'normal' };
 
 export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedDeliveryCoords, clearPickedDeliveryCoords }: OrdersPanelProps) {
-    const { jwtToken, userRole, activeOrders, orderActivity, recentDeliveries, inFlightOrders, savedHubs, refreshFeeds, setViewingImage, resolveDriverName } = useSocket();
+    const { jwtToken, userRole, activeOrders, inFlightOrders, savedHubs, refreshFeeds } = useSocket();
     const [drivers, setDrivers] = useState<StaffUser[]>([]);
     const [form, setForm] = useState(EMPTY_ORDER);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Collapsed by default: creating an order is an occasional task, while
+    // this panel's primary job — moment to moment — is browsing and
+    // assigning the queue below. Stacking a 7-field form permanently above
+    // that queue made the two read as one long list instead of two
+    // different modes (enter data vs. manage what already exists).
+    const [showCreateForm, setShowCreateForm] = useState(false);
 
     const loadDrivers = useCallback(async () => {
         try {
@@ -71,9 +76,11 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 delivery_lat: pickedDeliveryCoords[0],
                 recipient_name: form.recipientName.trim() || null,
                 recipient_phone: form.recipientPhone.trim() || null,
+                priority: form.priority as 'high' | 'normal' | 'low',
             }, jwtToken);
             setForm(EMPTY_ORDER);
             clearPickedDeliveryCoords();
+            setShowCreateForm(false);
             void refreshFeeds();
         } catch (err) {
             setError((err as Error).message || 'Failed to create order.');
@@ -88,10 +95,21 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
 
     return (
         <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3">
-            <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper">
-                <PackagePlus size={14} strokeWidth={2.5} className="text-steel" />
-                Dispatch queue ({activeOrders.length} pending)
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper">
+                    <PackagePlus size={14} strokeWidth={2.5} className="text-steel" />
+                    Dispatch queue ({activeOrders.length} pending)
+                </h3>
+                <button
+                    type="button"
+                    onClick={() => setShowCreateForm((v) => !v)}
+                    className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors ${
+                        showCreateForm ? 'bg-panel border-line/20 text-steel hover:text-paper' : 'bg-route/15 border-route/40 text-route hover:bg-route/25'
+                    }`}
+                >
+                    {showCreateForm ? 'Cancel' : '+ New order'}
+                </button>
+            </div>
 
             {error && (
                 <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-[11px] rounded font-mono">
@@ -99,6 +117,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 </div>
             )}
 
+            {showCreateForm && (
             <form onSubmit={(e) => void handleCreate(e)} className="space-y-2 bg-ink/60 p-2.5 rounded border border-line/10">
                 <div className="text-[9px] text-steel uppercase tracking-wider font-mono">New manifest entry</div>
                 <input
@@ -124,7 +143,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                         className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 font-mono"
                     />
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-3 gap-1.5">
                     <input
                         type="number"
                         placeholder="Weight (kg)"
@@ -141,6 +160,15 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                         {savedHubs.map((h) => (
                             <option key={h.id} value={h.id}>{h.name}</option>
                         ))}
+                    </select>
+                    <select
+                        value={form.priority}
+                        onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper font-mono"
+                    >
+                        <option value="high">High</option>
+                        <option value="normal">Normal</option>
+                        <option value="low">Low</option>
                     </select>
                 </div>
                 <button
@@ -161,6 +189,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                     {creating ? 'Logging manifest...' : '+ Create order'}
                 </button>
             </form>
+            )}
 
             <div className="max-h-52 overflow-y-auto space-y-1.5">
                 {activeOrders.length === 0 && (
@@ -177,57 +206,6 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                     <div className="max-h-52 overflow-y-auto space-y-1.5">
                         {inFlightOrders.map((order) => (
                             <InFlightRow key={order.id} order={order} drivers={drivers} jwtToken={jwtToken} onChanged={() => void refreshFeeds()} />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {orderActivity.length > 0 && (
-                <div className="pt-2 border-t border-line/10 space-y-1">
-                    <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Recent activity</div>
-                    <div className="max-h-28 overflow-y-auto space-y-1">
-                        {orderActivity.map((a, idx) => (
-                            <div key={`${a.orderId}-${a.timestamp}-${idx}`} className="flex justify-between text-[10px] font-mono text-steel">
-                                <span className="truncate max-w-[180px]">#{a.orderId} {a.cargo_description}</span>
-                                <span className="text-carbon font-bold">{a.status}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {recentDeliveries.length > 0 && (
-                <div className="pt-2 border-t border-line/10 space-y-1">
-                    <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Recent deliveries &middot; proof of delivery</div>
-                    <div className="max-h-32 overflow-y-auto space-y-1">
-                        {recentDeliveries.map((d) => (
-                            <div key={d.id} className={`flex justify-between items-center p-1.5 rounded border text-[10px] ${d.location_flagged ? 'bg-hazard/10 border-hazard/40' : 'bg-ink/60 border-line/10'}`}>
-                                <div className="min-w-0">
-                                    <div className="text-paper truncate max-w-[160px] flex items-center gap-1">
-                                        {d.location_flagged && (
-                                            <span title={`Confirmed ${Math.round(d.distance_from_target_m || 0)}m from the delivery point`}>
-                                                <AlertTriangle size={10} strokeWidth={2.5} className="text-hazard shrink-0" />
-                                            </span>
-                                        )}
-                                        #{d.order_id} {d.cargo_description}
-                                    </div>
-                                    <div className="text-steel font-mono">
-                                        {resolveDriverName(d.driver_name)} &middot; {new Date(d.confirmed_at).toLocaleTimeString()}
-                                        {d.location_flagged && <span className="text-hazard"> &middot; {Math.round(d.distance_from_target_m || 0)}m off</span>}
-                                    </div>
-                                </div>
-                                <div className="shrink-0 flex flex-col items-end gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setViewingImage(d.photo_url)}
-                                        className="flex items-center gap-1 bg-tarp/15 border border-tarp/40 text-tarp rounded px-2 py-1 font-bold uppercase"
-                                    >
-                                        <ImageIcon size={10} strokeWidth={2.5} />
-                                        Photo
-                                    </button>
-                                    <OrderHistoryToggle orderId={d.order_id} jwtToken={jwtToken} />
-                                </div>
-                            </div>
                         ))}
                     </div>
                 </div>

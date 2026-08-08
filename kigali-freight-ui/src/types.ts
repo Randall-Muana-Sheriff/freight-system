@@ -67,6 +67,7 @@ export interface Order {
     delivery_lat?: number;
     delivery_lng?: number;
     updated_at?: string;
+    priority?: 'high' | 'normal' | 'low';
 }
 
 export interface OrderActivityEvent {

@@ -186,6 +186,14 @@ export async function deleteVehicleType(id: number, token: string) {
     return apiFetch(`/api/vehicle-types/${id}`, { method: 'DELETE', token });
 }
 
+export async function fetchDispatchContact(token: string) {
+    return apiFetch('/api/settings/dispatch-contact', { method: 'GET', token }) as Promise<{ phoneNumber: string | null }>;
+}
+
+export async function updateDispatchContact(phoneNumber: string, token: string) {
+    return apiFetch('/api/settings/dispatch-contact', { method: 'PATCH', token, body: { phoneNumber } }) as Promise<{ phoneNumber: string | null }>;
+}
+
 export async function fetchActiveOrders(token: string): Promise<Order[]> {
     return apiFetch('/api/orders/active', { method: 'GET', token }) as Promise<Order[]>;
 }
@@ -198,6 +206,7 @@ export interface CreateOrderPayload {
     delivery_lat: number;
     recipient_name: string | null;
     recipient_phone: string | null;
+    priority?: 'high' | 'normal' | 'low';
 }
 
 export async function createOrder(orderData: CreateOrderPayload, token: string) {

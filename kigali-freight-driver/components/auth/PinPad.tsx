@@ -1,13 +1,31 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../lib/theme';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
+// Fire-and-forget, and dynamically imported for the same reason
+// BiometricPrompt.tsx dynamically imports expo-local-authentication: a
+// dev-client build made before this native module was added would
+// otherwise crash the whole app just from this file being evaluated.
+// Haptics are pure feel, never a correctness signal, so a failure here
+// (module missing, unsupported hardware) is silently swallowed.
+function haptic(kind: 'tap' | 'error') {
+  import('expo-haptics')
+    .then((Haptics) => {
+      if (kind === 'tap') {
+        return Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      return Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    })
+    .catch(() => {});
+}
+
 // The numpad + dot-indicator widget shared by PIN set/confirm/login — no
 // submit button anywhere, it auto-completes the instant the 4th digit is
-// entered. Mismatch handling (the red flash on confirm) lives in the
-// caller, which just passes `error` down for one render before clearing
+// entered. Mismatch handling (the red flash + shake) lives here, driven by
+// the `error` prop the caller passes down for one render before clearing
 // the value itself.
 export function PinPad({
   length = 4,
@@ -22,8 +40,27 @@ export function PinPad({
   onComplete: (value: string) => void;
   error?: boolean;
 }) {
+  const shakeX = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!error) return;
+    haptic('error');
+    // A short left-right wobble — the same beat as iOS's "incorrect
+    // passcode" shake — reads as "wrong" on its own, faster than waiting
+    // for someone to consciously notice the dots turned red.
+    shakeX.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: 1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -1, duration: 45, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0, duration: 45, useNativeDriver: true }),
+    ]).start();
+  }, [error, shakeX]);
+
   const onPressKey = (key: string) => {
     if (key === '') return;
+    haptic('tap');
     if (key === 'del') {
       onChange(value.slice(0, -1));
       return;
@@ -38,11 +75,16 @@ export function PinPad({
 
   return (
     <View>
-      <View style={styles.dotsRow}>
+      <Animated.View
+        style={[
+          styles.dotsRow,
+          { transform: [{ translateX: shakeX.interpolate({ inputRange: [-1, 1], outputRange: [-10, 10] }) }] },
+        ]}
+      >
         {Array.from({ length }).map((_, i) => (
-          <View key={i} style={[styles.dot, i < value.length && styles.dotFilled, error && styles.dotError]} />
+          <PinDot key={i} filled={i < value.length} error={!!error} />
         ))}
-      </View>
+      </Animated.View>
       <View style={styles.grid}>
         {KEYS.map((key, index) =>
           key === '' ? (
@@ -51,17 +93,55 @@ export function PinPad({
             // rendering a dead circle that looks tappable but does nothing.
             <View key={index} style={styles.keySpacer} />
           ) : (
-            <TouchableOpacity key={index} style={styles.key} activeOpacity={0.7} onPress={() => onPressKey(key)}>
-              {key === 'del' ? (
-                <Ionicons name="backspace-outline" size={20} color={theme.colors.text} />
-              ) : (
-                <Text style={styles.keyText}>{key}</Text>
-              )}
-            </TouchableOpacity>
+            <PinKey key={index} label={key} onPress={() => onPressKey(key)} />
           )
         )}
       </View>
     </View>
+  );
+}
+
+// A dot that pops (scales past 100% then settles) the instant it fills,
+// instead of just snapping to its filled color — the same small spring
+// most polished numeric-entry UIs use to make each digit feel registered.
+function PinDot({ filled, error }: { filled: boolean; error: boolean }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const wasFilled = useRef(filled);
+
+  useEffect(() => {
+    if (filled && !wasFilled.current) {
+      scale.setValue(1.35);
+      Animated.spring(scale, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }).start();
+    }
+    wasFilled.current = filled;
+  }, [filled, scale]);
+
+  return (
+    <Animated.View
+      style={[styles.dot, filled && styles.dotFilled, error && styles.dotError, { transform: [{ scale }] }]}
+    />
+  );
+}
+
+// Replaces the flat opacity-only TouchableOpacity with a real press: the
+// key scales down under the finger and springs back on release, matching
+// the tactile feedback of a native OS PIN keypad instead of just dimming.
+function PinKey({ label, onPress }: { label: string; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () => Animated.spring(scale, { toValue: 0.88, friction: 6, tension: 200, useNativeDriver: true }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, friction: 5, tension: 160, useNativeDriver: true }).start();
+
+  return (
+    <TouchableWithoutFeedback onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
+      <Animated.View style={[styles.key, { transform: [{ scale }] }]}>
+        {label === 'del' ? (
+          <Ionicons name="backspace-outline" size={20} color={theme.colors.text} />
+        ) : (
+          <Text style={styles.keyText}>{label}</Text>
+        )}
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
 }
 

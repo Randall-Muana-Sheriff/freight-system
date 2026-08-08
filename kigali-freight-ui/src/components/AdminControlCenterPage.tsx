@@ -5,7 +5,7 @@
 // User & Role Governance, and the Audit Log each get the full content width
 // instead of fighting neighbors for space.
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
-import { ArrowLeft, BarChart3, FileCheck, ShieldCheck, ScrollText, Users, Truck, PackageCheck, AlertTriangle, Clock, RefreshCw, UserPlus, MonitorPlay } from 'lucide-react';
+import { ArrowLeft, BarChart3, FileCheck, ShieldCheck, ScrollText, Users, Truck, PackageCheck, AlertTriangle, Clock, RefreshCw, UserPlus, MonitorPlay, Settings } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { fetchAdminStats, fetchFleetPerformanceReport } from '../utils/api';
 import AdminUserGovernance from './AdminUserGovernance';
@@ -13,6 +13,7 @@ import InviteDriverPanel from './InviteDriverPanel';
 import SystemAuditLogs from './SystemAuditLogs';
 import DriverDocumentReview from './DriverDocumentReview';
 import KioskDevicesPanel from './KioskDevicesPanel';
+import DispatchSettingsPanel from './DispatchSettingsPanel';
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
 
@@ -29,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'governance', label: 'User & role governance', icon: ShieldCheck },
   { id: 'kiosks', label: 'Kiosk displays', icon: MonitorPlay },
   { id: 'audit', label: 'Audit log', icon: ScrollText },
+  { id: 'settings', label: 'Dispatch settings', icon: Settings },
 ];
 
 type OrderStatus = 'PENDING' | 'ASSIGNED' | 'PICKED_UP' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED' | 'CANCELLED';
@@ -322,13 +324,14 @@ export default function AdminControlCenterPage() {
         </nav>
 
         <main className="flex-1 overflow-y-auto px-8 py-8">
-          <div className="max-w-5xl">
+          <div className="max-w-6xl">
             {activeSection === 'overview' && <StatisticsSection jwtToken={jwtToken} />}
             {activeSection === 'drivers' && <InviteDriverPanel />}
             {activeSection === 'documents' && <DriverDocumentReview />}
             {activeSection === 'governance' && <AdminUserGovernance />}
             {activeSection === 'kiosks' && <KioskDevicesPanel />}
             {activeSection === 'audit' && <SystemAuditLogs />}
+            {activeSection === 'settings' && <DispatchSettingsPanel />}
           </div>
         </main>
       </div>

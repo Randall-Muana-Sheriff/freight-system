@@ -107,7 +107,7 @@ export default function KioskDevicesPanel() {
 
                 {error && <div className="p-2 bg-rust/10 border border-rust/30 text-rust rounded">{error}</div>}
 
-                <form onSubmit={(e) => void handleCreate(e)} className="bg-ink/60 p-3.5 rounded border border-line/10 flex items-end gap-2.5">
+                <form onSubmit={(e) => void handleCreate(e)} className="bg-ink/60 p-3.5 rounded border border-line/10 flex items-end gap-2.5 max-w-md">
                     <label className="block flex-1">
                         <span className="block text-[8px] text-steel/70 uppercase tracking-wider mb-1">Label</span>
                         <input
@@ -149,8 +149,8 @@ export default function KioskDevicesPanel() {
 
             <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-[11px]">
                 <h3 className="text-sm font-bold tracking-tight text-paper font-sans">Active displays</h3>
-                <div className="space-y-1.5">
-                    {activeDevices.length === 0 && <div className="text-steel text-center py-2">No kiosk displays yet.</div>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                    {activeDevices.length === 0 && <div className="text-steel text-center py-2 md:col-span-2">No kiosk displays yet.</div>}
                     {activeDevices.map((d) => {
                         const isStale = !d.lastSeenAt || now - new Date(d.lastSeenAt).getTime() > KIOSK_STALE_AFTER_MS;
                         return (

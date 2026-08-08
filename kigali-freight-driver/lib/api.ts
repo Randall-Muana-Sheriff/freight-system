@@ -45,6 +45,7 @@ export type DriverAssignment = {
   origin_hub_name?: string;
   delivery_lng?: number;
   delivery_lat?: number;
+  priority?: 'high' | 'normal' | 'low';
   updated_at?: string;
 };
 
@@ -204,6 +205,14 @@ export async function requestDriverOtp(phoneNumber: string) {
   return (await apiFetch('/api/auth/driver/otp/request', { method: 'POST', body: { phoneNumber } })) as { accepted: boolean };
 }
 
+// No /api prefix — this is served by systemRoutes.js, the router's one
+// fully public/unauthenticated routes file, not the usual /api surface.
+// Needed pre-login (the PIN screens shown before a real session exists),
+// which is exactly why it has to be unauthenticated in the first place.
+export async function fetchDispatchContact() {
+  return (await apiFetch('/dispatch-contact', { method: 'GET' })) as { phoneNumber: string | null };
+}
+
 export async function verifyDriverOtp(phoneNumber: string, code: string) {
   return (await apiFetch('/api/auth/driver/otp/verify', { method: 'POST', body: { phoneNumber, code } })) as DriverOtpVerifyResult;
 }
@@ -295,6 +304,12 @@ export type OrderDetail = DriverAssignment & {
   pickup_lat?: number;
   recipient_name?: string;
   recipient_phone?: string;
+  // null (not just absent) means no fresh GPS fix to compute these from —
+  // see computeRouteProgress in orderController.js. Distinguishing "no
+  // signal yet" from "0% progress" matters for what the trip screen shows.
+  progressPercent?: number | null;
+  distanceRemainingKm?: number | null;
+  etaMinutes?: number | null;
 };
 
 export async function fetchOrderById(token: string, orderId: number) {
@@ -456,6 +471,20 @@ export type DriverDocumentStatus = {
 
 export async function fetchMyDocuments(token: string) {
   return (await apiFetch('/api/driver-documents/mine', { token })) as { checklist: DriverDocumentStatus[]; verified: boolean };
+}
+
+export type SafetyChecklistItems = Record<string, boolean>;
+
+export async function fetchTodaySafetyChecklist(token: string) {
+  return (await apiFetch('/api/driver-safety-checklist/today', { token })) as { items: SafetyChecklistItems };
+}
+
+export async function updateSafetyChecklistItem(token: string, itemKey: string, checked: boolean) {
+  return (await apiFetch('/api/driver-safety-checklist/today', {
+    method: 'PATCH',
+    token,
+    body: { itemKey, checked },
+  })) as { items: SafetyChecklistItems };
 }
 
 // Separate from apiFetch deliberately, same as confirmDelivery — a

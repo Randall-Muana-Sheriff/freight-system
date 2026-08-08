@@ -11,6 +11,14 @@ import { useAuth } from '../../../lib/auth';
 import * as ImagePicker from 'expo-image-picker';
 import { updateOrderStatus, fetchOrderById, confirmDelivery, isNetworkFailure, type OrderDetail } from '../../../lib/api';
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
+import { isJobInProgress } from '../../../lib/assignments';
+
+// How often to re-fetch the order while it's actively in progress, so the
+// route-progress bar/ETA below feels alive without needing a socket. Not
+// tied to the driver's own telemetry-send interval (~15s, see
+// locationTracking.ts) — this just needs to be frequent enough to feel
+// current, not to match it exactly.
+const ROUTE_PROGRESS_POLL_MS = 25000;
 
 // Maps the real backend status onto the simplified 4-step visual timeline.
 const TIMELINE_STEPS = ['Accepted', 'Picked up', 'In transit', 'Delivered'];
@@ -87,6 +95,19 @@ export default function TripDetailScreen() {
     loadOrder();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, id]);
+
+  // Polling rather than a socket push: this screen just needs one
+  // lightweight query re-run periodically, not a new stream wired into
+  // lib/liveEvents.ts's shared alerts socket (see the route-progress plan
+  // notes — that connection is scoped specifically to the alerts feed).
+  // Only runs while a job is actually in progress; nothing to keep fresh
+  // before pickup or after delivery.
+  useEffect(() => {
+    if (!isJobInProgress(order?.status || '')) return;
+    const interval = setInterval(loadOrder, ROUTE_PROGRESS_POLL_MS);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, id, order?.status]);
 
   const onAction = async (status: string) => {
     if (!token || !id) return;
@@ -278,6 +299,27 @@ export default function TripDetailScreen() {
             ))}
           </View>
 
+          {isJobInProgress(order.status || '') ? (
+            <>
+              <View style={styles.divider} />
+              <View>
+                <Text style={styles.label}>Route progress</Text>
+                {order.progressPercent != null ? (
+                  <>
+                    <View style={styles.progressTrack}>
+                      <View style={[styles.progressFill, { width: `${order.progressPercent}%` }]} />
+                    </View>
+                    <Text style={styles.progressCaption}>
+                      {order.distanceRemainingKm} km remaining · ETA ~{order.etaMinutes} min
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.progressCaption}>Waiting for GPS signal…</Text>
+                )}
+              </View>
+            </>
+          ) : null}
+
           <View style={styles.divider} />
 
           {nextAction ? (
@@ -378,6 +420,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.surface2,
+    marginTop: 10,
+    overflow: 'hidden',
+  },
+  progressFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
+  progressCaption: { color: theme.colors.muted, fontSize: 12, marginTop: 8, fontFamily: theme.fonts.mono },
   timeline: { gap: 10 },
   timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   dot: {

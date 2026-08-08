@@ -7,6 +7,7 @@ export type DriverAssignmentCard = {
   destination: string;
   eta: string;
   status: string;
+  priority: 'high' | 'normal' | 'low';
 };
 
 // A job is "in progress" once a driver has physically picked it up — before
@@ -40,5 +41,6 @@ export function toDriverAssignmentCard(order: DriverAssignment): DriverAssignmen
     destination,
     eta: 'Dispatch-managed',
     status: prettyStatus(order.status),
+    priority: order.priority || 'normal',
   };
 }

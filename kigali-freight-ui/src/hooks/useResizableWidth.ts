@@ -12,14 +12,22 @@ interface UseResizableWidthOptions {
     edge: 'left' | 'right';
 }
 
+// The width a collapsed panel still occupies — not zero, so there's a
+// visible thin strip with the expand toggle on it rather than the panel
+// vanishing without a trace of how to bring it back.
+const COLLAPSED_WIDTH = 8;
+
 // Both dashboard side panels (OperationsRail, SecondaryPanel) were a fixed
 // Tailwind width class — this makes either one drag-resizable from its
-// inner edge, remembering the chosen width per panel across reloads.
+// inner edge, remembering the chosen width per panel across reloads, plus
+// a fully-collapsible state (also remembered) for "give me the whole map
+// for a moment" without losing the width you'd already dialed in.
 export function useResizableWidth({ storageKey, defaultWidth, min, max, edge }: UseResizableWidthOptions) {
     const [width, setWidth] = useState(() => {
         const stored = Number(localStorage.getItem(storageKey));
         return Number.isFinite(stored) && stored >= min && stored <= max ? stored : defaultWidth;
     });
+    const [collapsed, setCollapsed] = useState(() => localStorage.getItem(`${storageKey}_collapsed`) === '1');
     const dragStart = useRef<{ x: number; width: number } | null>(null);
 
     const onMouseMove = useCallback(
@@ -60,5 +68,13 @@ export function useResizableWidth({ storageKey, defaultWidth, min, max, edge }: 
         [width, onMouseMove, onMouseUp]
     );
 
-    return { width, startResize };
+    const toggleCollapse = useCallback(() => {
+        setCollapsed((current) => {
+            const next = !current;
+            localStorage.setItem(`${storageKey}_collapsed`, next ? '1' : '0');
+            return next;
+        });
+    }, [storageKey]);
+
+    return { width: collapsed ? COLLAPSED_WIDTH : width, collapsed, toggleCollapse, startResize };
 }

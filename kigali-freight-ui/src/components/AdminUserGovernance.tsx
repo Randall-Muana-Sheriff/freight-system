@@ -149,9 +149,9 @@ export default function AdminUserGovernance() {
                 </div>
             </form>
 
-            <div className="max-h-[420px] overflow-y-auto space-y-1.5">
+            <div className="max-h-[420px] overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-1.5">
                 {staffUsers.length === 0 && !loading && (
-                    <div className="text-steel text-center py-2">No dispatcher/admin accounts found.</div>
+                    <div className="text-steel text-center py-2 md:col-span-2">No dispatcher/admin accounts found.</div>
                 )}
                 {staffUsers.map((u) => (
                     <div key={u.id} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-center">

@@ -184,8 +184,8 @@ export default function InviteDriverPanel() {
                     Drivers
                 </h3>
                 {resetMsg && <div className="p-2 bg-tarp/10 border border-tarp/30 text-tarp rounded">{resetMsg}</div>}
-                <div className="max-h-[360px] overflow-y-auto space-y-1.5">
-                    {drivers.length === 0 && <div className="text-steel text-center py-2">No drivers yet.</div>}
+                <div className="max-h-[360px] overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                    {drivers.length === 0 && <div className="text-steel text-center py-2 md:col-span-2">No drivers yet.</div>}
                     {drivers.map((d) => (
                         <div key={d.id} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-center">
                             <div className="truncate max-w-[280px]">

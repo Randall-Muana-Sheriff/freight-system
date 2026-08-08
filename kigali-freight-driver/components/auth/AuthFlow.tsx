@@ -1,15 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Linking, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { AuthScreen, AuthField, AuthButton } from '../AuthScreen';
 import { OtpBoxes } from './OtpBoxes';
 import { PinPad } from './PinPad';
 import { RevealCard } from './RevealCard';
 import { BiometricPrompt } from './BiometricPrompt';
+import { ConfirmCallModal } from './ConfirmCallModal';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { getRememberedPhone } from '../../lib/tokenStore';
-import { requestDriverOtp, verifyDriverOtp, verifyDriverInvite, type DriverInviteResult } from '../../lib/api';
+import { requestDriverOtp, verifyDriverOtp, verifyDriverInvite, fetchDispatchContact, type DriverInviteResult } from '../../lib/api';
 import type { Toast } from '../ToastOverlay';
 
 type Step = 'phone' | 'otp' | 'invite' | 'reveal' | 'pin-set' | 'pin-confirm' | 'pin-login' | 'biometric';
@@ -90,6 +91,8 @@ export function AuthFlow() {
   const [pinError, setPinError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
+  const [dispatchPhone, setDispatchPhone] = useState<string | null>(null);
+  const [confirmCallVisible, setConfirmCallVisible] = useState(false);
 
   useEffect(() => {
     getRememberedPhone().then((phone) => {
@@ -98,6 +101,13 @@ export function AuthFlow() {
         setPhoneDigits(phone.replace(/\D/g, '').slice(-9));
       }
     });
+    // Fire-and-forget: this only ever backs the "Contact dispatch" link on
+    // the PIN screens, minutes away at the earliest. If it hasn't resolved
+    // by then, that link just falls back to plain text instead of blocking
+    // anything here.
+    fetchDispatchContact()
+      .then((result) => setDispatchPhone(result.phoneNumber))
+      .catch(() => {});
   }, []);
 
   const enterApp = () => router.replace('/(app)');
@@ -265,9 +275,11 @@ export function AuthFlow() {
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={
-            <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 17 }}>
-              Your number needs to already be registered with dispatch — contact them if you&apos;re not set up yet.
-            </Text>
+            deviceSeenBefore ? undefined : (
+              <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 17 }}>
+                Your number needs to already be registered with dispatch — contact them if you&apos;re not set up yet.
+              </Text>
+            )
           }
         >
           <AuthField
@@ -369,6 +381,7 @@ export function AuthFlow() {
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={<StartOverFooter onStartOver={resetFlow} />}
+          showLogo={false}
         >
           <PinPad value={pinValue} onChange={setPinValue} onComplete={onPinConfirmComplete} error={pinError} />
         </AuthScreen>
@@ -376,27 +389,47 @@ export function AuthFlow() {
 
     case 'pin-login':
       return (
-        <AuthScreen
-          eyebrow="Driver access"
-          title="Enter your PIN."
-          subtitle="Welcome back — enter your PIN to continue."
-          toast={toast}
-          onDismissToast={() => setToast(null)}
-          footer={
-            <StartOverFooter onStartOver={resetFlow}>
-              <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
-                Forgot your PIN? <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bodySemiBold }}>Contact dispatch</Text>
-              </Text>
-            </StartOverFooter>
-          }
-        >
-          <PinPad value={pinValue} onChange={setPinValue} onComplete={onPinLoginComplete} error={pinError} />
-        </AuthScreen>
+        <>
+          <AuthScreen
+            eyebrow="Driver access"
+            title="Enter your PIN."
+            toast={toast}
+            onDismissToast={() => setToast(null)}
+            footer={
+              <StartOverFooter onStartOver={resetFlow}>
+                <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
+                  Forgot your PIN?{' '}
+                  {dispatchPhone ? (
+                    <Text
+                      onPress={() => setConfirmCallVisible(true)}
+                      style={{ color: theme.colors.primary, fontFamily: theme.fonts.bodySemiBold }}
+                    >
+                      Contact dispatch
+                    </Text>
+                  ) : (
+                    <Text>Contact dispatch</Text>
+                  )}
+                </Text>
+              </StartOverFooter>
+            }
+          >
+            <PinPad value={pinValue} onChange={setPinValue} onComplete={onPinLoginComplete} error={pinError} />
+          </AuthScreen>
+          <ConfirmCallModal
+            visible={confirmCallVisible}
+            phoneDisplay={dispatchPhone ? `+250 ${formatPhoneDisplay(dispatchPhone.replace('+250', ''))}` : ''}
+            onCancel={() => setConfirmCallVisible(false)}
+            onConfirm={() => {
+              setConfirmCallVisible(false);
+              if (dispatchPhone) Linking.openURL(`tel:${dispatchPhone}`);
+            }}
+          />
+        </>
       );
 
     case 'biometric':
       return (
-        <AuthScreen eyebrow="Optional" title="Enable biometric login." subtitle="Faster than typing your PIN every time you start a shift.">
+        <AuthScreen eyebrow="Optional" title="Enable biometric login." subtitle="Faster than typing your PIN every time you start a shift." showLogo={false}>
           <BiometricPrompt onEnable={onEnableBiometric} onSkip={enterApp} />
         </AuthScreen>
       );
