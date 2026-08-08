@@ -1,3 +1,5 @@
+name: freight-system
+
 services:
   postgres:
     image: postgis/postgis:16-3.4
@@ -30,9 +32,6 @@ services:
       retries: 5
 
   minio:
-    # Pinned to a specific release rather than :latest — a floating tag on
-    # infra images means `docker compose pull` can silently change behavior
-    # (or break) with no corresponding code change to review.
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: inzira-minio
     command: server /data --console-address ":9001"
