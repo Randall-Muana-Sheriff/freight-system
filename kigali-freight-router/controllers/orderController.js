@@ -11,6 +11,34 @@ import { logError } from '../utils/logger.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
+const ALLOWED_ORDER_PRIORITIES = ['high', 'normal', 'low'];
+
+// Matches the staleness threshold fleetController.js already uses to mark
+// a driver's signal STALE vs LIVE — a fix older than this is treated as no
+// fix at all here, rather than showing a progress bar frozen on a position
+// from several minutes ago.
+const TELEMETRY_STALE_SECONDS = 60;
+// A flat assumed speed for Kigali urban freight — this is a straight-line
+// (great-circle) distance estimate, not a routed-road duration, so the ETA
+// it produces is deliberately presented to the driver as an approximation
+// ("~12 min"), never a promised arrival time.
+const AVG_SPEED_KMH = 25;
+
+function computeRouteProgress({ driver_lat, telemetry_age_seconds, distance_remaining_meters, total_distance_meters }) {
+    const hasFreshFix = driver_lat != null && Number(telemetry_age_seconds) <= TELEMETRY_STALE_SECONDS;
+    if (!hasFreshFix || !(Number(total_distance_meters) > 0)) {
+        return { progressPercent: null, distanceRemainingKm: null, etaMinutes: null };
+    }
+    const distanceRemainingKm = Number(distance_remaining_meters) / 1000;
+    const totalDistanceKm = Number(total_distance_meters) / 1000;
+    const progressPercent = Math.max(0, Math.min(100, Math.round(100 - (distanceRemainingKm / totalDistanceKm) * 100)));
+    const etaMinutes = Math.max(0, Math.round((distanceRemainingKm / AVG_SPEED_KMH) * 60));
+    return {
+        progressPercent,
+        distanceRemainingKm: Math.round(distanceRemainingKm * 10) / 10,
+        etaMinutes,
+    };
+}
 
 // Drivers can move a job forward or confirm delivery, but cancelling an
 // order is a dispatch decision — a driver who can't complete a job reports
@@ -47,6 +75,7 @@ export const OrderController = {
                     delivery_lat,
                     recipient_name,
                     recipient_phone,
+                    priority,
                     updated_at
                 FROM orders
                 WHERE LOWER(COALESCE(assigned_to, '')) = LOWER($1)
@@ -136,10 +165,11 @@ export const OrderController = {
                     pickup_lng,
                     pickup_lat,
                     delivery_lng,
-                    delivery_lat
+                    delivery_lat,
+                    priority
                 FROM orders
                 WHERE status = 'PENDING'
-                ORDER BY id DESC;
+                ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;
             `;
             const result = await pool.query(query);
             return ok(res, result.rows);
@@ -159,7 +189,7 @@ export const OrderController = {
             const {
                 cargo_description, weight_kg, origin_hub_id,
                 delivery_lng, delivery_lat,
-                recipient_name, recipient_phone
+                recipient_name, recipient_phone, priority
             } = req.body;
 
             if (!origin_hub_id) {
@@ -167,6 +197,14 @@ export const OrderController = {
                     status: 400,
                     code: 'ORDERS_HUB_REQUIRED',
                     message: 'A pickup hub is required.',
+                });
+            }
+            const normalizedPriority = priority ? String(priority).toLowerCase() : 'normal';
+            if (!ALLOWED_ORDER_PRIORITIES.includes(normalizedPriority)) {
+                return fail(res, {
+                    status: 400,
+                    code: 'ORDERS_INVALID_PRIORITY',
+                    message: `Priority must be one of: ${ALLOWED_ORDER_PRIORITIES.join(', ')}.`,
                 });
             }
             if (!isValidWeightKg(weight_kg)) {
@@ -212,6 +250,7 @@ export const OrderController = {
                     delivery_lat,
                     recipient_name,
                     recipient_phone,
+                    priority,
                     pickup_coordinates,
                     delivery_coordinates,
                     pickup_geom,
@@ -228,18 +267,19 @@ export const OrderController = {
                     $8,
                     $9,
                     $10,
+                    $11,
                     ST_SetSRID(ST_MakePoint($5, $6), 4326),
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
                     ST_SetSRID(ST_MakePoint($5, $6), 4326),
                     ST_SetSRID(ST_MakePoint($7, $8), 4326)
                 )
-                RETURNING id, cargo_description, status, weight_kg, origin_hub_name, pickup_lng, pickup_lat, delivery_lng, delivery_lat, recipient_name, recipient_phone;
+                RETURNING id, cargo_description, status, weight_kg, origin_hub_name, pickup_lng, pickup_lat, delivery_lng, delivery_lat, recipient_name, recipient_phone, priority;
             `;
 
             const result = await pool.query(query, [
                 cargo_description, weight_kg, hub.id, hub.name,
                 hub.lng, hub.lat, delivery_lng, delivery_lat,
-                recipient_name || null, recipient_phone || null
+                recipient_name || null, recipient_phone || null, normalizedPriority
             ]);
 
             const newOrder = result.rows[0];
@@ -932,23 +972,38 @@ export const OrderController = {
     getOrderById: async (req, res) => {
         try {
             const { id } = req.params;
+            // dl (driver_locations) is LEFT JOINed, not INNER — a driver who
+            // hasn't sent a telemetry ping yet simply has no row there, and
+            // this endpoint still needs to return the order itself in that
+            // case. Distance is real great-circle distance via PostGIS
+            // (ST_DistanceSphere), the same function getNearestDrivers
+            // already uses elsewhere in this file — straight-line, not a
+            // road-routed distance, which is why the ETA computed from it
+            // below is explicitly an estimate.
             const query = `
                 SELECT
-                    id,
-                    cargo_description,
-                    status,
-                    weight_kg,
-                    origin_hub_name,
-                    assigned_to,
-                    pickup_lng,
-                    pickup_lat,
-                    delivery_lng,
-                    delivery_lat,
-                    recipient_name,
-                    recipient_phone,
-                    updated_at
-                FROM orders
-                WHERE id = $1;
+                    o.id,
+                    o.cargo_description,
+                    o.status,
+                    o.weight_kg,
+                    o.origin_hub_name,
+                    o.assigned_to,
+                    o.pickup_lng,
+                    o.pickup_lat,
+                    o.delivery_lng,
+                    o.delivery_lat,
+                    o.recipient_name,
+                    o.recipient_phone,
+                    o.priority,
+                    o.updated_at,
+                    dl.lat AS driver_lat,
+                    dl.lng AS driver_lng,
+                    EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS telemetry_age_seconds,
+                    ST_DistanceSphere(dl.geom, o.delivery_geom) AS distance_remaining_meters,
+                    ST_DistanceSphere(o.pickup_geom, o.delivery_geom) AS total_distance_meters
+                FROM orders o
+                LEFT JOIN driver_locations dl ON dl.driver_name = o.assigned_to
+                WHERE o.id = $1;
             `;
             const result = await pool.query(query, [id]);
             if (result.rows.length === 0) {
@@ -961,7 +1016,15 @@ export const OrderController = {
                 return fail(res, { status: 403, code: 'ORDERS_FORBIDDEN', message: 'You can only view orders assigned to you.' });
             }
 
-            return ok(res, order);
+            const {
+                driver_lat, driver_lng, telemetry_age_seconds,
+                distance_remaining_meters, total_distance_meters,
+                ...publicOrderFields
+            } = order;
+            return ok(res, {
+                ...publicOrderFields,
+                ...computeRouteProgress({ driver_lat, telemetry_age_seconds, distance_remaining_meters, total_distance_meters }),
+            });
         } catch (error) {
             logError(req, 'Database error', error);
             return fail(res, { status: 500, code: 'ORDERS_FETCH_FAILED', message: 'Failed to read order record.' });

@@ -1,0 +1,2 @@
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_priority_check;
+ALTER TABLE orders DROP COLUMN IF EXISTS priority;
