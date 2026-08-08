@@ -39,6 +39,9 @@ const MIGRATIONS = [
     { id: 'add_kiosk_devices.sql', destructive: false },
     { id: 'add_kiosk_devices_last_seen.sql', destructive: false },
     { id: 'add_totp_mfa.sql', destructive: false },
+    { id: 'add_dispatch_settings.sql', destructive: false },
+    { id: 'add_order_priority.sql', destructive: false },
+    { id: 'add_driver_safety_checklists.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';
