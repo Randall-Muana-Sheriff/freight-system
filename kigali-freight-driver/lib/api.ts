@@ -4,7 +4,8 @@ import { refreshAccessToken } from './tokenStore';
 
 function resolveApiBase() {
   const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
-  if (!extra?.apiBaseUrl) {
+  const apiBaseUrl = extra?.apiBaseUrl || process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (!apiBaseUrl) {
     throw new Error('Missing EXPO_PUBLIC_API_BASE_URL. Create a .env file from .env.example and set your backend URL.');
   }
 
@@ -15,14 +16,14 @@ function resolveApiBase() {
   // (Expo Go / dev-client, __DEV__ true) legitimately has no HTTPS setup
   // most of the time, so this only enforces the rule where it actually
   // matters: real builds a driver installs.
-  if (!__DEV__ && !extra.apiBaseUrl.startsWith('https://')) {
+  if (!__DEV__ && !apiBaseUrl.startsWith('https://')) {
     throw new Error(
-      `EXPO_PUBLIC_API_BASE_URL must be HTTPS in a release build (got "${extra.apiBaseUrl}"). ` +
+      `EXPO_PUBLIC_API_BASE_URL must be HTTPS in a release build (got "${apiBaseUrl}"). ` +
       'Set a real HTTPS backend URL via `eas env:create` for this build profile — see eas.json.'
     );
   }
 
-  return extra.apiBaseUrl;
+  return apiBaseUrl;
 }
 
 export const API_BASE = resolveApiBase();
