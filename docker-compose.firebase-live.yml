@@ -1,0 +1,17 @@
+# Optional overlay: mounts a real Firebase Admin service account into the
+# router so it can actually send push notifications, without changing the
+# base file's default (push disabled) for anyone else working on this repo.
+# Usage:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.firebase-live.yml up -d --build router
+#
+# Uses the exact same host path and in-container mount point as
+# docker-compose.prod.yml's own Firebase wiring (./secrets/firebase-service-
+# account.json), so this doubles as a way to test the real production
+# setup locally — the same secrets/ file works for both.
+services:
+  router:
+    environment:
+      FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/firebase-service-account.json
+    volumes:
+      - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro

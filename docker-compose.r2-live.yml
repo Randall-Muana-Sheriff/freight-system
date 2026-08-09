@@ -1,0 +1,27 @@
+# Optional overlay: points the router at real Cloudflare R2 instead of the
+# base file's local MinIO stand-in, without changing that default for
+# anyone else working on this repo. Usage:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.r2-live.yml up -d --build router
+#
+# Reads LIVE_R2_* from .env (see there) rather than reusing the base
+# file's R2_* names, since those are hardcoded literals in
+# docker-compose.yml, not passthroughs — keeping separate names avoids any
+# ambiguity about which value actually applies.
+#
+# R2_ENDPOINT is deliberately left unset here: config/r2Client.js derives
+# https://<accountId>.r2.cloudflarestorage.com automatically when it's
+# empty, which is the real R2 endpoint. Same for R2_PUBLIC_URL_BASE — the
+# presigner falls back to that same derived endpoint when it's unset,
+# which is already publicly reachable for real R2 (unlike local MinIO's
+# docker-network hostname, which is why the base file needs an explicit
+# override there).
+services:
+  router:
+    environment:
+      R2_ACCOUNT_ID: ${LIVE_R2_ACCOUNT_ID:?Set LIVE_R2_ACCOUNT_ID in .env}
+      R2_ENDPOINT: ""
+      R2_ACCESS_KEY_ID: ${LIVE_R2_ACCESS_KEY_ID:?Set LIVE_R2_ACCESS_KEY_ID in .env}
+      R2_SECRET_ACCESS_KEY: ${LIVE_R2_SECRET_ACCESS_KEY:?Set LIVE_R2_SECRET_ACCESS_KEY in .env}
+      R2_BUCKET_NAME: ${LIVE_R2_BUCKET_NAME:?Set LIVE_R2_BUCKET_NAME in .env}
+      R2_PUBLIC_URL_BASE: ""
