@@ -1,4 +1,21 @@
 import 'dotenv/config';
+import net from 'net';
+
+// Node 18.13+ defaults to racing IPv4/IPv6 connection attempts in parallel
+// ("Happy Eyeballs"/autoSelectFamily) for any dual-stack host. Inside this
+// project's Docker bridge networks, that races against an IPv6 route that
+// exists in DNS but isn't actually reachable (ENETUNREACH) — for most
+// hosts the fallback to IPv4 is fast enough not to matter, but for at
+// least oauth2.googleapis.com (needed for Firebase Admin's push
+// notifications) it reliably hangs the whole request instead of falling
+// back. Disabling the race restores the pre-18.13 behavior of just using
+// the first resolved address directly, which is what actually works here
+// — confirmed via raw net/tls connections succeeding while the racing
+// http(s) client hung indefinitely on the same host from the same
+// container. Must run before any module below opens its own HTTP(S)
+// client (Firebase Admin, etc.), hence living at the very top of entry.
+net.setDefaultAutoSelectFamily(false);
+
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
