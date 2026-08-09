@@ -30,6 +30,7 @@ import { requestContext } from './middleware/requestContext.js';
 import { metricsMiddleware, observeSocketEvent } from './middleware/metrics.js';
 import { createTelemetryQueue, FLEET_STATE_KEY } from './services/telemetryQueue.js';
 import { hashGetAll } from './services/sharedState.js';
+import { dispatchExternalAlert } from './services/alertDispatchService.js';
 
 import pool from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
@@ -90,9 +91,6 @@ app.use((req, res, next) => {
 });
 
 const JWT_SECRET = appConfig.jwtSecret;
-const TELEGRAM_BOT_TOKEN = appConfig.telegramBotToken;
-const TELEGRAM_CHAT_ID = appConfig.telegramChatId;
-const ALERT_WEBHOOK_URL = appConfig.alertWebhookUrl;
 const __filename = fileURLToPath(import.meta.url);
 const isMainModule = process.argv[1] === __filename;
 
@@ -114,30 +112,6 @@ if (isRedisEnabled()) {
     const { createAdapter } = await import('@socket.io/redis-adapter');
     io.adapter(createAdapter(pubClient, subClient));
     console.log('🔗 Socket.IO Redis adapter attached — safe to run multiple instances.');
-  }
-}
-
-async function dispatchExternalAlert(message) {
-  console.log(`[INCIDENT TELEMETRY]: ${message}`);
-  try {
-    if (ALERT_WEBHOOK_URL) {
-      await fetch(ALERT_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'inzira-router', message }),
-      });
-      return;
-    }
-
-    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
-
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: 'Markdown' }),
-    });
-  } catch (err) {
-    console.error('❌ Notification dispatch failed:', err.message);
   }
 }
 
@@ -191,8 +165,18 @@ app.use((err, req, res, next) => {
 process.on('unhandledRejection', (reason) => {
   console.error('❌ Unhandled promise rejection:', reason);
 });
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', async (error) => {
   console.error('❌ Uncaught exception, shutting down:', error.stack || error.message);
+  // Best-effort: race the alert against a short timeout so a hung network
+  // call (the exact failure mode this whole handler exists to survive)
+  // can never delay the actual crash-exit that the container orchestrator
+  // is waiting on to restart this process.
+  await Promise.race([
+    dispatchExternalAlert(
+      `💥 *ROUTER CRASHED* 💥\n\n*Error:* ${error.message}\n*Time:* ${new Date().toISOString()}`
+    ),
+    new Promise((resolve) => setTimeout(resolve, 3000)),
+  ]).catch(() => {});
   process.exit(1);
 });
 

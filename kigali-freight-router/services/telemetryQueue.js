@@ -1,5 +1,6 @@
-import { hashDelete, hashGet, hashSet, listLength, listPopBatch, listPush } from './sharedState.js';
+import { hashDelete, hashGet, hashGetAll, hashSet, listLength, listPopBatch, listPush } from './sharedState.js';
 import { sendPushToUser } from './pushNotificationService.js';
+import { getAssetLabelForDriver } from './alertDispatchService.js';
 
 const DEFAULT_FLUSH_INTERVAL_MS = 250;
 const DEFAULT_BATCH_SIZE = 100;
@@ -36,6 +37,19 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
 const QUEUE_KEY = 'kigali:telemetry:queue';
 export const FLEET_STATE_KEY = 'kigali:fleet:live-state';
 const DRIVER_BREACHES_KEY = 'kigali:fleet:driver-breaches';
+const DRIVER_STALE_KEY = 'kigali:fleet:driver-stale';
+
+// Matches the staleness threshold fleetController.js/orderController.js's
+// route-progress computation already use ("STALE_SIGNAL") — one definition
+// of "how old is too old" for a GPS fix, reused here rather than inventing
+// a second one.
+const STALE_TELEMETRY_THRESHOLD_SECONDS = 60;
+// How often to scan for drivers who've gone quiet mid-delivery. Independent
+// of the telemetry flush loop above (which only runs when new pings
+// arrive) — a driver whose phone died mid-job stops producing pings
+// entirely, so nothing would ever re-check them without this separate
+// timer.
+const STALE_TELEMETRY_CHECK_INTERVAL_MS = 30_000;
 
 // A driver's assigned vehicle (and its type) changes rarely, but this join
 // would otherwise run on every single GPS ping (every ~250ms flush). A short
@@ -48,6 +62,9 @@ const VEHICLE_TYPE_CACHE_TTL_MS = 30_000;
 export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
     let flushTimer = null;
     let draining = false;
+    const staleCheckTimer = setInterval(() => {
+        checkStaleTelemetry();
+    }, STALE_TELEMETRY_CHECK_INTERVAL_MS);
     const vehicleTypeCache = new Map(); // driverName -> { vehicleType, expiresAt }
 
     async function getVehicleTypeForDriver(driverName) {
@@ -150,9 +167,13 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                 };
 
                 io.emit('geofence:violation', incidentPayload);
-                dispatchExternalAlert(
-                    `🚨 *CRITICAL SAFETY INCIDENT* 🚨\n\n*Asset:* ${driverName}\n*Incident:* ${violationType}\n*Detail:* ${description}\n*Timestamp:* ${new Date(timestamp).toLocaleTimeString()}`
-                );
+                getAssetLabelForDriver(driverName)
+                    .catch(() => driverName)
+                    .then((assetLabel) => {
+                        dispatchExternalAlert(
+                            `🚨 *CRITICAL SAFETY INCIDENT* 🚨\n\n*Asset:* ${assetLabel}\n*Incident:* ${violationType}\n*Detail:* ${description}\n*Timestamp:* ${new Date(timestamp).toLocaleTimeString()}`
+                        );
+                    });
                 // The dispatcher sees this via the socket broadcast above,
                 // but the driver themselves has no live dashboard open —
                 // a push notification is the only way they'd know in the
@@ -171,7 +192,11 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                 [await currentActiveOrderId(), driverName, 'ZONE_EXIT', `${driverName} exited ${ongoingViolation.zoneName}`, 0]
             );
             io.emit('geofence:exit', { driverName, zoneName: ongoingViolation.zoneName, exitedAt: timestamp });
-            dispatchExternalAlert(`✅ *RESOLVED:* ${driverName} has safely departed the restricted perimeter.`);
+            getAssetLabelForDriver(driverName)
+                .catch(() => driverName)
+                .then((assetLabel) => {
+                    dispatchExternalAlert(`✅ *RESOLVED:* ${assetLabel} has safely departed the restricted perimeter.`);
+                });
         }
 
         // Broadcast the same noise-filtered position written above — using
@@ -181,6 +206,58 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
         const nextState = { driverName, lat: displayLat, lng: displayLng, velocityKmh: currentVelocityKmh, lastSeen: timestamp, vehicleType };
         await hashSet(FLEET_STATE_KEY, driverName, nextState);
         io.emit('driver:location-update', nextState);
+    }
+
+    // Finds every driver with an active (picked-up/in-transit/arrived) job
+    // and how stale their last GPS fix is, then reconciles that against who
+    // was already flagged stale last time this ran: newly-stale drivers get
+    // a critical alert, previously-stale drivers whose signal is fresh
+    // again get a resolved alert, and drivers whose job ended while
+    // flagged just get quietly un-flagged (the job's over, there's nothing
+    // to resolve). DISTINCT ON collapses to one row per driver in the rare
+    // case of multiple active orders at once.
+    async function checkStaleTelemetry() {
+        try {
+            const result = await pool.query(
+                `SELECT DISTINCT ON (o.assigned_to)
+                        o.assigned_to AS "driverName",
+                        EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS "telemetryAgeSeconds"
+                 FROM orders o
+                 JOIN driver_locations dl ON dl.driver_name = o.assigned_to
+                 WHERE o.status IN ('PICKED_UP', 'IN_TRANSIT', 'ARRIVED')
+                 ORDER BY o.assigned_to, o.updated_at DESC;`
+            );
+
+            const activeDrivers = new Map(result.rows.map((row) => [row.driverName, Number(row.telemetryAgeSeconds)]));
+            const flaggedStale = await hashGetAll(DRIVER_STALE_KEY);
+
+            for (const [driverName, ageSeconds] of activeDrivers) {
+                const alreadyFlagged = Boolean(flaggedStale[driverName]);
+                const isStale = ageSeconds > STALE_TELEMETRY_THRESHOLD_SECONDS;
+
+                if (isStale && !alreadyFlagged) {
+                    await hashSet(DRIVER_STALE_KEY, driverName, { since: Date.now() });
+                    const assetLabel = await getAssetLabelForDriver(driverName).catch(() => driverName);
+                    dispatchExternalAlert(
+                        `📡 *SIGNAL LOST* 📡\n\n*Asset:* ${assetLabel}\n*Detail:* No GPS update for over ${Math.round(ageSeconds / 60)} min during an active delivery.\n*Timestamp:* ${new Date().toLocaleTimeString()}`
+                    );
+                } else if (!isStale && alreadyFlagged) {
+                    await hashDelete(DRIVER_STALE_KEY, driverName);
+                    const assetLabel = await getAssetLabelForDriver(driverName).catch(() => driverName);
+                    dispatchExternalAlert(`✅ *RESOLVED:* ${assetLabel} is reporting GPS signal again.`);
+                }
+            }
+
+            // Anyone flagged stale whose job isn't active anymore (delivered,
+            // cancelled, reassigned) — clear silently, nothing to resolve.
+            for (const driverName of Object.keys(flaggedStale)) {
+                if (!activeDrivers.has(driverName)) {
+                    await hashDelete(DRIVER_STALE_KEY, driverName);
+                }
+            }
+        } catch (err) {
+            console.error('❌ Stale-telemetry check failed:', err.message);
+        }
     }
 
     async function flushQueue() {
@@ -226,6 +303,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
             clearTimeout(flushTimer);
             flushTimer = null;
         }
+        clearInterval(staleCheckTimer);
         await flushQueue();
     }
 

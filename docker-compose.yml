@@ -137,6 +137,14 @@ services:
       # MFA enroll endpoint returns a clear error rather than failing to
       # boot, since MFA is opt-in per account (see appConfig.js).
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
+      # Critical safety-incident alerts (geofence/speed violations) —
+      # server.js's dispatchExternalAlert() tries ALERT_WEBHOOK_URL first,
+      # falling back to Telegram when only that's set. Previously read by
+      # config/appConfig.js but never actually passed through to this
+      # container, so setting them in .env alone silently did nothing.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
     ports:
       - "5000:5000"
     depends_on:

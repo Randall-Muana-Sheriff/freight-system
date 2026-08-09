@@ -7,6 +7,9 @@ import { analyzeIncident } from '../services/incidentAnalysisService.js';
 import { findNearestHub } from '../services/hubService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
+import { dispatchExternalAlert, getAssetLabelForDriver } from '../services/alertDispatchService.js';
+
+const SEVERITY_EMOJI = { high: '🚨', medium: '⚠️', low: 'ℹ️' };
 
 const STATUS_PUSH_COPY = {
     ACKNOWLEDGED: { title: 'Report seen by dispatch', body: (label) => `Dispatch is looking into "${label}".` },
@@ -182,6 +185,20 @@ export const IncidentController = {
 
             const incident = result.rows[0];
             io.emit('incident:reported', { ...incident, photo_url: await toSignedUrl(incident.photo_url) });
+
+            // Fire-and-forget, same as the geofence/stale-signal alerts —
+            // never delay the driver's own response waiting on Telegram.
+            // Unlike those two, this is driver-initiated rather than
+            // automatic, so it's the one alert category dispatch has no
+            // other way to learn about except by having the dashboard open.
+            const severity = (analysis?.severity || 'medium').toLowerCase();
+            getAssetLabelForDriver(driverName)
+                .catch(() => driverName)
+                .then((assetLabel) => {
+                    dispatchExternalAlert(
+                        `${SEVERITY_EMOJI[severity] || 'ℹ️'} *DRIVER REPORTED INCIDENT* ${SEVERITY_EMOJI[severity] || 'ℹ️'}\n\n*Asset:* ${assetLabel}\n*Severity:* ${severity}\n*Report:* ${finalTitle}\n${finalDescription}\n*Timestamp:* ${new Date().toLocaleTimeString()}`
+                    );
+                });
 
             return ok(
                 res,
