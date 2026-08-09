@@ -61,7 +61,12 @@ const config: ExpoConfig = {
     bundleIdentifier: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.kigalifreightdriver',
   },
   android: {
-    package: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.kigalifreightdriver',
+    // com.muana.kigalifreightdriver was already taken (Play Store/Firebase
+    // package names are globally unique, not just per-developer-account),
+    // so the production Android package is this "app"-suffixed variant
+    // instead — independent of iOS's bundleIdentifier above, which is a
+    // separate namespace and doesn't need to match.
+    package: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.kigalifreightdriverapp',
     // Edge-to-edge is mandatory (no opt-out) as of Android 16 / this SDK —
     // the old edgeToEdgeEnabled toggle was removed since there's nothing
     // left to toggle.
