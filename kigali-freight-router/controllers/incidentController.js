@@ -7,7 +7,7 @@ import { analyzeIncident } from '../services/incidentAnalysisService.js';
 import { findNearestHub } from '../services/hubService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
-import { dispatchExternalAlert, getAssetLabelForDriver } from '../services/alertDispatchService.js';
+import { dispatchExternalAlert, getAssetLabelForDriver, ALERT_CATEGORY } from '../services/alertDispatchService.js';
 
 const SEVERITY_EMOJI = { high: '🚨', medium: '⚠️', low: 'ℹ️' };
 
@@ -196,7 +196,8 @@ export const IncidentController = {
                 .catch(() => driverName)
                 .then((assetLabel) => {
                     dispatchExternalAlert(
-                        `${SEVERITY_EMOJI[severity] || 'ℹ️'} *DRIVER REPORTED INCIDENT* ${SEVERITY_EMOJI[severity] || 'ℹ️'}\n\n*Asset:* ${assetLabel}\n*Severity:* ${severity}\n*Report:* ${finalTitle}\n${finalDescription}\n*Timestamp:* ${new Date().toLocaleTimeString()}`
+                        `${SEVERITY_EMOJI[severity] || 'ℹ️'} *DRIVER REPORTED INCIDENT* ${SEVERITY_EMOJI[severity] || 'ℹ️'}\n\n*Asset:* ${assetLabel}\n*Severity:* ${severity}\n*Report:* ${finalTitle}\n${finalDescription}\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                        ALERT_CATEGORY.INCIDENT
                     );
                 });
 

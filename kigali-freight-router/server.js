@@ -30,7 +30,7 @@ import { requestContext } from './middleware/requestContext.js';
 import { metricsMiddleware, observeSocketEvent } from './middleware/metrics.js';
 import { createTelemetryQueue, FLEET_STATE_KEY } from './services/telemetryQueue.js';
 import { hashGetAll } from './services/sharedState.js';
-import { dispatchExternalAlert } from './services/alertDispatchService.js';
+import { dispatchExternalAlert, ALERT_CATEGORY } from './services/alertDispatchService.js';
 
 import pool from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
@@ -173,7 +173,8 @@ process.on('uncaughtException', async (error) => {
   // is waiting on to restart this process.
   await Promise.race([
     dispatchExternalAlert(
-      `💥 *ROUTER CRASHED* 💥\n\n*Error:* ${error.message}\n*Time:* ${new Date().toISOString()}`
+      `💥 *ROUTER CRASHED* 💥\n\n*Error:* ${error.message}\n*Time:* ${new Date().toISOString()}`,
+      ALERT_CATEGORY.SYSTEM
     ),
     new Promise((resolve) => setTimeout(resolve, 3000)),
   ]).catch(() => {});

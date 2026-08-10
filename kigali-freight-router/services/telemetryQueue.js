@@ -1,6 +1,6 @@
 import { hashDelete, hashGet, hashGetAll, hashSet, listLength, listPopBatch, listPush } from './sharedState.js';
 import { sendPushToUser } from './pushNotificationService.js';
-import { getAssetLabelForDriver } from './alertDispatchService.js';
+import { getAssetLabelForDriver, ALERT_CATEGORY } from './alertDispatchService.js';
 
 const DEFAULT_FLUSH_INTERVAL_MS = 250;
 const DEFAULT_BATCH_SIZE = 100;
@@ -38,6 +38,7 @@ const QUEUE_KEY = 'kigali:telemetry:queue';
 export const FLEET_STATE_KEY = 'kigali:fleet:live-state';
 const DRIVER_BREACHES_KEY = 'kigali:fleet:driver-breaches';
 const DRIVER_STALE_KEY = 'kigali:fleet:driver-stale';
+const STUCK_ARRIVED_KEY = 'kigali:fleet:stuck-arrived';
 
 // Matches the staleness threshold fleetController.js/orderController.js's
 // route-progress computation already use ("STALE_SIGNAL") — one definition
@@ -50,6 +51,18 @@ const STALE_TELEMETRY_THRESHOLD_SECONDS = 60;
 // entirely, so nothing would ever re-check them without this separate
 // timer.
 const STALE_TELEMETRY_CHECK_INTERVAL_MS = 30_000;
+
+// A driver reaching the delivery point and a driver actually confirming
+// delivery (photo upload) are two separate steps — nothing previously
+// noticed if a job sat in ARRIVED indefinitely without the second one ever
+// happening (handoff done verbally, app closed before confirming, etc.).
+// 2 hours is long enough that a driver still doing paperwork/handoff at
+// the destination isn't falsely flagged, short enough that a genuinely
+// abandoned confirmation gets caught same-day rather than a week later.
+const STUCK_ARRIVED_THRESHOLD_SECONDS = 2 * 60 * 60;
+// Far coarser than the GPS check above — the threshold here is hours, not
+// minutes, so checking every 30s would just be wasted queries.
+const STUCK_ARRIVED_CHECK_INTERVAL_MS = 5 * 60_000;
 
 // A driver's assigned vehicle (and its type) changes rarely, but this join
 // would otherwise run on every single GPS ping (every ~250ms flush). A short
@@ -65,6 +78,9 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
     const staleCheckTimer = setInterval(() => {
         checkStaleTelemetry();
     }, STALE_TELEMETRY_CHECK_INTERVAL_MS);
+    const stuckArrivedCheckTimer = setInterval(() => {
+        checkStuckArrivedOrders();
+    }, STUCK_ARRIVED_CHECK_INTERVAL_MS);
     const vehicleTypeCache = new Map(); // driverName -> { vehicleType, expiresAt }
 
     async function getVehicleTypeForDriver(driverName) {
@@ -171,7 +187,8 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                     .catch(() => driverName)
                     .then((assetLabel) => {
                         dispatchExternalAlert(
-                            `🚨 *CRITICAL SAFETY INCIDENT* 🚨\n\n*Asset:* ${assetLabel}\n*Incident:* ${violationType}\n*Detail:* ${description}\n*Timestamp:* ${new Date(timestamp).toLocaleTimeString()}`
+                            `🚨 *CRITICAL SAFETY INCIDENT* 🚨\n\n*Asset:* ${assetLabel}\n*Incident:* ${violationType}\n*Detail:* ${description}\n*Timestamp:* ${new Date(timestamp).toLocaleTimeString()}`,
+                            ALERT_CATEGORY.SAFETY
                         );
                     });
                 // The dispatcher sees this via the socket broadcast above,
@@ -195,7 +212,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
             getAssetLabelForDriver(driverName)
                 .catch(() => driverName)
                 .then((assetLabel) => {
-                    dispatchExternalAlert(`✅ *RESOLVED:* ${assetLabel} has safely departed the restricted perimeter.`);
+                    dispatchExternalAlert(`✅ *RESOLVED:* ${assetLabel} has safely departed the restricted perimeter.`, ALERT_CATEGORY.SAFETY);
                 });
         }
 
@@ -239,12 +256,13 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                     await hashSet(DRIVER_STALE_KEY, driverName, { since: Date.now() });
                     const assetLabel = await getAssetLabelForDriver(driverName).catch(() => driverName);
                     dispatchExternalAlert(
-                        `📡 *SIGNAL LOST* 📡\n\n*Asset:* ${assetLabel}\n*Detail:* No GPS update for over ${Math.round(ageSeconds / 60)} min during an active delivery.\n*Timestamp:* ${new Date().toLocaleTimeString()}`
+                        `📡 *SIGNAL LOST* 📡\n\n*Asset:* ${assetLabel}\n*Detail:* No GPS update for over ${Math.round(ageSeconds / 60)} min during an active delivery.\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                        ALERT_CATEGORY.GPS
                     );
                 } else if (!isStale && alreadyFlagged) {
                     await hashDelete(DRIVER_STALE_KEY, driverName);
                     const assetLabel = await getAssetLabelForDriver(driverName).catch(() => driverName);
-                    dispatchExternalAlert(`✅ *RESOLVED:* ${assetLabel} is reporting GPS signal again.`);
+                    dispatchExternalAlert(`✅ *RESOLVED:* ${assetLabel} is reporting GPS signal again.`, ALERT_CATEGORY.GPS);
                 }
             }
 
@@ -257,6 +275,64 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
             }
         } catch (err) {
             console.error('❌ Stale-telemetry check failed:', err.message);
+        }
+    }
+
+    // Companion to checkStaleTelemetry above, but watching a different
+    // failure mode: a driver reaching the delivery point (status ARRIVED)
+    // and then never completing the separate confirm-delivery-with-photo
+    // step. That's invisible to the GPS-staleness check whenever the
+    // driver's phone keeps reporting fine from a spot near the
+    // destination — the job just silently never finishes.
+    async function checkStuckArrivedOrders() {
+        try {
+            const staleResult = await pool.query(
+                `SELECT id, cargo_description AS "cargoDescription", assigned_to AS "driverName", updated_at AS "updatedAt"
+                 FROM orders
+                 WHERE status = 'ARRIVED' AND updated_at < NOW() - ($1 || ' seconds')::interval;`,
+                [STUCK_ARRIVED_THRESHOLD_SECONDS]
+            );
+            const flaggedStuck = await hashGetAll(STUCK_ARRIVED_KEY);
+
+            for (const row of staleResult.rows) {
+                const orderId = String(row.id);
+                if (flaggedStuck[orderId]) continue;
+
+                await hashSet(STUCK_ARRIVED_KEY, orderId, { since: Date.now() });
+                const assetLabel = await getAssetLabelForDriver(row.driverName).catch(() => row.driverName);
+                const hoursStuck = Math.round((Date.now() - new Date(row.updatedAt).getTime()) / 3_600_000);
+                dispatchExternalAlert(
+                    `📦 *DELIVERY NOT CONFIRMED* 📦\n\n*Asset:* ${assetLabel}\n*Order:* #${orderId} — ${row.cargoDescription}\n*Detail:* Marked arrived ${hoursStuck}h ago, never confirmed delivered.\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                    ALERT_CATEGORY.DELIVERY
+                );
+            }
+
+            // Reconcile against every previously-flagged order's current
+            // status — a resolved alert only for one that actually reached
+            // DELIVERED; CANCELLED (or a since-deleted order) just clears
+            // silently, since there's nothing to resolve if the job never
+            // finished at all.
+            const flaggedIds = Object.keys(flaggedStuck);
+            if (flaggedIds.length > 0) {
+                const statusResult = await pool.query(
+                    `SELECT id, status, cargo_description AS "cargoDescription", assigned_to AS "driverName" FROM orders WHERE id = ANY($1::int[]);`,
+                    [flaggedIds.map(Number)]
+                );
+                const statusById = new Map(statusResult.rows.map((r) => [String(r.id), r]));
+
+                for (const orderId of flaggedIds) {
+                    const current = statusById.get(orderId);
+                    if (current && current.status === 'ARRIVED') continue;
+
+                    await hashDelete(STUCK_ARRIVED_KEY, orderId);
+                    if (current?.status === 'DELIVERED') {
+                        const assetLabel = await getAssetLabelForDriver(current.driverName).catch(() => current.driverName);
+                        dispatchExternalAlert(`✅ *RESOLVED:* Order #${orderId} — ${current.cargoDescription} was confirmed delivered by ${assetLabel}.`, ALERT_CATEGORY.DELIVERY);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('❌ Stuck-arrived check failed:', err.message);
         }
     }
 
@@ -304,6 +380,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
             flushTimer = null;
         }
         clearInterval(staleCheckTimer);
+        clearInterval(stuckArrivedCheckTimer);
         await flushQueue();
     }
 
