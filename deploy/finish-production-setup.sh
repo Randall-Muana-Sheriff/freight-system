@@ -16,26 +16,36 @@ PROD_ENV="$ROOT/.env.production"
 ROUTER_ENV="$ROOT/kigali-freight-router/.env"
 UNIT="/etc/systemd/system/kigali-backup.service"
 
-# ── Fill these in before running ────────────────────────────────────────
+# ── Fill these three in before running ──────────────────────────────────
 AT_API_KEY_VALUE=""        # Africa's Talking API key (atsk_...)
-AT_USERNAME_VALUE=""       # Africa's Talking username
-BACKUP_BUCKET_VALUE=""     # R2 bucket for DB dumps, e.g. inzira-db-backups
-# R2 credentials for the backup upload. Reuse the same account already in
-# .env.production; the bucket above must be a DIFFERENT bucket from the
-# delivery-photos one, so database dumps never share a namespace with
-# driver documents.
-R2_ACCOUNT_ID_VALUE=""
-R2_ACCESS_KEY_ID_VALUE=""
-R2_SECRET_ACCESS_KEY_VALUE=""
+AT_USERNAME_VALUE=""       # "sandbox" for testing, or your live AT username
+BACKUP_BUCKET_VALUE=""     # A NEW R2 bucket for DB dumps, e.g. inzira-db-backups.
+                           # Must NOT be the delivery-photos bucket — database
+                           # dumps should never share a namespace with driver
+                           # documents served over presigned URLs.
 # ────────────────────────────────────────────────────────────────────────
 
-for v in AT_API_KEY_VALUE AT_USERNAME_VALUE BACKUP_BUCKET_VALUE \
-         R2_ACCOUNT_ID_VALUE R2_ACCESS_KEY_ID_VALUE R2_SECRET_ACCESS_KEY_VALUE; do
+for v in AT_API_KEY_VALUE AT_USERNAME_VALUE BACKUP_BUCKET_VALUE; do
   if [ -z "${!v}" ]; then
     echo "✗ $v is empty — fill in the block at the top of this script first." >&2
     exit 1
   fi
 done
+
+# R2 credentials are reused from the account already configured for
+# delivery photos, so they never have to be retyped (and can't be
+# mistyped) — only the bucket differs.
+read_env() { grep -m1 "^$2=" "$1" 2>/dev/null | cut -d= -f2- ; }
+R2_ACCOUNT_ID_VALUE="$(read_env "$PROD_ENV" R2_ACCOUNT_ID)"
+R2_ACCESS_KEY_ID_VALUE="$(read_env "$PROD_ENV" R2_ACCESS_KEY_ID)"
+R2_SECRET_ACCESS_KEY_VALUE="$(read_env "$PROD_ENV" R2_SECRET_ACCESS_KEY)"
+
+if [ -z "$R2_ACCOUNT_ID_VALUE" ] || [ -z "$R2_ACCESS_KEY_ID_VALUE" ] || [ -z "$R2_SECRET_ACCESS_KEY_VALUE" ]; then
+  echo "✗ Could not read R2 credentials from $PROD_ENV — expected R2_ACCOUNT_ID," >&2
+  echo "  R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY to already be set there." >&2
+  exit 1
+fi
+echo "→ Reusing R2 account ${R2_ACCOUNT_ID_VALUE:0:8}… from .env.production"
 
 # Replace an existing KEY=... line, or append if absent. Avoids the
 # duplicate-key confusion that plain `echo >>` causes on a re-run.
