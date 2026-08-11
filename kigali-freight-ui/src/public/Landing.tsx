@@ -1,24 +1,28 @@
 import { useState, type FormEvent } from 'react';
 import { sendContactMessage } from './publicApi';
+import { HeroRoute } from './HeroRoute';
 
-// Straight from the design's services list. Six is what was drawn, and
-// each line says what the customer gets rather than what we operate.
+// Services are a menu, not a sequence — nobody does same-day delivery
+// *before* bulk freight. So they get no numbering. What they do get is the
+// one fact a buyer decides on, pulled out in mono, because "up to 1,000 kg"
+// and "before noon" are what actually answer "can you do my job?"
 const SERVICES = [
-    { n: '01', name: 'Same-day delivery', tag: 'Most popular', body: 'Order before noon — delivered the same day anywhere in Kigali. Tracked the whole way.' },
-    { n: '02', name: 'Bulk freight', tag: null, body: 'Palletised and bulk loads. Heavy-van fleet with professional handling.' },
-    { n: '03', name: 'Secure transport', tag: null, body: 'High-value cargo with verified drivers, tamper-evident sealing and full incident reporting.' },
-    { n: '04', name: 'Scheduled routes', tag: 'For business', body: 'Set it once, runs daily. Your supply chain on autopilot between fixed locations.' },
-    { n: '05', name: 'Hub-to-hub transfer', tag: null, body: 'Drop cargo at any of our hubs — we route it to the destination hub automatically.' },
-    { n: '06', name: 'Document courier', tag: null, body: 'Contracts and certificates with signature confirmation and a full audit trail.' },
+    { name: 'Same-day delivery', spec: 'Order before noon', body: 'Anywhere in Kigali, on the road within the hour, tracked the whole way.' },
+    { name: 'Bulk freight', spec: 'Palletised loads', body: 'Heavy-van fleet with drivers who load and secure it themselves.' },
+    { name: 'Secure transport', spec: 'Sealed & verified', body: 'High-value cargo, tamper-evident sealing, full incident reporting.' },
+    { name: 'Scheduled routes', spec: 'Set once, runs daily', body: 'A standing lane between two fixed points. Your supply chain on autopilot.' },
+    { name: 'Hub-to-hub', spec: 'Drop and go', body: 'Leave cargo at any hub — we move it to the destination hub for you.' },
+    { name: 'Document courier', spec: 'Signature on arrival', body: 'Contracts and certificates with a full chain-of-custody trail.' },
 ];
 
-// Mirrors what the backend actually does, which is why step 2 says a
-// dispatcher reviews rather than promising instant assignment.
-const STEPS = [
-    { n: '01', name: 'Place your order', body: 'Pickup, destination, cargo type. No account needed.' },
-    { n: '02', name: 'Dispatcher reviews', body: 'We confirm the details and assign the nearest verified driver.' },
-    { n: '03', name: 'Live tracking', body: 'Follow the delivery with the code we text you.' },
-    { n: '04', name: 'Delivered', body: 'Photo proof of delivery captured on arrival.' },
+// This one IS a sequence — a consignment genuinely passes through these in
+// order — so it earns the route-line treatment and the ordinals.
+const STOPS = [
+    { name: 'You place the order', body: 'Pickup, destination, what it is. No account, no phone call, no waiting for a quote to book.' },
+    { name: 'A dispatcher confirms it', body: 'A person checks the addresses and calls you if anything is unclear. Nothing goes to a driver unchecked.' },
+    { name: 'A driver takes it', body: 'The nearest verified driver on shift, with your cargo on their manifest and their position on our map.' },
+    { name: 'You watch it move', body: 'Your tracking code shows where it is, not just that it left. Refresh it as often as you like.' },
+    { name: 'Signed and photographed', body: 'Proof of delivery captured at the door, timestamped against the position it was taken at.' },
 ];
 
 function ContactForm() {
@@ -41,48 +45,47 @@ function ContactForm() {
 
     if (state === 'sent') {
         return (
-            <div className="rounded-2xl border border-brand-jade/40 bg-brand-surface2 p-10 text-center">
-                <p className="font-display text-2xl font-black text-brand-text">Message received.</p>
-                <p className="mt-2 font-body text-sm text-brand-muted">We&apos;ll get back to you on the number you gave us.</p>
+            <div className="border-l-2 border-pub-laterite bg-pub-paper2 px-8 py-10">
+                <p className="display-tight text-2xl text-pub-onpaper">Message received.</p>
+                <p className="mt-2 text-sm text-pub-onpaper-soft">We answer on the number you gave us, usually the same day.</p>
             </div>
         );
     }
 
-    const field = 'w-full rounded-xl border border-brand-line bg-brand-ink px-4 py-3 font-body text-sm text-brand-text placeholder:text-brand-muted/70 focus:border-brand-jade focus:outline-none';
-    const label = 'mb-1.5 block font-body text-xs font-bold uppercase tracking-widest text-brand-muted';
+    const field = 'w-full border-b border-pub-onpaper/20 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
     return (
-        <form onSubmit={submit} className="rounded-2xl border border-brand-line bg-brand-surface2 p-6 sm:p-8">
-            <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label className={label} htmlFor="contact-name">Name</label>
-                    <input id="contact-name" required className={field} value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Jean Mutabazi" />
-                </div>
-                <div>
-                    <label className={label} htmlFor="contact-phone">Phone</label>
-                    <input id="contact-phone" required className={field} value={form.phone}
-                        onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="0788 000 000" />
-                </div>
-            </div>
-            <div className="mt-4">
-                <label className={label} htmlFor="contact-email">Email (optional)</label>
-                <input id="contact-email" type="email" className={field} value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.rw" />
-            </div>
-            <div className="mt-4">
-                <label className={label} htmlFor="contact-message">Message</label>
-                <textarea id="contact-message" required rows={5} className={field} value={form.message}
-                    onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    placeholder="Tell us about your freight needs…" />
-            </div>
+        <form onSubmit={submit} className="grid gap-6 sm:grid-cols-2">
+            <label className="block">
+                <span className="data-label text-pub-onpaper-soft">Name</span>
+                <input required className={field} value={form.name} placeholder="Jean Mutabazi"
+                    onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </label>
+            <label className="block">
+                <span className="data-label text-pub-onpaper-soft">Phone</span>
+                <input required className={field} value={form.phone} placeholder="0788 000 000"
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </label>
+            <label className="block sm:col-span-2">
+                <span className="data-label text-pub-onpaper-soft">Email — optional</span>
+                <input type="email" className={field} value={form.email} placeholder="you@company.rw"
+                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </label>
+            <label className="block sm:col-span-2">
+                <span className="data-label text-pub-onpaper-soft">What do you need moved?</span>
+                <textarea required rows={3} className={`${field} resize-none`} value={form.message}
+                    placeholder="Two pallets a week from Gikondo to Musanze…"
+                    onChange={(e) => setForm({ ...form, message: e.target.value })} />
+            </label>
 
-            {error ? <p role="alert" className="mt-4 font-body text-sm text-red-400">{error}</p> : null}
+            {error ? <p role="alert" className="text-sm text-pub-laterite sm:col-span-2">{error}</p> : null}
 
-            <button type="submit" disabled={state === 'sending'}
-                className="mt-6 w-full rounded-full bg-brand-jade py-3.5 font-body font-bold text-brand-ink transition-colors hover:bg-brand-jade-deep disabled:opacity-60">
-                {state === 'sending' ? 'Sending…' : 'Send message'}
-            </button>
+            <div className="sm:col-span-2">
+                <button type="submit" disabled={state === 'sending'}
+                    className="bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
+                    {state === 'sending' ? 'Sending…' : 'Send message'}
+                </button>
+            </div>
         </form>
     );
 }
@@ -92,104 +95,108 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
 
     return (
         <>
-            <section className="relative overflow-hidden border-b border-brand-line">
-                <div className="mx-auto max-w-6xl px-5 py-24 text-center sm:py-32">
-                    <p className="mb-6 font-body text-xs font-bold uppercase tracking-[0.2em] text-brand-jade">
-                        <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-brand-jade align-middle" />
-                        Kigali, Rwanda
-                    </p>
-                    <h1 className="font-display text-5xl font-black leading-[0.95] tracking-tight text-brand-text sm:text-7xl"
-                        style={{ textWrap: 'balance' } as React.CSSProperties}>
-                        Freight. On time.
-                        <br />
-                        <span className="text-brand-jade">Every time.</span>
-                    </h1>
-                    <p className="mx-auto mt-6 max-w-xl font-body text-base leading-relaxed text-brand-muted sm:text-lg">
-                        Verified drivers, live GPS and delivery you can follow from pickup to
-                        signature — across Kigali.
-                    </p>
+            {/* THE ROAD — dark, live, moving. */}
+            <section className="bg-pub-ink px-5 pb-16 pt-14 sm:pt-20">
+                <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
+                    <div>
+                        <p className="data-label mb-7 text-pub-laterite-soft">Freight across Kigali</p>
+                        <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink" style={{ textWrap: 'balance' } as React.CSSProperties}>
+                            Know where
+                            <br />
+                            your cargo is.
+                        </h1>
+                        <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">
+                            Most freight goes quiet the moment it leaves your gate. Ours doesn&apos;t —
+                            every consignment carries a code that shows you its position until
+                            somebody signs for it.
+                        </p>
 
-                    <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-                        <button onClick={() => onNavigate('/order')}
-                            className="rounded-full bg-brand-jade px-7 py-3.5 font-body font-bold text-brand-ink transition-colors hover:bg-brand-jade-deep">
-                            Place a freight order
-                        </button>
-                        <button onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="rounded-full border border-brand-line px-7 py-3.5 font-body font-medium text-brand-text transition-colors hover:border-brand-jade hover:text-brand-jade">
-                            Explore services
-                        </button>
+                        <div className="mt-9 flex flex-wrap items-center gap-3">
+                            <button onClick={() => onNavigate('/order')}
+                                className="bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                                Book a delivery
+                            </button>
+                            <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
+                                className="flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
+                                <label htmlFor="hero-track" className="sr-only">Tracking code</label>
+                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)}
+                                    placeholder="Have a code?"
+                                    className="w-40 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none" />
+                                <button type="submit" className="px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">Track →</button>
+                            </form>
+                        </div>
                     </div>
 
-                    {/* A customer arriving to check on a delivery is the most
-                        common visit, so tracking is on the hero, not buried. */}
-                    <form
-                        onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
-                        className="mx-auto mt-12 flex max-w-md items-center gap-2 rounded-full border border-brand-line bg-brand-surface2 p-2"
-                    >
-                        <label htmlFor="hero-track" className="pl-4 font-body text-xs font-bold uppercase tracking-widest text-brand-muted">
-                            Track
-                        </label>
-                        <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)}
-                            placeholder="INZ-XXXXXXXX"
-                            className="min-w-0 flex-1 bg-transparent font-mono text-sm text-brand-text placeholder:text-brand-muted/60 focus:outline-none" />
-                        <button type="submit" className="rounded-full bg-brand-jade px-5 py-2 font-body text-sm font-bold text-brand-ink hover:bg-brand-jade-deep">
-                            Go
-                        </button>
-                    </form>
+                    <HeroRoute />
                 </div>
             </section>
 
-            <section id="services" className="border-b border-brand-line">
-                <div className="mx-auto max-w-6xl px-5 py-20">
-                    <div className="mb-12 flex items-baseline gap-5">
-                        <h2 className="font-body text-xs font-bold uppercase tracking-[0.2em] text-brand-jade">Services</h2>
-                        <div className="h-px flex-1 bg-brand-line" />
+            {/* THE PAPERWORK — light, precise, documentary. */}
+            <section id="services" className="bg-pub-paper px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-6xl">
+                    <div className="mb-14 max-w-2xl">
+                        <p className="data-label mb-5 text-pub-laterite">What we move</p>
+                        <h2 className="display-wide text-[clamp(2rem,4.5vw,3.2rem)] text-pub-onpaper">
+                            Six ways to get it there.
+                        </h2>
                     </div>
-                    <ul>
+
+                    <div className="grid gap-x-14 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
                         {SERVICES.map((service) => (
-                            <li key={service.n} className="grid items-baseline gap-2 border-b border-brand-line py-7 sm:grid-cols-[auto_1fr_2fr_auto] sm:gap-8">
-                                <span className="font-mono text-sm text-brand-muted/60">{service.n}</span>
-                                <h3 className="font-display text-xl font-black tracking-tight text-brand-text">{service.name}</h3>
-                                <p className="font-body text-sm leading-relaxed text-brand-muted">{service.body}</p>
-                                {service.tag ? (
-                                    <span className="justify-self-start rounded-full border border-brand-jade/40 px-3 py-1 font-body text-xs font-bold uppercase tracking-wider text-brand-jade sm:justify-self-end">
-                                        {service.tag}
-                                    </span>
-                                ) : <span />}
-                            </li>
+                            <article key={service.name} className="border-t border-pub-onpaper/15 pt-5">
+                                <p className="data-label mb-3 text-pub-laterite">{service.spec}</p>
+                                <h3 className="display-tight text-xl text-pub-onpaper">{service.name}</h3>
+                                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{service.body}</p>
+                            </article>
                         ))}
-                    </ul>
+                    </div>
                 </div>
             </section>
 
-            <section id="how" className="border-b border-brand-line bg-brand-surface">
-                <div className="mx-auto max-w-6xl px-5 py-20">
-                    <div className="mb-12 flex items-baseline gap-5">
-                        <h2 className="font-body text-xs font-bold uppercase tracking-[0.2em] text-brand-jade">How it works</h2>
-                        <div className="h-px flex-1 bg-brand-line" />
+            {/* The route line: this section is a journey, so it is drawn as
+                one. The line is the page's structural signature and the only
+                place ordinals appear, because this is the only content where
+                order is real information. */}
+            <section id="how" className="bg-pub-paper2 px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-3xl">
+                    <div className="mb-14">
+                        <p className="data-label mb-5 text-pub-laterite">Start to finish</p>
+                        <h2 className="display-wide text-[clamp(2rem,4.5vw,3.2rem)] text-pub-onpaper">
+                            What happens to your cargo.
+                        </h2>
                     </div>
-                    <ol className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                        {STEPS.map((step) => (
-                            <li key={step.n} className="rounded-2xl border border-brand-line bg-brand-surface2 p-6">
-                                <span className="font-display text-3xl font-black text-brand-jade/25">{step.n}</span>
-                                <h3 className="mt-3 font-display text-lg font-black tracking-tight text-brand-text">{step.name}</h3>
-                                <p className="mt-2 font-body text-sm leading-relaxed text-brand-muted">{step.body}</p>
+
+                    <ol className="relative">
+                        <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-3 w-px bg-pub-onpaper/20" />
+                        {STOPS.map((stop, index) => (
+                            <li key={stop.name} className="relative flex gap-7 pb-11 last:pb-0">
+                                <span aria-hidden="true"
+                                    className={`relative z-10 mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 ${
+                                        index === 0 ? 'border-pub-laterite bg-pub-laterite' : 'border-pub-onpaper/40 bg-pub-paper2'
+                                    }`} />
+                                <div>
+                                    <p className="data-label mb-1.5 text-pub-onpaper-soft">Stop {index + 1}</p>
+                                    <h3 className="display-tight text-lg text-pub-onpaper">{stop.name}</h3>
+                                    <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-pub-onpaper-soft">{stop.body}</p>
+                                </div>
                             </li>
                         ))}
                     </ol>
                 </div>
             </section>
 
-            <section id="contact">
-                <div className="mx-auto max-w-2xl px-5 py-20">
-                    <div className="mb-10 text-center">
-                        <p className="mb-4 font-body text-xs font-bold uppercase tracking-[0.2em] text-brand-jade">Get in touch</p>
-                        <h2 className="font-display text-4xl font-black leading-tight tracking-tight text-brand-text sm:text-5xl">
-                            Let&apos;s talk <span className="text-brand-jade">freight.</span>
+            <section id="contact" className="bg-pub-paper px-5 py-20 sm:py-28">
+                <div className="mx-auto grid max-w-5xl gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
+                    <div>
+                        <p className="data-label mb-5 text-pub-laterite">Talk to us</p>
+                        <h2 className="display-wide text-[clamp(2rem,4.5vw,3rem)] text-pub-onpaper">
+                            Moving something regularly?
                         </h2>
-                        <p className="mt-4 font-body text-base text-brand-muted">
-                            Bulk enquiry, a standing route, or your very first order — we&apos;re quick to respond.
+                        <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-pub-onpaper-soft">
+                            Standing routes and bulk lanes are priced per business rather than per
+                            drop. Tell us the shape of it and we&apos;ll come back with a number.
                         </p>
+                        <p className="data-label mt-8 text-pub-onpaper-soft">Gikondo Industrial Zone · Kigali</p>
                     </div>
                     <ContactForm />
                 </div>

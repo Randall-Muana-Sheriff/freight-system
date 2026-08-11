@@ -1,25 +1,22 @@
 import { useEffect, useState } from 'react';
 import { trackShipment, type TrackedShipment } from './publicApi';
 
-// The four milestones a customer cares about, mapped from the seven
-// statuses the backend actually uses — ARRIVED is folded into "In transit"
-// because from outside the cab there is no meaningful difference between
-// nearly there and there.
+// Tracking is the road, not the paperwork, so it runs on the dark ground —
+// and it is the one page where signal amber earns its keep, marking the
+// leg that is actually happening right now.
+
 const MILESTONES = [
-    { key: 'PENDING', label: 'Order received' },
-    { key: 'ASSIGNED', label: 'Driver assigned' },
-    { key: 'PICKED_UP', label: 'Cargo picked up' },
-    { key: 'DELIVERED', label: 'Delivered & confirmed' },
+    { key: 'PENDING', label: 'Order received', note: 'With a dispatcher for checking.' },
+    { key: 'ASSIGNED', label: 'Driver assigned', note: 'On a driver’s manifest.' },
+    { key: 'PICKED_UP', label: 'Collected', note: 'Cargo is on the vehicle.' },
+    { key: 'DELIVERED', label: 'Delivered', note: 'Signed for, with photo proof.' },
 ];
 
+// Seven backend statuses folded into the four a customer cares about.
+// ARRIVED reads the same as IN_TRANSIT from outside the cab.
 const REACHED_BY: Record<string, number> = {
     PENDING: 0, ASSIGNED: 1, PICKED_UP: 2, IN_TRANSIT: 2, ARRIVED: 2, DELIVERED: 3,
 };
-
-function statusLabel(status: string) {
-    if (status === 'CANCELLED') return 'Cancelled';
-    return status.toLowerCase().replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
-}
 
 function formatTime(iso?: string) {
     if (!iso) return null;
@@ -46,8 +43,6 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
         }
     };
 
-    // Arriving from the hero widget or the confirmation screen already
-    // carries the code, so don't make them type it twice.
     useEffect(() => {
         if (initialCode) lookup(initialCode);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -55,97 +50,101 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
 
     const reached = shipment ? (REACHED_BY[shipment.status] ?? 0) : -1;
     const cancelled = shipment?.status === 'CANCELLED';
+    const delivered = shipment?.status === 'DELIVERED';
 
     return (
-        <div className="mx-auto max-w-2xl px-5 py-14">
-            <h1 className="font-display text-4xl font-black tracking-tight text-brand-text">Track shipment</h1>
-            <p className="mt-2 font-body text-sm text-brand-muted">Enter the code from your confirmation SMS.</p>
+        <div className="min-h-[70vh] bg-pub-ink px-5 py-16 sm:py-20">
+            <div className="mx-auto max-w-2xl">
+                <p className="data-label text-pub-laterite-soft">Tracking</p>
+                <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onink">
+                    Where is it?
+                </h1>
 
-            <form onSubmit={(e) => { e.preventDefault(); lookup(code); }} className="mt-8 flex gap-2">
-                <label htmlFor="track-code" className="sr-only">Tracking code</label>
-                <input id="track-code" value={code} onChange={(e) => setCode(e.target.value)}
-                    placeholder="INZ-XXXXXXXX"
-                    className="min-w-0 flex-1 rounded-xl border border-brand-line bg-brand-surface2 px-4 py-3 font-mono text-sm uppercase text-brand-text placeholder:text-brand-muted/60 focus:border-brand-jade focus:outline-none" />
-                <button type="submit" disabled={loading}
-                    className="rounded-xl bg-brand-jade px-7 font-body font-bold text-brand-ink hover:bg-brand-jade-deep disabled:opacity-60">
-                    {loading ? '…' : 'Track'}
-                </button>
-            </form>
-
-            {error ? (
-                <div role="alert" className="mt-8 rounded-2xl border border-brand-line bg-brand-surface2 p-7 text-center">
-                    <p className="font-body text-sm text-brand-text">{error}</p>
-                    <button onClick={() => onNavigate('/order')} className="mt-4 font-body text-sm font-bold text-brand-jade hover:underline">
-                        Place a new order instead
+                <form onSubmit={(e) => { e.preventDefault(); lookup(code); }}
+                    className="mt-9 flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
+                    <label htmlFor="track-code" className="sr-only">Tracking code</label>
+                    <input id="track-code" value={code} onChange={(e) => setCode(e.target.value)}
+                        placeholder="INZ-XXXXXXXX"
+                        className="min-w-0 flex-1 bg-transparent py-3.5 font-mono text-lg uppercase tracking-wider text-pub-onink placeholder:text-pub-onink-soft/50 focus:outline-none" />
+                    <button type="submit" disabled={loading}
+                        className="shrink-0 px-3 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal disabled:opacity-50">
+                        {loading ? 'Looking…' : 'Track →'}
                     </button>
-                </div>
-            ) : null}
+                </form>
 
-            {shipment ? (
-                <>
-                    <section className="mt-8 rounded-2xl border border-brand-line bg-brand-surface2 p-6 sm:p-7">
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <p className="font-mono text-xs tracking-wider text-brand-muted">{shipment.trackingToken}</p>
-                                <h2 className="mt-1.5 font-display text-2xl font-black tracking-tight text-brand-text">{shipment.cargo}</h2>
-                            </div>
-                            <span className={`shrink-0 rounded-full border px-3 py-1 font-body text-xs font-bold uppercase tracking-wider ${
-                                cancelled ? 'border-red-500/40 text-red-400' : 'border-brand-jade/40 text-brand-jade'
-                            }`}>
-                                {statusLabel(shipment.status)}
+                {error ? (
+                    <div role="alert" className="mt-10 border-l-2 border-pub-laterite pl-5">
+                        <p className="text-[15px] text-pub-onink">{error}</p>
+                        <button onClick={() => onNavigate('/order')}
+                            className="data-label mt-3 text-pub-laterite-soft hover:text-pub-onink">
+                            Book a delivery instead →
+                        </button>
+                    </div>
+                ) : null}
+
+                {shipment ? (
+                    <div className="mt-12">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-pub-onink/15 pb-6">
+                            <h2 className="display-tight text-2xl text-pub-onink">{shipment.cargo}</h2>
+                            <span className={`data-label ${cancelled ? 'text-pub-laterite-soft' : delivered ? 'text-pub-onink-soft' : 'text-pub-signal'}`}>
+                                {cancelled ? 'Cancelled' : delivered ? 'Delivered' : 'In progress'}
                             </span>
                         </div>
 
-                        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                            <div className="rounded-xl border border-brand-line bg-brand-ink p-4">
-                                <p className="font-body text-xs font-bold uppercase tracking-widest text-brand-muted">From</p>
-                                <p className="mt-1 font-body text-sm text-brand-text">{shipment.pickup || 'To be confirmed'}</p>
+                        <dl className="grid gap-x-8 gap-y-5 py-7 sm:grid-cols-2">
+                            <div>
+                                <dt className="data-label text-pub-onink-soft">Collect from</dt>
+                                <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.pickup || 'Being confirmed'}</dd>
                             </div>
-                            <div className="rounded-xl border border-brand-line bg-brand-ink p-4">
-                                <p className="font-body text-xs font-bold uppercase tracking-widest text-brand-muted">To</p>
-                                <p className="mt-1 font-body text-sm text-brand-text">{shipment.delivery || 'To be confirmed'}</p>
+                            <div>
+                                <dt className="data-label text-pub-onink-soft">Deliver to</dt>
+                                <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.delivery || 'Being confirmed'}</dd>
                             </div>
-                        </div>
+                            {shipment.driverFirstName ? (
+                                <div>
+                                    <dt className="data-label text-pub-onink-soft">Driver</dt>
+                                    <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.driverFirstName}</dd>
+                                </div>
+                            ) : null}
+                            <div>
+                                <dt className="data-label text-pub-onink-soft">Reference</dt>
+                                <dd className="mt-1.5 font-mono text-[15px] tracking-wider text-pub-onink">{shipment.trackingToken}</dd>
+                            </div>
+                        </dl>
 
-                        {shipment.driverFirstName ? (
-                            <p className="mt-4 font-body text-sm text-brand-muted">
-                                Driver: <span className="text-brand-text">{shipment.driverFirstName}</span>
+                        {cancelled ? (
+                            <p className="border-t border-pub-onink/15 pt-7 text-[15px] text-pub-onink-soft">
+                                This shipment was cancelled. Call us if that&apos;s unexpected.
                             </p>
-                        ) : null}
-                    </section>
-
-                    {cancelled ? null : (
-                        <section className="mt-4 rounded-2xl border border-brand-line bg-brand-surface2 p-6 sm:p-7">
-                            <h3 className="mb-5 font-body text-xs font-bold uppercase tracking-widest text-brand-muted">Timeline</h3>
-                            <ol>
+                        ) : (
+                            <ol className="relative border-t border-pub-onink/15 pt-8">
+                                <span aria-hidden="true" className="absolute bottom-6 left-[5px] top-11 w-px bg-pub-onink/15" />
                                 {MILESTONES.map((milestone, index) => {
                                     const done = index <= reached;
+                                    const current = index === reached && !delivered;
                                     const entry = shipment.timeline.find((t) => t.status === milestone.key);
                                     const at = index === 0 ? formatTime(shipment.placedAt) : formatTime(entry?.at);
                                     return (
-                                        <li key={milestone.key} className="flex gap-4">
-                                            <div className="flex flex-col items-center">
-                                                <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
-                                                    done ? 'bg-brand-jade text-brand-ink' : 'border border-brand-line'
-                                                }`}>
-                                                    {done ? '✓' : ''}
-                                                </span>
-                                                {index < MILESTONES.length - 1 ? (
-                                                    <span className={`w-px flex-1 ${index < reached ? 'bg-brand-jade' : 'bg-brand-line'}`} />
-                                                ) : null}
-                                            </div>
-                                            <div className={`pb-6 ${done ? '' : 'opacity-45'}`}>
-                                                <p className="font-body text-sm font-bold text-brand-text">{milestone.label}</p>
-                                                <p className="mt-0.5 font-mono text-xs text-brand-muted">{done ? (at || '—') : 'Pending'}</p>
+                                        <li key={milestone.key} className="relative flex gap-6 pb-9 last:pb-0">
+                                            <span aria-hidden="true"
+                                                className={`relative z-10 mt-1.5 h-[11px] w-[11px] shrink-0 rounded-full ${
+                                                    current ? 'bg-pub-signal' : done ? 'bg-pub-onink' : 'border border-pub-onink/30 bg-pub-ink'
+                                                }`} />
+                                            <div className={done ? '' : 'opacity-40'}>
+                                                <p className={`text-[15px] font-semibold ${current ? 'text-pub-signal' : 'text-pub-onink'}`}>
+                                                    {milestone.label}
+                                                </p>
+                                                <p className="mt-0.5 text-sm text-pub-onink-soft">{milestone.note}</p>
+                                                <p className="data-label mt-1.5 text-pub-onink-soft/70">{done ? (at || '—') : 'Not yet'}</p>
                                             </div>
                                         </li>
                                     );
                                 })}
                             </ol>
-                        </section>
-                    )}
-                </>
-            ) : null}
+                        )}
+                    </div>
+                ) : null}
+            </div>
         </div>
     );
 }

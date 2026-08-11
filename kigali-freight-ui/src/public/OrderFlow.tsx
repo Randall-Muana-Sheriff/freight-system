@@ -1,44 +1,14 @@
 import { useEffect, useState } from 'react';
 import { fetchCargoTypes, submitOrder, type OrderDraft } from './publicApi';
 
-const STEPS = ['Cargo', 'Details', 'Review'] as const;
+// Booking is paperwork, so it is styled as paperwork: daylight, ruled
+// fields, mono labels, no cards floating on a gradient. The restraint is
+// the point — the hero can be the showpiece, a form someone is filling in
+// with a lorry waiting should be quiet and legible.
 
-const field = 'w-full rounded-xl border border-brand-line bg-brand-ink px-4 py-3 font-body text-sm text-brand-text placeholder:text-brand-muted/70 focus:border-brand-jade focus:outline-none';
-const label = 'mb-1.5 block font-body text-xs font-bold uppercase tracking-widest text-brand-muted';
+const STEPS = ['Cargo', 'Contact', 'Check'] as const;
 
-function Stepper({ current }: { current: number }) {
-    return (
-        <ol className="mb-10 flex items-center gap-3">
-            {STEPS.map((name, index) => {
-                const done = index < current;
-                const active = index === current;
-                return (
-                    <li key={name} className="flex flex-1 items-center gap-3">
-                        <span
-                            aria-current={active ? 'step' : undefined}
-                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-body text-xs font-bold ${
-                                done || active ? 'bg-brand-jade text-brand-ink' : 'border border-brand-line text-brand-muted'
-                            }`}
-                        >
-                            {done ? '✓' : index + 1}
-                        </span>
-                        <span className={`font-body text-sm ${active ? 'font-bold text-brand-text' : 'text-brand-muted'}`}>{name}</span>
-                        {index < STEPS.length - 1 ? <span className={`hidden h-px flex-1 sm:block ${done ? 'bg-brand-jade' : 'bg-brand-line'}`} /> : null}
-                    </li>
-                );
-            })}
-        </ol>
-    );
-}
-
-function Row({ term, value }: { term: string; value: string }) {
-    return (
-        <div className="flex items-baseline justify-between gap-6 border-b border-brand-line py-3.5 last:border-0">
-            <dt className="font-body text-xs font-bold uppercase tracking-widest text-brand-muted">{term}</dt>
-            <dd className="text-right font-body text-sm text-brand-text">{value || '—'}</dd>
-        </div>
-    );
-}
+const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
 export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }) {
     const [step, setStep] = useState(0);
@@ -52,14 +22,12 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
     const [error, setError] = useState<string | null>(null);
     const [token, setToken] = useState<string | null>(null);
 
-    // The list comes from the server so the dropdown can never offer a
-    // value the API would then reject.
     useEffect(() => {
         fetchCargoTypes().then(setCargoTypes).catch(() => setCargoTypes([]));
     }, []);
 
     const cargoValid = draft.pickupAddress.trim() && draft.deliveryAddress.trim() && draft.cargoType && Number(weightInput) > 0;
-    const detailsValid = draft.customerName.trim() && draft.customerPhone.trim();
+    const contactValid = draft.customerName.trim() && draft.customerPhone.trim();
 
     const confirm = async () => {
         setSubmitting(true);
@@ -73,151 +41,166 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
         }
     };
 
+    // Confirmation goes dark: the job has left the paperwork and joined the
+    // road, and the code is the one thing on screen worth reading.
     if (token) {
         return (
-            <div className="mx-auto max-w-lg px-5 py-20 text-center">
-                <div className="mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-full bg-brand-jade">
-                    <svg viewBox="0 0 24 24" className="h-8 w-8" fill="none" stroke="#050C18" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M4 12.5l5.5 5.5L20 7" />
-                    </svg>
-                </div>
-                <h1 className="font-display text-4xl font-black tracking-tight text-brand-text">Order confirmed</h1>
-                <p className="mt-3 font-body text-sm leading-relaxed text-brand-muted">
-                    A dispatcher will review it and assign a driver. Keep this code — it&apos;s how you track the shipment.
-                </p>
+            <div className="bg-pub-ink px-5 py-24">
+                <div className="mx-auto max-w-xl">
+                    <p className="data-label text-pub-signal">Order received</p>
+                    <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onink">
+                        Keep this code.
+                    </h1>
+                    <p className="mt-5 text-[15px] leading-relaxed text-pub-onink-soft">
+                        It&apos;s how you see where your cargo is. A dispatcher is checking the
+                        details now and will call you if anything needs confirming.
+                    </p>
 
-                <div className="mt-8 rounded-2xl border border-brand-jade/40 bg-brand-surface2 p-7">
-                    <p className="font-body text-xs font-bold uppercase tracking-widest text-brand-muted">Tracking code</p>
-                    <p className="mt-2 font-mono text-3xl font-bold tracking-wider text-brand-jade">{token}</p>
-                </div>
-                {/* Said plainly because the SMS is a convenience, not the
-                    record — a customer who loses the code and never got the
-                    text has no way back to their shipment. */}
-                <p className="mt-3 font-body text-xs text-brand-muted">We&apos;ve also texted this to {draft.customerPhone}. Write it down if you can.</p>
+                    <p className="mt-10 border-y border-pub-onink/15 py-7 font-mono text-[clamp(1.8rem,6vw,2.6rem)] tracking-[0.12em] text-pub-signal">
+                        {token}
+                    </p>
 
-                <div className="mt-8 flex justify-center gap-3">
-                    <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
-                        className="rounded-full bg-brand-jade px-6 py-3 font-body font-bold text-brand-ink hover:bg-brand-jade-deep">
-                        Track order
-                    </button>
-                    <button onClick={() => onNavigate('/')}
-                        className="rounded-full border border-brand-line px-6 py-3 font-body font-medium text-brand-text hover:border-brand-jade hover:text-brand-jade">
-                        Done
-                    </button>
+                    <p className="mt-4 text-sm text-pub-onink-soft">
+                        Texted to {draft.customerPhone}. Write it down anyway — a text can go astray.
+                    </p>
+
+                    <div className="mt-10 flex flex-wrap gap-3">
+                        <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
+                            className="bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
+                            Track it now
+                        </button>
+                        <button onClick={() => onNavigate('/')}
+                            className="border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">
+                            Done
+                        </button>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="mx-auto max-w-2xl px-5 py-14">
-            <h1 className="font-display text-4xl font-black tracking-tight text-brand-text">Place an order</h1>
-            <p className="mt-2 font-body text-sm text-brand-muted">No account needed.</p>
+        <div className="bg-pub-paper px-5 py-16 sm:py-20">
+            <div className="mx-auto max-w-2xl">
+                <p className="data-label text-pub-laterite">Booking · no account needed</p>
+                <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onpaper">
+                    Where&apos;s it going?
+                </h1>
 
-            <div className="mt-10">
-                <Stepper current={step} />
+                {/* Progress as a rule that fills, not three circles with
+                    ticks — this is a short form, not an achievement. */}
+                <div className="mt-10 flex gap-2" aria-hidden="true">
+                    {STEPS.map((name, index) => (
+                        <div key={name} className="flex-1">
+                            <div className={`h-0.5 ${index <= step ? 'bg-pub-laterite' : 'bg-pub-onpaper/20'}`} />
+                            <p className={`data-label mt-2 ${index === step ? 'text-pub-laterite' : 'text-pub-onpaper-soft'}`}>{name}</p>
+                        </div>
+                    ))}
+                </div>
+                <p className="sr-only" role="status">Step {step + 1} of {STEPS.length}: {STEPS[step]}</p>
 
-                <div className="rounded-2xl border border-brand-line bg-brand-surface2 p-6 sm:p-8">
+                <div className="mt-12 grid gap-7">
                     {step === 0 ? (
                         <>
-                            <div className="mb-4">
-                                <label className={label} htmlFor="pickup">Pickup location</label>
-                                <input id="pickup" className={field} value={draft.pickupAddress}
-                                    onChange={(e) => setDraft({ ...draft, pickupAddress: e.target.value })}
-                                    placeholder="e.g. Gikondo Industrial Zone" />
-                            </div>
-                            <div className="mb-4">
-                                <label className={label} htmlFor="destination">Delivery destination</label>
-                                <input id="destination" className={field} value={draft.deliveryAddress}
-                                    onChange={(e) => setDraft({ ...draft, deliveryAddress: e.target.value })}
-                                    placeholder="e.g. Kimironko Market, Shop 14" />
-                            </div>
-                            <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className={label} htmlFor="cargo-type">Cargo type</label>
-                                    <select id="cargo-type" className={field} value={draft.cargoType}
+                            <label className="block">
+                                <span className="data-label text-pub-onpaper-soft">Collect from</span>
+                                <input className={field} value={draft.pickupAddress} placeholder="Gikondo Industrial Zone, gate 3"
+                                    onChange={(e) => setDraft({ ...draft, pickupAddress: e.target.value })} />
+                            </label>
+                            <label className="block">
+                                <span className="data-label text-pub-onpaper-soft">Deliver to</span>
+                                <input className={field} value={draft.deliveryAddress} placeholder="Kimironko Market, shop 14"
+                                    onChange={(e) => setDraft({ ...draft, deliveryAddress: e.target.value })} />
+                            </label>
+                            <div className="grid gap-7 sm:grid-cols-2">
+                                <label className="block">
+                                    <span className="data-label text-pub-onpaper-soft">What is it</span>
+                                    <select className={field} value={draft.cargoType}
                                         onChange={(e) => setDraft({ ...draft, cargoType: e.target.value })}>
-                                        <option value="">Select…</option>
+                                        <option value="">Choose…</option>
                                         {cargoTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                                     </select>
-                                </div>
-                                <div>
-                                    <label className={label} htmlFor="weight">Weight (kg)</label>
-                                    <input id="weight" type="number" min="1" className={field} value={weightInput}
-                                        onChange={(e) => setWeightInput(e.target.value)} placeholder="e.g. 150" />
-                                </div>
+                                </label>
+                                <label className="block">
+                                    <span className="data-label text-pub-onpaper-soft">Weight in kg</span>
+                                    <input type="number" min="1" className={field} value={weightInput} placeholder="150"
+                                        onChange={(e) => setWeightInput(e.target.value)} />
+                                </label>
                             </div>
-                            <div>
-                                <label className={label} htmlFor="instructions">Special instructions (optional)</label>
-                                <textarea id="instructions" rows={3} className={field} value={draft.specialInstructions}
-                                    onChange={(e) => setDraft({ ...draft, specialInstructions: e.target.value })}
-                                    placeholder="Fragile items, access codes…" />
-                            </div>
+                            <label className="block">
+                                <span className="data-label text-pub-onpaper-soft">Anything the driver should know — optional</span>
+                                <textarea rows={2} className={`${field} resize-none`} value={draft.specialInstructions}
+                                    placeholder="Fragile. Ask for Claudine at the gate."
+                                    onChange={(e) => setDraft({ ...draft, specialInstructions: e.target.value })} />
+                            </label>
                         </>
                     ) : step === 1 ? (
                         <>
-                            <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <label className={label} htmlFor="name">Full name</label>
-                                    <input id="name" className={field} value={draft.customerName}
-                                        onChange={(e) => setDraft({ ...draft, customerName: e.target.value })} placeholder="Jean Mutabazi" />
-                                </div>
-                                <div>
-                                    <label className={label} htmlFor="phone">Phone</label>
-                                    <input id="phone" className={field} value={draft.customerPhone}
-                                        onChange={(e) => setDraft({ ...draft, customerPhone: e.target.value })} placeholder="0788 000 000" />
-                                </div>
+                            <div className="grid gap-7 sm:grid-cols-2">
+                                <label className="block">
+                                    <span className="data-label text-pub-onpaper-soft">Your name</span>
+                                    <input className={field} value={draft.customerName} placeholder="Jean Mutabazi"
+                                        onChange={(e) => setDraft({ ...draft, customerName: e.target.value })} />
+                                </label>
+                                <label className="block">
+                                    <span className="data-label text-pub-onpaper-soft">Phone</span>
+                                    <input className={field} value={draft.customerPhone} placeholder="0788 000 000"
+                                        onChange={(e) => setDraft({ ...draft, customerPhone: e.target.value })} />
+                                </label>
                             </div>
-                            <div>
-                                <label className={label} htmlFor="email">Email (optional)</label>
-                                <input id="email" type="email" className={field} value={draft.customerEmail}
-                                    onChange={(e) => setDraft({ ...draft, customerEmail: e.target.value })} placeholder="you@company.rw" />
-                            </div>
-                            <p className="mt-5 rounded-xl border border-brand-line bg-brand-ink p-4 font-body text-xs leading-relaxed text-brand-muted">
-                                We text your tracking code to this number, and the dispatcher calls it if
-                                anything about the pickup needs checking.
+                            <label className="block">
+                                <span className="data-label text-pub-onpaper-soft">Email — optional</span>
+                                <input type="email" className={field} value={draft.customerEmail} placeholder="you@company.rw"
+                                    onChange={(e) => setDraft({ ...draft, customerEmail: e.target.value })} />
+                            </label>
+                            <p className="border-l-2 border-pub-laterite pl-4 text-sm leading-relaxed text-pub-onpaper-soft">
+                                Your tracking code goes to this number, and it&apos;s the number the
+                                dispatcher rings if the pickup address needs checking.
                             </p>
                         </>
                     ) : (
                         <>
-                            <dl>
-                                <Row term="Pickup" value={draft.pickupAddress} />
-                                <Row term="Destination" value={draft.deliveryAddress} />
-                                <Row term="Cargo" value={draft.cargoType} />
-                                <Row term="Weight" value={weightInput ? `${weightInput} kg` : ''} />
-                                <Row term="Contact" value={`${draft.customerName} · ${draft.customerPhone}`} />
-                                {draft.specialInstructions ? <Row term="Notes" value={draft.specialInstructions} /> : null}
+                            <dl className="grid gap-0">
+                                {[
+                                    ['Collect from', draft.pickupAddress],
+                                    ['Deliver to', draft.deliveryAddress],
+                                    ['Cargo', draft.cargoType],
+                                    ['Weight', weightInput ? `${weightInput} kg` : ''],
+                                    ['Contact', `${draft.customerName} · ${draft.customerPhone}`],
+                                    ...(draft.specialInstructions ? [['Notes', draft.specialInstructions]] : []),
+                                ].map(([term, value]) => (
+                                    <div key={term} className="grid grid-cols-[9rem_1fr] gap-4 border-b border-pub-onpaper/15 py-3.5">
+                                        <dt className="data-label pt-0.5 text-pub-onpaper-soft">{term}</dt>
+                                        <dd className="text-[15px] text-pub-onpaper">{value || '—'}</dd>
+                                    </div>
+                                ))}
                             </dl>
-                            <p className="mt-5 font-body text-xs leading-relaxed text-brand-muted">
-                                A dispatcher reviews this order and confirms the pickup before a driver is assigned.
+                            <p className="text-sm leading-relaxed text-pub-onpaper-soft">
+                                A dispatcher checks this before any driver is sent. You&apos;ll get a
+                                tracking code straight away.
                             </p>
-                            {error ? <p role="alert" className="mt-4 font-body text-sm text-red-400">{error}</p> : null}
+                            {error ? <p role="alert" className="text-sm font-medium text-pub-laterite">{error}</p> : null}
                         </>
                     )}
+                </div>
 
-                    <div className="mt-7 flex items-center justify-between gap-3 border-t border-brand-line pt-6">
-                        <button
-                            onClick={() => (step === 0 ? onNavigate('/') : setStep(step - 1))}
-                            className="rounded-full border border-brand-line px-6 py-3 font-body font-medium text-brand-text hover:border-brand-jade hover:text-brand-jade"
-                        >
-                            {step === 0 ? 'Cancel' : 'Back'}
+                <div className="mt-12 flex items-center justify-between gap-4 border-t border-pub-onpaper/15 pt-7">
+                    <button onClick={() => (step === 0 ? onNavigate('/') : setStep(step - 1))}
+                        className="text-sm font-semibold text-pub-onpaper-soft hover:text-pub-onpaper">
+                        {step === 0 ? 'Cancel' : '← Back'}
+                    </button>
+
+                    {step < 2 ? (
+                        <button onClick={() => setStep(step + 1)} disabled={step === 0 ? !cargoValid : !contactValid}
+                            className="bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:cursor-not-allowed disabled:opacity-30">
+                            Continue
                         </button>
-
-                        {step < 2 ? (
-                            <button
-                                onClick={() => setStep(step + 1)}
-                                disabled={step === 0 ? !cargoValid : !detailsValid}
-                                className="rounded-full bg-brand-jade px-6 py-3 font-body font-bold text-brand-ink hover:bg-brand-jade-deep disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                Continue →
-                            </button>
-                        ) : (
-                            <button onClick={confirm} disabled={submitting}
-                                className="rounded-full bg-brand-jade px-6 py-3 font-body font-bold text-brand-ink hover:bg-brand-jade-deep disabled:opacity-60">
-                                {submitting ? 'Placing…' : 'Confirm order'}
-                            </button>
-                        )}
-                    </div>
+                    ) : (
+                        <button onClick={confirm} disabled={submitting}
+                            className="bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                            {submitting ? 'Placing…' : 'Place the order'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

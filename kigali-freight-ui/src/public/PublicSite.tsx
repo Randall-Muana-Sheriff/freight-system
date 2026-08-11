@@ -60,7 +60,7 @@ export default function PublicSite() {
     };
 
     return (
-        <div className="min-h-screen bg-brand-ink font-body text-brand-text">
+        <div className="min-h-screen bg-pub-paper font-body text-pub-onpaper antialiased">
             <PublicHeader onNavigate={navigate} />
             <main>
                 {route.path === '/order' ? (

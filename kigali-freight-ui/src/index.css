@@ -18,24 +18,76 @@
   --color-steel: #8a9188;
   --color-line: #f4efe4;
 
-  /* Customer-facing palette. Not the same as the dispatcher tokens above,
-     and deliberately so: those are a warm near-black with route orange,
-     while the Inzira brand everyone outside the office actually sees — the
-     driver app, the launcher icon, the browser favicon — is deep navy with
-     electric jade. The public site is the brand's face, so it matches the
-     brand rather than the internal tool. Values are lifted from the driver
-     app's theme.ts so the two cannot drift. */
-  --color-brand-ink: #050c18;
-  --color-brand-surface: #0a1628;
-  --color-brand-surface2: #0f1e35;
-  --color-brand-jade: #00d97c;
-  --color-brand-jade-deep: #00a85f;
-  --color-brand-text: #f2f6fb;
-  --color-brand-muted: #7c8aa6;
-  --color-brand-line: rgba(242, 246, 251, 0.1);
+  /* Customer-facing palette — separate from the dispatcher tokens above,
+     which are the internal tool's.
 
-  --font-display: 'Outfit', system-ui, sans-serif;
-  --font-body: 'DM Sans', system-ui, sans-serif;
+     Taken from what a truck in Kigali actually drives through rather than
+     from a theme picker: hills that read green-black at dusk, laterite —
+     the red-orange of Rwandan roads — and the pale limestone of a paper
+     document. The site alternates between the two grounds because freight
+     is two things, the road and the paperwork, and each half is styled as
+     what it is.
+
+     Two accents, each with one job, because the product thesis is the
+     split between them:
+
+       laterite  — the physical world. Roads, cargo, hubs, emphasis.
+                   The single brand accent, and the only large area of
+                   colour anywhere on the site.
+       signal    — the digital layer, and only ever live instrumentation:
+                   a moving vehicle, a pulse, a LIVE label. Used at tiny
+                   scale exclusively, the way a warning lamp is. Nothing
+                   static is ever signal, so it stays honest.
+
+     Deliberately drops the driver app's jade. That palette belongs to the
+     tools; this is the shopfront and does not have to match. */
+  --color-pub-ink: #0a1712;
+  --color-pub-ink2: #10231a;
+  --color-pub-ink3: #1a3327;
+  --color-pub-paper: #e9e5db;
+  --color-pub-paper2: #dcd6c8;
+  --color-pub-laterite: #bf4e26;
+  --color-pub-laterite-soft: #d46c40;
+  --color-pub-signal: #ffc24b;
+  --color-pub-onink: #f1efe8;
+  --color-pub-onink-soft: #8ba295;
+  --color-pub-onpaper: #101f18;
+  --color-pub-onpaper-soft: #58685d;
+
+  /* Archivo is used on its width axis, not only weight — see index.html. */
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/* Signage-wide display setting. Kept as a utility rather than repeated at
+   every call site so the width axis can be tuned in one place. */
+/* Weight goes through font-weight, not font-variation-settings. Chrome
+   resolves the high-level property last and quietly discards a 'wght'
+   axis set alongside it, which rendered these headlines at regular. Only
+   the width axis — which has no high-level equivalent — is set low-level. */
+@utility display-wide {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-variation-settings: 'wdth' 118;
+  letter-spacing: -0.025em;
+  line-height: 0.92;
+}
+
+@utility display-tight {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-variation-settings: 'wdth' 100;
+  letter-spacing: -0.012em;
+}
+
+/* Freight is full of codes, coordinates and timestamps. They get the mono
+   face and the slight tracking that makes a reference number scannable. */
+@utility data-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 /* The dispatcher board is a fixed full-screen app, hence overflow:hidden
