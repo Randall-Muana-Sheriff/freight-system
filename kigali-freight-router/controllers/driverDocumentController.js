@@ -31,6 +31,39 @@ const DOCUMENT_LABELS = {
 // "don't let a late/duplicate result clobber a newer upload" on top,
 // since a driver can re-upload (rejected -> resubmit) while a previous
 // analysis call for the same row is still in flight.
+// Analysis is deliberately not awaited at the call site — a driver's
+// upload must return as soon as the file is stored, not sit waiting on a
+// model call. But "not awaited" was being taken to mean "untracked", so a
+// SIGTERM (every `docker compose up -d --build` deploy sends one) closed
+// the pool out from under any call still in flight. The analysis was then
+// lost with nothing to show for it but a "Cannot use a pool after calling
+// end on the pool" line, and the document sat silently un-analysed.
+//
+// Holding the promises here lets shutdown wait for them the same way it
+// already waits for the telemetry queue to flush.
+const pendingAnalyses = new Set();
+
+function trackPendingAnalysis(promise) {
+    pendingAnalyses.add(promise);
+    promise.catch(() => {}).finally(() => pendingAnalyses.delete(promise));
+}
+
+// Bounded, because orchestrators SIGKILL once their own grace period runs
+// out and a slow model call must not be the reason a container dies hard.
+// Anything still unfinished at the deadline is abandoned on purpose: the
+// document just stays un-analysed, and re-uploading runs it again.
+export async function drainPendingDocumentAnalyses(timeoutMs = 5000) {
+    if (pendingAnalyses.size === 0) return;
+    console.log(`⏳ Waiting up to ${timeoutMs}ms for ${pendingAnalyses.size} document analysis call(s) to finish...`);
+    // unref() so this timer can't itself keep the event loop alive — the
+    // exact failure mode that made the integration suite hang.
+    const deadline = new Promise((resolve) => setTimeout(resolve, timeoutMs).unref());
+    await Promise.race([Promise.allSettled([...pendingAnalyses]), deadline]);
+    if (pendingAnalyses.size > 0) {
+        console.warn(`⚠️ Shutting down with ${pendingAnalyses.size} document analysis call(s) unfinished — those documents stay un-analysed until re-uploaded.`);
+    }
+}
+
 async function analyzeAndStoreDocumentInsights({ documentId, buffer, mimeType, documentLabel, username, uploadedAt }) {
     try {
         const userResult = await pool.query(`SELECT full_name AS "fullName" FROM users WHERE username = $1`, [username]);
@@ -199,14 +232,16 @@ export const DriverDocumentController = {
 
             const doc = result.rows[0];
             const realType = assertRealFileType(req.file.buffer, ['image/jpeg', 'image/png', 'application/pdf']);
-            analyzeAndStoreDocumentInsights({
-                documentId: doc.id,
-                buffer: req.file.buffer,
-                mimeType: realType,
-                documentLabel: DOCUMENT_LABELS[documentType],
-                username,
-                uploadedAt: doc.uploadedAt,
-            });
+            trackPendingAnalysis(
+                analyzeAndStoreDocumentInsights({
+                    documentId: doc.id,
+                    buffer: req.file.buffer,
+                    mimeType: realType,
+                    documentLabel: DOCUMENT_LABELS[documentType],
+                    username,
+                    uploadedAt: doc.uploadedAt,
+                })
+            );
             delete doc.uploadedAt;
 
             doc.fileUrl = await toSignedUrl(doc.fileUrl);

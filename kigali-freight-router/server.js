@@ -31,6 +31,7 @@ import { metricsMiddleware, observeSocketEvent } from './middleware/metrics.js';
 import { createTelemetryQueue, FLEET_STATE_KEY } from './services/telemetryQueue.js';
 import { hashGetAll } from './services/sharedState.js';
 import { dispatchExternalAlert, ALERT_CATEGORY } from './services/alertDispatchService.js';
+import { drainPendingDocumentAnalyses } from './controllers/driverDocumentController.js';
 
 import pool from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
@@ -309,6 +310,9 @@ async function shutdownServices() {
   }
   await Promise.all(redisAdapterClients.map((client) => client.quit().catch(() => {})));
   await closeRedisClients();
+  // Must come before pool.end() — these calls still need a live
+  // connection to write their results back.
+  await drainPendingDocumentAnalyses();
   await pool.end();
 }
 
