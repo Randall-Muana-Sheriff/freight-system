@@ -1,0 +1,35 @@
+# Docker only reads the .dockerignore at the root of the *build context*.
+# Both services build with `context: .` (the repo root), so
+# kigali-freight-router/.dockerignore was never being applied — it sat
+# there looking like it excluded .env, .git and node_modules while the
+# build context actually contained all of them. This file is the one that
+# takes effect; keep exclusions here, not in the per-service copies.
+
+# Never bake dependencies from the host: both Dockerfiles run `npm ci`
+# themselves, and copying a host node_modules risks platform-mismatched
+# native builds on top of being slow.
+**/node_modules
+
+# Secrets. No .env is present in the copied service directories today, so
+# nothing has leaked — but `COPY kigali-freight-router ./` would sweep one
+# straight into an image layer the moment someone adds it locally.
+**/.env
+**/.env.*
+!**/.env.example
+kigali-freight-router/config/secrets/
+
+# The commit stamp is written inside the image from build args (see the
+# router Dockerfile). Copying the host's copy in is what made /health
+# report a months-stale SHA with total confidence: the file is gitignored
+# and regenerated only by an npm script nothing ever invoked, so every
+# rebuild re-baked whatever happened to be lying around.
+kigali-freight-router/build-info.json
+
+# Nothing in the build reads git history — the commit is passed as a build
+# arg — and this is 12MB of context transferred on every build.
+.git
+.github
+
+**/npm-debug.log
+**/*.log
+dist-export

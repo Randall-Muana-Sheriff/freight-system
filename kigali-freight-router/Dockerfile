@@ -41,6 +41,21 @@ COPY --from=builder /app/packages ./packages
 # Copy router
 COPY --from=builder /app/kigali-freight-router ./
 
+# Stamp the commit this image was built from, so /health can report it
+# (see config/buildInfo.js). Passed in as build args rather than read from
+# git: .git is excluded from the build context and this image has no git
+# binary. When the args are absent the file is simply not written and
+# /health honestly reports "unknown" — an unstamped build is far better
+# than the confidently-wrong SHA a stale copied-in file produced.
+# Written before USER app since /app is root-owned.
+ARG GIT_COMMIT=""
+ARG GIT_BRANCH=""
+RUN if [ -n "$GIT_COMMIT" ]; then \
+      printf '{\n  "commit": "%s",\n  "branch": "%s",\n  "builtAt": "%s"\n}\n' \
+        "$GIT_COMMIT" "$GIT_BRANCH" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > /app/build-info.json; \
+    fi
+
 # Run as non-root user
 RUN addgroup -S app && adduser -S app -G app
 USER app

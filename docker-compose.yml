@@ -75,6 +75,14 @@ services:
     build:
       context: .
       dockerfile: kigali-freight-router/Dockerfile
+      # Stamps /health's commit field. Compose can't shell out, so these
+      # come from the environment — use `deploy/build-router.sh` (or set
+      # GIT_COMMIT yourself) rather than a bare `up -d --build`, which
+      # leaves them empty and reports "unknown". Unknown is intentional
+      # and harmless; a wrong SHA is not.
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
+        GIT_BRANCH: ${GIT_BRANCH:-}
     container_name: inzira-router
     command: sh -c "node bin/migrate.js && node server.js"
     environment:

@@ -1,3 +1,11 @@
+# INERT for the current build. docker-compose.yml builds this service with
+# `context: .` (the repo root), and Docker only reads the .dockerignore at
+# the root of the build context — so none of the rules below apply today.
+# The real exclusions live in /.dockerignore; change that one.
+#
+# Kept rather than deleted so the protection is still here if this service
+# is ever built with its own directory as the context. Mirror any change
+# into the root file.
 node_modules
 npm-debug.log
 .env
