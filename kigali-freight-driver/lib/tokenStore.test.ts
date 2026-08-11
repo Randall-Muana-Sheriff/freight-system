@@ -109,12 +109,46 @@ describe('tokenStore', () => {
 
         it('clears tokens and returns null when the server rejects the refresh token (expired/revoked)', async () => {
             await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
-            (global.fetch as unknown as FetchMock).mockResolvedValue({ ok: false });
+            // 401/403 is the only answer that actually means "this refresh
+            // token is no longer valid" — see the status check in
+            // refreshAccessToken.
+            (global.fetch as unknown as FetchMock).mockResolvedValue({ ok: false, status: 401 });
 
             const result = await refreshAccessToken('http://api.test');
 
             expect(result).toBeNull();
             expect(getCachedTokens().token).toBeNull();
+        });
+
+        // A driver being silently signed out mid-shift — losing their name,
+        // vehicle, job list and location tracking — because one refresh
+        // happened to hit the backend while it was restarting.
+        it.each([500, 502, 503, 504, 429])(
+            'does NOT clear tokens on a transient %i — the session is still valid',
+            async (status) => {
+                await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
+                (global.fetch as unknown as FetchMock).mockResolvedValue({ ok: false, status });
+
+                const result = await refreshAccessToken('http://api.test');
+
+                expect(result).toBeNull();
+                expect(getCachedTokens().token).toBe('old');
+                expect(getCachedTokens().refreshToken).toBe('refresh-1');
+            }
+        );
+
+        it('does NOT clear tokens when a 2xx comes back with a malformed body', async () => {
+            await setTokens({ token: 'old', refreshToken: 'refresh-1', role: 'driver', username: 'jean' });
+            (global.fetch as unknown as FetchMock).mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => ({ data: {} }),
+            });
+
+            const result = await refreshAccessToken('http://api.test');
+
+            expect(result).toBeNull();
+            expect(getCachedTokens().token).toBe('old');
         });
 
         it('does NOT clear tokens on a network failure — a transient blip should not force sign-out', async () => {

@@ -148,15 +148,28 @@ export async function refreshAccessToken(apiBase: string): Promise<string | null
         body: JSON.stringify({ refreshToken: currentRefreshToken }),
         signal: controller.signal,
       });
-      if (!response.ok) {
+      // Only an explicit rejection of the refresh token itself means the
+      // session is genuinely over. Every other non-2xx is transient — a
+      // 502/503/504 while the backend restarts or the connection is
+      // flaky, a 429 from the rate limiter, a 500 blip — and treating
+      // those as "signed out" logged drivers out mid-shift for nothing,
+      // wiping their name, vehicle and job list and stopping location
+      // tracking, purely because one refresh happened to land in a bad
+      // moment. Keep the session and let the caller's request fail; the
+      // next refresh attempt will succeed once the backend is reachable.
+      if (response.status === 401 || response.status === 403) {
         await clearTokens();
+        return null;
+      }
+      if (!response.ok) {
         return null;
       }
 
       const payload = await response.json();
       const data = payload?.data ?? payload;
       if (!data?.token || !data?.refreshToken) {
-        await clearTokens();
+        // A 2xx with a malformed body is a server-side contract break,
+        // not proof the driver's session is invalid — same reasoning.
         return null;
       }
 
