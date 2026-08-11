@@ -7,6 +7,7 @@ import { io as socketClient } from 'socket.io-client';
 
 import pool from '../config/db.js';
 import { app, server, startServer, shutdownServices } from '../server.js';
+import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
 // Matches driverAuthController.js's own hashCode() exactly — needed so this
 // test can plant a known OTP/invite code's hash directly via the DB and
@@ -262,6 +263,182 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(poolingResponse.statusCode, 200);
         assert.equal(poolingResponse.body.success, true);
         assert.ok(Array.isArray(poolingResponse.body.data));
+    });
+
+    // The delivery lifecycle is the single most business-critical path in
+    // the system and had no coverage: assignment, each status transition,
+    // and the photo-backed confirmation that actually closes a job out.
+    // Compliance gate: a driver can log in and appear in the fleet long
+    // before they're cleared to carry cargo. Dispatch must refuse to assign
+    // until all five required documents are admin-approved.
+    test('assignment is refused while the driver is unverified', async () => {
+        const res = await request(app)
+            .post('/api/orders/assign')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [createdOrderId], driverName: driverPhone });
+        assert.equal(res.statusCode, 409, JSON.stringify(res.body));
+        assert.equal(res.body.error.code, 'ORDERS_ASSIGN_DRIVER_UNVERIFIED');
+    });
+
+    // Upload + admin-approve all five compliance documents, which is the
+    // only way to clear the gate above. Exercises the document
+    // upload/review path end to end as a side effect.
+    test('driver documents: upload and approval clears the verification gate', async () => {
+        const pngHeader = Buffer.from(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+            'base64'
+        );
+        // Each document needs distinct bytes: uploads are content-hashed and
+        // re-submitting the same image under a second document type is
+        // rejected as DRIVER_DOCUMENT_DUPLICATE_FILE. Padding is also well
+        // above the minimum-size guard.
+        const photoFor = (index) => Buffer.concat([pngHeader, Buffer.alloc(60 * 1024, index + 1)]);
+
+        for (const [index, documentType] of REQUIRED_DOCUMENT_TYPES.entries()) {
+            const upload = await request(app)
+                .post('/api/driver-documents')
+                .set('Authorization', `Bearer ${driverToken}`)
+                .field('documentType', documentType)
+                .attach('document', photoFor(index), `${documentType}.png`);
+            assert.equal(upload.statusCode, 201, `${documentType}: ${JSON.stringify(upload.body)}`);
+
+            const approve = await request(app)
+                .patch(`/api/driver-documents/${upload.body.data.id}/status`)
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send({ status: 'approved' });
+            assert.equal(approve.statusCode, 200, `${documentType}: ${JSON.stringify(approve.body)}`);
+        }
+
+        const mine = await request(app)
+            .get('/api/driver-documents/mine')
+            .set('Authorization', `Bearer ${driverToken}`);
+        assert.equal(mine.statusCode, 200);
+        assert.equal(mine.body.data.verified, true, JSON.stringify(mine.body.data));
+    });
+
+    test('delivery lifecycle: assign -> IN_TRANSIT -> ARRIVED -> confirm-delivery', async () => {
+        // Deliberately its own order, not the shared createdOrderId — the
+        // tenancy test below depends on that one staying unassigned so a
+        // driver acting on it is genuinely a cross-tenant attempt.
+        const created = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Lifecycle test cargo',
+                weight_kg: 12,
+                origin_hub_id: hubId,
+                delivery_lng: 30.0619,
+                delivery_lat: -1.9441,
+                recipient_name: 'Lifecycle Recipient',
+                recipient_phone: '+250788000001',
+            });
+        assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+        const lifecycleOrderId = created.body.data.order.id;
+
+        const assignResponse = await request(app)
+            .post('/api/orders/assign')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [lifecycleOrderId], driverName: driverPhone });
+        assert.equal(assignResponse.statusCode, 200, JSON.stringify(assignResponse.body));
+        assert.equal(assignResponse.body.data.dispatchedCount, 1);
+
+        // The assigned driver now shows the job on their own board.
+        const assignments = await request(app)
+            .get('/api/orders/driver/assignments')
+            .set('Authorization', `Bearer ${driverToken}`);
+        assert.equal(assignments.statusCode, 200);
+        assert.ok(assignments.body.data.some((o) => o.id === lifecycleOrderId));
+
+        for (const status of ['IN_TRANSIT', 'ARRIVED']) {
+            const res = await request(app)
+                .patch(`/api/orders/${lifecycleOrderId}/status`)
+                .set('Authorization', `Bearer ${driverToken}`)
+                .send({ status });
+            assert.equal(res.statusCode, 200, `${status} failed: ${JSON.stringify(res.body)}`);
+            assert.equal(res.body.data.order.status, status);
+        }
+
+        // Proof-of-delivery photo closes the job out. Note this endpoint
+        // intentionally has no minimum-size guard — that check belongs to
+        // driver-document uploads, where image quality is a compliance
+        // concern; a delivery snapshot is just evidence the drop happened.
+        const realPhoto = Buffer.concat([
+            Buffer.from(
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+                'base64'
+            ),
+            Buffer.alloc(60 * 1024, 7),
+        ]);
+        const confirmed = await request(app)
+            .post(`/api/orders/${lifecycleOrderId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`)
+            .attach('photo', realPhoto, 'proof.png');
+        assert.equal(confirmed.statusCode, 200, JSON.stringify(confirmed.body));
+        assert.equal(confirmed.body.data.order.status, 'DELIVERED');
+
+        // And it lands in the driver's completed history.
+        const completed = await request(app)
+            .get('/api/orders/driver/completed')
+            .set('Authorization', `Bearer ${driverToken}`);
+        assert.equal(completed.statusCode, 200);
+        assert.ok(completed.body.data.some((o) => o.id === lifecycleOrderId));
+    });
+
+    // Weight bounds are validated at order creation, before capacity is
+    // ever considered — an implausible load never becomes an order at all.
+    test('order creation rejects an out-of-range weight', async () => {
+        const res = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Weight guard test',
+                weight_kg: 99999,
+                origin_hub_id: hubId,
+                delivery_lng: 30.0619,
+                delivery_lat: -1.9441,
+                recipient_name: 'Weight Test',
+                recipient_phone: '+250788000000',
+            });
+        assert.equal(res.statusCode, 400, JSON.stringify(res.body));
+        assert.equal(res.body.error.code, 'ORDERS_INVALID_WEIGHT');
+    });
+
+    test('safety checklist persists per-driver and rejects unknown items', async () => {
+        const patched = await request(app)
+            .patch('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ itemKey: 'seatbelt', checked: true });
+        assert.equal(patched.statusCode, 200, JSON.stringify(patched.body));
+        assert.equal(patched.body.data.items.seatbelt, true);
+
+        const reread = await request(app)
+            .get('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`);
+        assert.equal(reread.statusCode, 200);
+        assert.equal(reread.body.data.items.seatbelt, true);
+
+        const bogus = await request(app)
+            .patch('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ itemKey: 'not_a_real_check', checked: true });
+        assert.equal(bogus.statusCode, 400, JSON.stringify(bogus.body));
+    });
+
+    // Regression guards for two endpoints that used to dereference request
+    // fields before validating them, answering 500 to what is really a
+    // client mistake.
+    test('malformed payloads are rejected with 400, not 500', async () => {
+        const geofence = await request(app)
+            .post('/api/geofences')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ name: 'No Coordinates Zone' });
+        assert.equal(geofence.statusCode, 400, JSON.stringify(geofence.body));
+
+        const optimize = await request(app)
+            .post('/api/routes/optimize')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ stops: [{ lat: -1.95, lng: 30.06 }] });
+        assert.equal(optimize.statusCode, 400, JSON.stringify(optimize.body));
     });
 
     // Tenancy isolation: a driver must never be able to act on an order

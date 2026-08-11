@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { API_BASE } from '../utils/api';
 
 interface ErrorBoundaryProps {
     children: ReactNode;
@@ -28,6 +29,19 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
 
     componentDidCatch(error: Error, info: ErrorInfo) {
         console.error('Dashboard crashed:', error, info?.componentStack);
+        // Fire-and-forget: without this a white-screened dispatcher is
+        // visible only to the person looking at it. Any failure here is
+        // swallowed on purpose — a broken error reporter must never throw
+        // a second exception on top of the first.
+        fetch(`${API_BASE}/client-errors`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: error.message,
+                componentStack: info?.componentStack,
+                source: 'dashboard',
+            }),
+        }).catch(() => {});
     }
 
     handleReload = () => {
