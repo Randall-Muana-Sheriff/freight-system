@@ -4,3 +4,7 @@ dist/
 build/
 *.log
 config/secrets/
+
+# Generated at deploy time by bin/write-build-info.js — reflects the
+# host it was built on, never committed.
+build-info.json

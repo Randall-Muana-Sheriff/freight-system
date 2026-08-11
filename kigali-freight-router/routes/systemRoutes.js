@@ -4,6 +4,7 @@ import { appConfig } from '../config/appConfig.js';
 import { buildMetricsText, register } from '../middleware/metrics.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { dispatchExternalAlert, ALERT_CATEGORY } from '../services/alertDispatchService.js';
+import { buildInfo } from '../config/buildInfo.js';
 
 const router = Router();
 
@@ -21,6 +22,11 @@ router.get('/health', (req, res) => {
             status: 'ok',
             service: 'inzira-router',
             uptimeSeconds: Math.round(process.uptime()),
+            // Which commit is actually live. "unknown" means the deploy
+            // didn't stamp build-info.json (local dev, or a host deployed
+            // before this existed) — see config/buildInfo.js.
+            version: buildInfo.commit,
+            builtAt: buildInfo.builtAt,
         },
     });
 });
