@@ -42,6 +42,7 @@ const MIGRATIONS = [
     { id: 'add_dispatch_settings.sql', destructive: false },
     { id: 'add_order_priority.sql', destructive: false },
     { id: 'add_driver_safety_checklists.sql', destructive: false },
+    { id: 'add_public_orders.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

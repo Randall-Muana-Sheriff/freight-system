@@ -46,6 +46,7 @@ import stopRouter from './routes/stopRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import hubRoutes from './routes/hubRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
 import driverDocumentRoutes from './routes/driverDocumentRoutes.js';
 import safetyChecklistRoutes from './routes/safetyChecklistRoutes.js';
 import geocodeRoutes from './routes/geocodeRoutes.js';
@@ -131,6 +132,9 @@ app.use('/api/stops', stopRouter);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/hubs', hubRoutes);
+// Unauthenticated by design — the customer site. Mounted under its own
+// /public prefix so it is obvious at a glance which surface is exposed.
+app.use('/api/public', publicRoutes);
 app.use('/api/driver-documents', driverDocumentRoutes);
 app.use('/api/driver-safety-checklist', safetyChecklistRoutes);
 app.use('/api/geocode', geocodeRoutes);
