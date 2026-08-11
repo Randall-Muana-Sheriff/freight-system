@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { sendContactMessage } from './publicApi';
 import { HeroRoute } from './HeroRoute';
-import { HERO, SERVICES, JOURNEY, CONTACT } from './content';
+import { HERO, SERVICES, JOURNEY, ABOUT, CONTACT } from './content';
 
 // Copy lives in content.ts. This file is layout only, so the writing can
 // be read and edited as writing.
@@ -157,6 +157,31 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             </li>
                         ))}
                     </ol>
+                </div>
+            </section>
+
+            {/* Returns to the dark ground: this section is about the
+                machinery on the road, and it gives the long light stretch
+                a break before the page closes on the contact form. */}
+            <section id="about" className="bg-pub-ink px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-6xl">
+                    <div className="mb-14 max-w-2xl">
+                        <SectionHead eyebrow={ABOUT.eyebrow} headline={ABOUT.headline} onPaper={false} />
+                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{ABOUT.intro}</p>
+                    </div>
+
+                    <div className="grid gap-x-14 gap-y-10 md:grid-cols-3">
+                        {ABOUT.views.map((view) => (
+                            <article key={view.title} className="border-t border-pub-onink/15 pt-5">
+                                <h3 className="display-tight text-lg text-pub-onink">{view.title}</h3>
+                                <p className="mt-2.5 text-[15px] leading-relaxed text-pub-onink-soft">{view.body}</p>
+                            </article>
+                        ))}
+                    </div>
+
+                    <p className="mt-12 max-w-2xl border-l-2 border-pub-laterite pl-5 text-[15px] leading-relaxed text-pub-onink-soft">
+                        {ABOUT.closing}
+                    </p>
                 </div>
             </section>
 

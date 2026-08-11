@@ -6,6 +6,7 @@ import { InziraMark } from './InziraMark';
 const SECTIONS = [
     { id: 'services', label: 'What we move' },
     { id: 'how', label: 'How it works' },
+    { id: 'about', label: 'The system' },
     { id: 'contact', label: 'Talk to us' },
 ];
 
