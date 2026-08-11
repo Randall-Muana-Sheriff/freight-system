@@ -64,9 +64,25 @@ repo is built to consume regardless of which you pick:
 ## 3. Deploy
 
 ```bash
+# Stamps the running commit onto /health so you can tell from outside the
+# box which code is actually live. Without these two exports the build
+# args are empty and /health reports "unknown" — it still deploys fine,
+# you just lose the drift check. Never hardcode a SHA here.
+export GIT_COMMIT="$(git rev-parse HEAD)$([ -n "$(git status --porcelain)" ] && echo -dirty)"
+export GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
   --env-file .env.production \
-  up -d postgres redis router ui caddy
+  up -d --build postgres redis router ui caddy
+```
+
+Confirm the deploy actually landed before walking away — this is the
+whole point of the stamp, and the failure it catches (code committed but
+not running) is silent otherwise:
+
+```bash
+curl -s https://<your-api-domain>/health
+# "version" must equal the SHA you just deployed, not an older one
 ```
 
 `docker-compose.prod.yml` (repo root):
