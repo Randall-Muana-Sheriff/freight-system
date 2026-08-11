@@ -295,6 +295,15 @@ if (isMainModule) {
 
 async function shutdownServices() {
   await telemetryQueue.shutdown();
+  // io.close(), not just server.close(). Socket.IO owns engine.io's
+  // ping/timeout interval and any still-open client connections, and
+  // server.close() only stops accepting *new* connections — it neither
+  // clears that timer nor drops established sockets. Closing the HTTP
+  // server alone therefore left handles on the event loop forever, which
+  // is why `npm run test:integration` hung indefinitely after reporting
+  // all tests passed (CI would have timed out rather than gone green).
+  // io.close() closes the attached HTTP server too, hence the guard below.
+  await new Promise((resolve) => io.close(resolve));
   if (server.listening) {
     await new Promise((resolve) => server.close(resolve));
   }
