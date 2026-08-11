@@ -4,6 +4,7 @@ import { SocketProvider, useSocket } from './context/SocketContext';
 import AuthForm from './components/AuthForm';
 import ImageLightbox from './components/ImageLightbox';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
 
 // Only one of these two ever renders at a time (gated by showAdminCenter),
 // and neither is needed at all until after login — code-splitting them
@@ -26,7 +27,25 @@ function ScreenLoading() {
 }
 
 function AppShell() {
-  const { jwtToken, showAdminCenter, viewingImage, setViewingImage } = useSocket();
+  const {
+    jwtToken, showAdminCenter, viewingImage, setViewingImage,
+    incidentReports, activeBreachedDrivers,
+  } = useSocket();
+
+  // Counted rather than "is there anything at all": a dispatcher wants to
+  // know the board went from two problems to three without looking at it.
+  // Only things still open — a resolved incident is history, not a demand
+  // on anyone's attention — and only while signed in, since the login
+  // screen has no business advertising operational state to whoever walks
+  // past the monitor.
+  const openIncidents = incidentReports.filter((i) => !i.resolved_at).length;
+  const attention = jwtToken ? openIncidents + Object.keys(activeBreachedDrivers).length : 0;
+
+  useDocumentTitle(
+    !jwtToken ? 'Sign in' : showAdminCenter ? 'Control centre' : 'Dispatch',
+    attention
+  );
+
   return (
     <>
       <Suspense fallback={<ScreenLoading />}>

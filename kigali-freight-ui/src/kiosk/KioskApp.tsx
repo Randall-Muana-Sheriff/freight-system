@@ -13,6 +13,7 @@ import { io, type Socket } from 'socket.io-client';
 import { API_BASE, fetchHubs, fetchActiveOrders, fetchIncidents, fetchInFlightOrders, fetchDrivers, fetchMyKioskDevice } from '../utils/api';
 import { attachSocketListeners } from '../context/socketEventHandlers';
 import KioskDashboard from './KioskDashboard';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import type { Hub, Order, Incident, TrackedAsset, GeofenceViolation, OrderActivityEvent, RecentDelivery, StaffUser } from '../types';
 
 const KIOSK_TOKEN_KEY = 'kiosk_token';
@@ -26,6 +27,13 @@ export default function KioskApp() {
     const [token, setToken] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
+
+    // Named after the device rather than the app, because these are
+    // unattended wall displays that get set up once — whoever is standing
+    // at the machine choosing which screen goes on which monitor needs to
+    // tell "Warehouse floor" from "Dispatch desk" in the tab strip. No
+    // attention count: nobody is watching a wall display's tab title.
+    useDocumentTitle(deviceLabel || 'Wall display');
 
     const [trackedAssets, setTrackedAssets] = useState<Record<string, TrackedAsset>>({});
     const [routeHistories, setRouteHistories] = useState<Record<string, [number, number][]>>({});
