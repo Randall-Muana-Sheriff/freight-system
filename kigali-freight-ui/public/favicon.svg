@@ -18,8 +18,15 @@
 
        The mark is also 2.4:1 and sits low in the source, leaving the
        upper-left empty — fine at launcher size, but at 16px it wasted
-       most of the tile and the curve nearly vanished. The y translate
-       centres it. Same mark at the same scale, just not bottom-heavy. -->
+       most of the tile and the curve nearly vanished.
+
+       So it is centred and scaled 1.25x, which zooms past the left end of
+       the curve: the route now runs off the left edge instead of starting
+       inside the tile. That reads as a road continuing beyond frame, and
+       it buys the weight the mark needs to hold up small — at 1.25x the
+       stroke lands at ~86 and the pin at r168, which is about where the
+       previous hand-drawn favicon sat (83 and 160). Traced at 1:1 the
+       same mark came out visibly lighter than the icon it replaced. -->
   <defs>
     <linearGradient id="ground" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#0F1E35"/>
@@ -29,7 +36,7 @@
 
   <rect width="32" height="32" rx="7" fill="url(#ground)"/>
 
-  <g transform="scale(0.03125) translate(-51 -144)">
+  <g transform="scale(0.03125) translate(-319 -308) scale(1.25)">
     <path d="M108 788C160 812 210 820 260 818C340 814 420 760 494 699C570 636 700 575 800 522"
           stroke="#DADFE5" stroke-width="69" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <circle cx="902" cy="592" r="134" fill="#00D97C"/>
