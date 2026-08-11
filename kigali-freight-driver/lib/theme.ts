@@ -25,7 +25,10 @@ export const theme = {
     ink: '#050C18',
   },
   fonts: {
-    heading: 'Outfit_800ExtraBold',
+    // One Outfit weight, not two. 800 and 900 were both loaded but are
+    // near-indistinguishable at the sizes this app actually renders, so the
+    // second file bought an extra download and no visible hierarchy —
+    // hierarchy comes from the size scale and colour instead.
     headingBlack: 'Outfit_900Black',
     body: 'DMSans_400Regular',
     bodyMedium: 'DMSans_500Medium',

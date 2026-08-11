@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { NotificationItem } from '../../components/NotificationItem';
+import { EmptyState } from '../../components/EmptyState';
 import { useLiveDriverEvents } from '../../lib/liveEvents';
 import { theme } from '../../lib/theme';
 
@@ -34,11 +35,11 @@ export default function AlertsScreen() {
           ))}
         </View>
       ) : (
-        <View style={styles.emptyState}>
-          <Ionicons name="notifications-outline" size={26} color={theme.colors.muted} />
-          <Text style={styles.emptyTitle}>No alerts yet</Text>
-          <Text style={styles.emptyBody}>Trip status changes and safety events for you will show up here as they happen.</Text>
-        </View>
+        <EmptyState
+          icon="notifications-outline"
+          title="No alerts yet"
+          body="Trip status changes and safety events for you will show up here as they happen."
+        />
       )}
     </ScreenShell>
   );
@@ -62,11 +63,4 @@ const styles = StyleSheet.create({
   statusDotLive: { backgroundColor: theme.colors.success },
   statusDotIdle: { backgroundColor: theme.colors.warning },
   statusText: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
-  emptyState: {
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 40,
-  },
-  emptyTitle: { color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
-  emptyBody: { color: theme.colors.muted, ...theme.type.bodySm, textAlign: 'center', maxWidth: 240, fontFamily: theme.fonts.body },
 });

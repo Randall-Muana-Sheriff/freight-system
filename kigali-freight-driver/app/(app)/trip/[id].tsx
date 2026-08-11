@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   summaryText: { color: theme.colors.text, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
   infoBlock: { flex: 1 },
   label: { color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, ...theme.type.micro, fontFamily: theme.fonts.mono },
-  value: { color: theme.colors.text, marginTop: 6, ...theme.type.title, fontFamily: theme.fonts.heading },
+  value: { color: theme.colors.text, marginTop: 6, ...theme.type.title, fontFamily: theme.fonts.headingBlack },
   recipientRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,13 +433,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: theme.colors.surface2,
+    height: 8,
+    borderRadius: 4,
+    // surface2 sits too close to the card behind it for the unfilled
+    // portion to read as a track at all, which left the fill percentage
+    // impossible to judge at a glance — the caption underneath was doing
+    // all the work. A translucent light overlay separates from any
+    // surface it is placed on.
+    backgroundColor: 'rgba(242, 246, 251, 0.12)',
     marginTop: 10,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+    // Keeps a sliver visible at very low percentages, so "just started"
+    // still looks different from "no data".
+    minWidth: 4,
+  },
   progressCaption: { color: theme.colors.muted, ...theme.type.label, marginTop: 8, fontFamily: theme.fonts.mono },
   timeline: { gap: 10 },
   timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },

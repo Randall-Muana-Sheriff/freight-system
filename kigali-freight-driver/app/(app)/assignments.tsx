@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { ScreenShell } from '../../components/ScreenShell';
 import { AssignmentCard } from '../../components/AssignmentCard';
+import { EmptyState } from '../../components/EmptyState';
 import { SectionHeader } from '../../components/SectionHeader';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
@@ -107,11 +108,11 @@ export default function AssignmentsScreen() {
           </TouchableOpacity>
         </View>
       ) : assignments.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="checkmark-done-circle-outline" size={28} color={theme.colors.muted} />
-          <Text style={styles.emptyTitle}>Nothing on your plate</Text>
-          <Text style={styles.emptyText}>Pull down to refresh, or wait for dispatch to send your next job.</Text>
-        </View>
+        <EmptyState
+          icon="checkmark-done-circle-outline"
+          title="Nothing on your plate"
+          body="Pull down to refresh, or wait for dispatch to send your next job."
+        />
       ) : (
         <>
           {inProgress.length > 0 ? (
@@ -162,13 +163,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.danger,
   },
   retryText: { color: theme.colors.ink, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
-  emptyState: {
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 48,
-  },
-  emptyTitle: { color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
-  emptyText: { color: theme.colors.muted, ...theme.type.bodySm, textAlign: 'center', maxWidth: 240, fontFamily: theme.fonts.body },
   group: { marginBottom: 28 },
   groupLabel: {
     color: theme.colors.muted,

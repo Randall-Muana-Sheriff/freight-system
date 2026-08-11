@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     },
     title: {
         color: theme.colors.text,
-        fontFamily: theme.fonts.heading,
+        fontFamily: theme.fonts.headingBlack,
         ...theme.type.title,
     },
     message: {

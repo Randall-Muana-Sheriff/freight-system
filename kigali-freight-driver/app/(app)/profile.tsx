@@ -7,6 +7,7 @@ import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
 import { ImageViewerModal } from '../../components/ImageViewerModal';
+import { EmptyState } from '../../components/EmptyState';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { fetchMyProfile, fetchMyVehicle, fetchMyCompletedDeliveries, fetchMyDocuments, type MyProfile, type MyVehicle, type CompletedDelivery } from '../../lib/api';
@@ -441,6 +442,15 @@ export default function ProfileScreen() {
         <Card icon="time-outline" title="Delivery history" summary={completedDeliveries && completedDeliveries.length > 0 ? `${deliveredThisWeekCount} this week` : undefined}>
           {completedDeliveries === undefined ? (
             <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
+          ) : completedDeliveries.length === 0 ? (
+            // Previously rendered an empty View, so a driver who hadn't
+            // completed a delivery yet saw a titled card with nothing in it.
+            <EmptyState
+              compact
+              icon="cube-outline"
+              title="No deliveries yet"
+              body="Once you confirm a delivery it appears here with its photo proof."
+            />
           ) : (
             <>
               <View>

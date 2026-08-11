@@ -2,7 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { Outfit_800ExtraBold, Outfit_900Black } from '@expo-google-fonts/outfit';
+import { Outfit_900Black } from '@expo-google-fonts/outfit';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold } from '@expo-google-fonts/dm-sans';
 import { DMMono_400Regular, DMMono_500Medium } from '@expo-google-fonts/dm-mono';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,7 +26,6 @@ initCrashReporting();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
-    Outfit_800ExtraBold,
     Outfit_900Black,
     DMSans_400Regular,
     DMSans_500Medium,

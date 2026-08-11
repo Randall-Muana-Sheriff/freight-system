@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 18,
   },
-  title: { color: theme.colors.text, ...theme.type.heading, fontFamily: theme.fonts.heading, textAlign: 'center' },
+  title: { color: theme.colors.text, ...theme.type.heading, fontFamily: theme.fonts.headingBlack, textAlign: 'center' },
   message: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   options: { marginTop: 18 },
   optionRow: {

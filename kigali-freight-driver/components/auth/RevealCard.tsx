@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   avatarInitial: { color: theme.colors.primary, ...theme.type.display, fontFamily: theme.fonts.headingBlack },
-  name: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.heading, textAlign: 'center' },
+  name: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.headingBlack, textAlign: 'center' },
   role: {
     color: theme.colors.muted,
     ...theme.type.micro,
