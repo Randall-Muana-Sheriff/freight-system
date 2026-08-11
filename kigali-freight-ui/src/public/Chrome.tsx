@@ -2,6 +2,7 @@
 // footer closes the page back into the dark, so the site opens and shuts
 // on the road with the paperwork in between.
 import { InziraMark } from './InziraMark';
+import { restartTour } from './SiteTour';
 
 const SECTIONS = [
     { id: 'services', label: 'What we move' },
@@ -75,6 +76,7 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                         <span className="text-sm text-pub-onink-soft">Gikondo Industrial Zone</span>
                         <span className="text-sm text-pub-onink-soft">Kigali, Rwanda</span>
                         <button className={link} onClick={() => onNavigate('/dispatch')}>Staff sign in</button>
+                        <button className={link} onClick={restartTour}>Show me around</button>
                     </div>
                 </div>
 

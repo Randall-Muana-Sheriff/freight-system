@@ -102,11 +102,12 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">{HERO.body}</p>
 
                         <div className="mt-9 flex flex-wrap items-center gap-3">
-                            <button onClick={() => onNavigate('/order')}
+                            <button data-tour="book" onClick={() => onNavigate('/order')}
                                 className="bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                                 Book a delivery
                             </button>
-                            <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
+                            <form data-tour="track"
+                                onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
                                 className="flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
                                 <label htmlFor="hero-track" className="sr-only">Tracking code</label>
                                 <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"

@@ -4,6 +4,7 @@ import { Landing } from './Landing';
 import { OrderFlow } from './OrderFlow';
 import { TrackPage } from './TrackPage';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { SiteTour } from './SiteTour';
 
 // Still no router dependency — App.tsx already branches on pathname for
 // /kiosk and adding one library to serve three static paths would be more
@@ -72,6 +73,11 @@ export default function PublicSite() {
                 )}
             </main>
             <PublicFooter onNavigate={navigate} />
+
+            {/* Landing only. Someone who lands straight on /track already
+                knows what they came for, and someone mid-booking should
+                not be interrupted by a tour of the page they left. */}
+            {route.path === '/' ? <SiteTour onBook={() => navigate('/order')} /> : null}
         </div>
     );
 }
