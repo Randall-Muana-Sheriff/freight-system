@@ -1,29 +1,24 @@
 import { useState, type FormEvent } from 'react';
 import { sendContactMessage } from './publicApi';
 import { HeroRoute } from './HeroRoute';
+import { HERO, PROOF, SERVICES, JOURNEY, SAFETY, DELIVERY, BUSINESS, COVERAGE, FAQ, ABOUT, CONTACT } from './content';
 
-// Services are a menu, not a sequence — nobody does same-day delivery
-// *before* bulk freight. So they get no numbering. What they do get is the
-// one fact a buyer decides on, pulled out in mono, because "up to 1,000 kg"
-// and "before noon" are what actually answer "can you do my job?"
-const SERVICES = [
-    { name: 'Same-day delivery', spec: 'Order before noon', body: 'Anywhere in Kigali, on the road within the hour, tracked the whole way.' },
-    { name: 'Bulk freight', spec: 'Palletised loads', body: 'Heavy-van fleet with drivers who load and secure it themselves.' },
-    { name: 'Secure transport', spec: 'Sealed & verified', body: 'High-value cargo, tamper-evident sealing, full incident reporting.' },
-    { name: 'Scheduled routes', spec: 'Set once, runs daily', body: 'A standing lane between two fixed points. Your supply chain on autopilot.' },
-    { name: 'Hub-to-hub', spec: 'Drop and go', body: 'Leave cargo at any hub — we move it to the destination hub for you.' },
-    { name: 'Document courier', spec: 'Signature on arrival', body: 'Contracts and certificates with a full chain-of-custody trail.' },
-];
+// Copy lives in content.ts. This file is layout only, so the writing can
+// be read and edited as writing.
 
-// This one IS a sequence — a consignment genuinely passes through these in
-// order — so it earns the route-line treatment and the ordinals.
-const STOPS = [
-    { name: 'You place the order', body: 'Pickup, destination, what it is. No account, no phone call, no waiting for a quote to book.' },
-    { name: 'A dispatcher confirms it', body: 'A person checks the addresses and calls you if anything is unclear. Nothing goes to a driver unchecked.' },
-    { name: 'A driver takes it', body: 'The nearest verified driver on shift, with your cargo on their manifest and their position on our map.' },
-    { name: 'You watch it move', body: 'Your tracking code shows where it is, not just that it left. Refresh it as often as you like.' },
-    { name: 'Signed and photographed', body: 'Proof of delivery captured at the door, timestamped against the position it was taken at.' },
-];
+function SectionHead({ eyebrow, headline, onPaper = true, className = '' }: {
+    eyebrow: string; headline: string; onPaper?: boolean; className?: string;
+}) {
+    return (
+        <div className={className}>
+            <p className={`data-label mb-5 ${onPaper ? 'text-pub-laterite' : 'text-pub-laterite-soft'}`}>{eyebrow}</p>
+            <h2 className={`display-wide text-[clamp(2rem,4.5vw,3.2rem)] ${onPaper ? 'text-pub-onpaper' : 'text-pub-onink'}`}
+                style={{ textWrap: 'balance' } as React.CSSProperties}>
+                {headline}
+            </h2>
+        </div>
+    );
+}
 
 function ContactForm() {
     const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
@@ -95,21 +90,16 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
 
     return (
         <>
-            {/* THE ROAD — dark, live, moving. */}
+            {/* ── THE ROAD ─────────────────────────────────────────────── */}
             <section className="bg-pub-ink px-5 pb-16 pt-14 sm:pt-20">
                 <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
                     <div>
-                        <p className="data-label mb-7 text-pub-laterite-soft">Freight across Kigali</p>
-                        <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink" style={{ textWrap: 'balance' } as React.CSSProperties}>
-                            Know where
-                            <br />
-                            your cargo is.
+                        <p className="data-label mb-7 text-pub-laterite-soft">{HERO.eyebrow}</p>
+                        <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink"
+                            style={{ textWrap: 'balance' } as React.CSSProperties}>
+                            {HERO.headline[0]}<br />{HERO.headline[1]}
                         </h1>
-                        <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">
-                            Most freight goes quiet the moment it leaves your gate. Ours doesn&apos;t —
-                            every consignment carries a code that shows you its position until
-                            somebody signs for it.
-                        </p>
+                        <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">{HERO.body}</p>
 
                         <div className="mt-9 flex flex-wrap items-center gap-3">
                             <button onClick={() => onNavigate('/order')}
@@ -119,8 +109,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             <form onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
                                 className="flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
                                 <label htmlFor="hero-track" className="sr-only">Tracking code</label>
-                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)}
-                                    placeholder="Have a code?"
+                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"
                                     className="w-40 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none" />
                                 <button type="submit" className="px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">Track →</button>
                             </form>
@@ -131,18 +120,26 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 </div>
             </section>
 
-            {/* THE PAPERWORK — light, precise, documentary. */}
+            {/* Three mechanisms, not three adjectives. Sits on the fold
+                between road and paperwork, so it takes the raised ink. */}
+            <section className="bg-pub-ink2 px-5 py-14">
+                <dl className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-3">
+                    {PROOF.map((item) => (
+                        <div key={item.label} className="border-t border-pub-onink/15 pt-5">
+                            <dt className="display-tight text-2xl text-pub-onink">{item.stat}</dt>
+                            <p className="data-label mt-2 text-pub-laterite-soft">{item.label}</p>
+                            <dd className="mt-3 text-[15px] leading-relaxed text-pub-onink-soft">{item.body}</dd>
+                        </div>
+                    ))}
+                </dl>
+            </section>
+
+            {/* ── THE PAPERWORK ────────────────────────────────────────── */}
             <section id="services" className="bg-pub-paper px-5 py-20 sm:py-28">
                 <div className="mx-auto max-w-6xl">
-                    <div className="mb-14 max-w-2xl">
-                        <p className="data-label mb-5 text-pub-laterite">What we move</p>
-                        <h2 className="display-wide text-[clamp(2rem,4.5vw,3.2rem)] text-pub-onpaper">
-                            Six ways to get it there.
-                        </h2>
-                    </div>
-
+                    <SectionHead eyebrow={SERVICES.eyebrow} headline={SERVICES.headline} className="mb-14 max-w-2xl" />
                     <div className="grid gap-x-14 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-                        {SERVICES.map((service) => (
+                        {SERVICES.items.map((service) => (
                             <article key={service.name} className="border-t border-pub-onpaper/15 pt-5">
                                 <p className="data-label mb-3 text-pub-laterite">{service.spec}</p>
                                 <h3 className="display-tight text-xl text-pub-onpaper">{service.name}</h3>
@@ -153,22 +150,14 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 </div>
             </section>
 
-            {/* The route line: this section is a journey, so it is drawn as
-                one. The line is the page's structural signature and the only
-                place ordinals appear, because this is the only content where
-                order is real information. */}
+            {/* The one section that is genuinely a sequence, so the one
+                section drawn as a route with ordinals. */}
             <section id="how" className="bg-pub-paper2 px-5 py-20 sm:py-28">
                 <div className="mx-auto max-w-3xl">
-                    <div className="mb-14">
-                        <p className="data-label mb-5 text-pub-laterite">Start to finish</p>
-                        <h2 className="display-wide text-[clamp(2rem,4.5vw,3.2rem)] text-pub-onpaper">
-                            What happens to your cargo.
-                        </h2>
-                    </div>
-
+                    <SectionHead eyebrow={JOURNEY.eyebrow} headline={JOURNEY.headline} className="mb-14" />
                     <ol className="relative">
                         <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-3 w-px bg-pub-onpaper/20" />
-                        {STOPS.map((stop, index) => (
+                        {JOURNEY.stops.map((stop, index) => (
                             <li key={stop.name} className="relative flex gap-7 pb-11 last:pb-0">
                                 <span aria-hidden="true"
                                     className={`relative z-10 mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 ${
@@ -185,18 +174,101 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 </div>
             </section>
 
+            {/* ── BACK TO THE ROAD: this is about drivers and vehicles ─── */}
+            <section id="safety" className="bg-pub-ink px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-6xl">
+                    <div className="mb-14 max-w-2xl">
+                        <SectionHead eyebrow={SAFETY.eyebrow} headline={SAFETY.headline} onPaper={false} />
+                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{SAFETY.body}</p>
+                    </div>
+                    <div className="grid gap-x-14 gap-y-11 sm:grid-cols-2">
+                        {SAFETY.columns.map((column) => (
+                            <article key={column.title} className="border-t border-pub-onink/15 pt-5">
+                                <h3 className="display-tight text-lg text-pub-onink">{column.title}</h3>
+                                <p className="mt-2.5 text-[15px] leading-relaxed text-pub-onink-soft">{column.body}</p>
+                            </article>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="bg-pub-paper px-5 py-20 sm:py-28">
+                <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[0.85fr_1fr] lg:gap-20">
+                    <SectionHead eyebrow={DELIVERY.eyebrow} headline={DELIVERY.headline} />
+                    <p className="text-lg leading-relaxed text-pub-onpaper-soft">{DELIVERY.body}</p>
+                </div>
+            </section>
+
+            <section id="business" className="bg-pub-paper2 px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-5xl">
+                    <div className="mb-12 max-w-2xl">
+                        <SectionHead eyebrow={BUSINESS.eyebrow} headline={BUSINESS.headline} />
+                        <p className="mt-6 text-lg leading-relaxed text-pub-onpaper-soft">{BUSINESS.body}</p>
+                    </div>
+                    <div className="grid gap-x-12 gap-y-8 sm:grid-cols-3">
+                        {BUSINESS.points.map((point) => (
+                            <div key={point.title} className="border-t border-pub-onpaper/15 pt-5">
+                                <h3 className="display-tight text-base text-pub-onpaper">{point.title}</h3>
+                                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{point.body}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="mt-11 bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite">
+                        Ask about a standing route
+                    </button>
+                </div>
+            </section>
+
+            <section id="coverage" className="bg-pub-ink px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-5xl">
+                    <div className="mb-12 max-w-2xl">
+                        <SectionHead eyebrow={COVERAGE.eyebrow} headline={COVERAGE.headline} onPaper={false} />
+                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{COVERAGE.body}</p>
+                    </div>
+                    <div className="grid gap-x-12 gap-y-9 sm:grid-cols-3">
+                        {COVERAGE.hubs.map((hub) => (
+                            <div key={hub.name} className="border-t border-pub-onink/15 pt-5">
+                                <h3 className="display-tight text-xl text-pub-onink">{hub.name}</h3>
+                                <p className="data-label mt-2 text-pub-laterite-soft">{hub.role}</p>
+                                <p className="mt-3 text-[15px] leading-relaxed text-pub-onink-soft">{hub.note}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section id="faq" className="bg-pub-paper px-5 py-20 sm:py-28">
+                <div className="mx-auto max-w-3xl">
+                    <SectionHead eyebrow={FAQ.eyebrow} headline={FAQ.headline} className="mb-12" />
+                    <dl>
+                        {FAQ.items.map((item) => (
+                            <div key={item.q} className="border-t border-pub-onpaper/15 py-7">
+                                <dt className="display-tight text-lg text-pub-onpaper">{item.q}</dt>
+                                <dd className="mt-2.5 text-[15px] leading-relaxed text-pub-onpaper-soft">{item.a}</dd>
+                            </div>
+                        ))}
+                    </dl>
+                </div>
+            </section>
+
+            <section id="about" className="bg-pub-paper2 px-5 py-20 sm:py-28">
+                <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[0.85fr_1fr] lg:gap-20">
+                    <SectionHead eyebrow={ABOUT.eyebrow} headline={ABOUT.headline} />
+                    <div className="space-y-5">
+                        {ABOUT.body.map((paragraph) => (
+                            <p key={paragraph.slice(0, 24)} className="text-lg leading-relaxed text-pub-onpaper-soft">{paragraph}</p>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             <section id="contact" className="bg-pub-paper px-5 py-20 sm:py-28">
                 <div className="mx-auto grid max-w-5xl gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
                     <div>
-                        <p className="data-label mb-5 text-pub-laterite">Talk to us</p>
-                        <h2 className="display-wide text-[clamp(2rem,4.5vw,3rem)] text-pub-onpaper">
-                            Moving something regularly?
-                        </h2>
-                        <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-pub-onpaper-soft">
-                            Standing routes and bulk lanes are priced per business rather than per
-                            drop. Tell us the shape of it and we&apos;ll come back with a number.
-                        </p>
-                        <p className="data-label mt-8 text-pub-onpaper-soft">Gikondo Industrial Zone · Kigali</p>
+                        <SectionHead eyebrow={CONTACT.eyebrow} headline={CONTACT.headline} />
+                        <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-pub-onpaper-soft">{CONTACT.body}</p>
+                        <p className="data-label mt-8 text-pub-onpaper-soft">{CONTACT.address}</p>
                     </div>
                     <ContactForm />
                 </div>
