@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { sendContactMessage } from './publicApi';
 import { HeroRoute } from './HeroRoute';
-import { HERO, PROOF, SERVICES, JOURNEY, SAFETY, DELIVERY, BUSINESS, COVERAGE, FAQ, ABOUT, CONTACT } from './content';
+import { HERO, SERVICES, JOURNEY, CONTACT } from './content';
 
 // Copy lives in content.ts. This file is layout only, so the writing can
 // be read and edited as writing.
@@ -120,20 +120,6 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 </div>
             </section>
 
-            {/* Three mechanisms, not three adjectives. Sits on the fold
-                between road and paperwork, so it takes the raised ink. */}
-            <section className="bg-pub-ink2 px-5 py-14">
-                <dl className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-3">
-                    {PROOF.map((item) => (
-                        <div key={item.label} className="border-t border-pub-onink/15 pt-5">
-                            <dt className="display-tight text-2xl text-pub-onink">{item.stat}</dt>
-                            <p className="data-label mt-2 text-pub-laterite-soft">{item.label}</p>
-                            <dd className="mt-3 text-[15px] leading-relaxed text-pub-onink-soft">{item.body}</dd>
-                        </div>
-                    ))}
-                </dl>
-            </section>
-
             {/* ── THE PAPERWORK ────────────────────────────────────────── */}
             <section id="services" className="bg-pub-paper px-5 py-20 sm:py-28">
                 <div className="mx-auto max-w-6xl">
@@ -171,95 +157,6 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             </li>
                         ))}
                     </ol>
-                </div>
-            </section>
-
-            {/* ── BACK TO THE ROAD: this is about drivers and vehicles ─── */}
-            <section id="safety" className="bg-pub-ink px-5 py-20 sm:py-28">
-                <div className="mx-auto max-w-6xl">
-                    <div className="mb-14 max-w-2xl">
-                        <SectionHead eyebrow={SAFETY.eyebrow} headline={SAFETY.headline} onPaper={false} />
-                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{SAFETY.body}</p>
-                    </div>
-                    <div className="grid gap-x-14 gap-y-11 sm:grid-cols-2">
-                        {SAFETY.columns.map((column) => (
-                            <article key={column.title} className="border-t border-pub-onink/15 pt-5">
-                                <h3 className="display-tight text-lg text-pub-onink">{column.title}</h3>
-                                <p className="mt-2.5 text-[15px] leading-relaxed text-pub-onink-soft">{column.body}</p>
-                            </article>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            <section className="bg-pub-paper px-5 py-20 sm:py-28">
-                <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[0.85fr_1fr] lg:gap-20">
-                    <SectionHead eyebrow={DELIVERY.eyebrow} headline={DELIVERY.headline} />
-                    <p className="text-lg leading-relaxed text-pub-onpaper-soft">{DELIVERY.body}</p>
-                </div>
-            </section>
-
-            <section id="business" className="bg-pub-paper2 px-5 py-20 sm:py-28">
-                <div className="mx-auto max-w-5xl">
-                    <div className="mb-12 max-w-2xl">
-                        <SectionHead eyebrow={BUSINESS.eyebrow} headline={BUSINESS.headline} />
-                        <p className="mt-6 text-lg leading-relaxed text-pub-onpaper-soft">{BUSINESS.body}</p>
-                    </div>
-                    <div className="grid gap-x-12 gap-y-8 sm:grid-cols-3">
-                        {BUSINESS.points.map((point) => (
-                            <div key={point.title} className="border-t border-pub-onpaper/15 pt-5">
-                                <h3 className="display-tight text-base text-pub-onpaper">{point.title}</h3>
-                                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{point.body}</p>
-                            </div>
-                        ))}
-                    </div>
-                    <button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
-                        className="mt-11 bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite">
-                        Ask about a standing route
-                    </button>
-                </div>
-            </section>
-
-            <section id="coverage" className="bg-pub-ink px-5 py-20 sm:py-28">
-                <div className="mx-auto max-w-5xl">
-                    <div className="mb-12 max-w-2xl">
-                        <SectionHead eyebrow={COVERAGE.eyebrow} headline={COVERAGE.headline} onPaper={false} />
-                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{COVERAGE.body}</p>
-                    </div>
-                    <div className="grid gap-x-12 gap-y-9 sm:grid-cols-3">
-                        {COVERAGE.hubs.map((hub) => (
-                            <div key={hub.name} className="border-t border-pub-onink/15 pt-5">
-                                <h3 className="display-tight text-xl text-pub-onink">{hub.name}</h3>
-                                <p className="data-label mt-2 text-pub-laterite-soft">{hub.role}</p>
-                                <p className="mt-3 text-[15px] leading-relaxed text-pub-onink-soft">{hub.note}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </section>
-
-            <section id="faq" className="bg-pub-paper px-5 py-20 sm:py-28">
-                <div className="mx-auto max-w-3xl">
-                    <SectionHead eyebrow={FAQ.eyebrow} headline={FAQ.headline} className="mb-12" />
-                    <dl>
-                        {FAQ.items.map((item) => (
-                            <div key={item.q} className="border-t border-pub-onpaper/15 py-7">
-                                <dt className="display-tight text-lg text-pub-onpaper">{item.q}</dt>
-                                <dd className="mt-2.5 text-[15px] leading-relaxed text-pub-onpaper-soft">{item.a}</dd>
-                            </div>
-                        ))}
-                    </dl>
-                </div>
-            </section>
-
-            <section id="about" className="bg-pub-paper2 px-5 py-20 sm:py-28">
-                <div className="mx-auto grid max-w-5xl gap-12 lg:grid-cols-[0.85fr_1fr] lg:gap-20">
-                    <SectionHead eyebrow={ABOUT.eyebrow} headline={ABOUT.headline} />
-                    <div className="space-y-5">
-                        {ABOUT.body.map((paragraph) => (
-                            <p key={paragraph.slice(0, 24)} className="text-lg leading-relaxed text-pub-onpaper-soft">{paragraph}</p>
-                        ))}
-                    </div>
                 </div>
             </section>
 

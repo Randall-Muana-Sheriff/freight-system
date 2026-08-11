@@ -6,9 +6,7 @@ import { InziraMark } from './InziraMark';
 const SECTIONS = [
     { id: 'services', label: 'What we move' },
     { id: 'how', label: 'How it works' },
-    { id: 'safety', label: 'Safety' },
-    { id: 'business', label: 'For business' },
-    { id: 'faq', label: 'Questions' },
+    { id: 'contact', label: 'Talk to us' },
 ];
 
 function scrollToSection(id: string) {
