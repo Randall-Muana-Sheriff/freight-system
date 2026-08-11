@@ -16,6 +16,7 @@
     "build:info": "node bin/write-build-info.js",
     "db:migrate:down": "node bin/migrate-down.js",
     "backup:db": "node ops/backup-db.js",
+    "backup:offsite": "node ops/upload-backup-offsite.js",
     "restore:db": "node ops/restore-db.js",
     "backup:verify": "node ops/verify-backup.js",
     "backup:prune": "node ops/prune-backups.js",
