@@ -1,0 +1,235 @@
+package __PACKAGE__
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.os.Build
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.google.android.gms.location.CurrentLocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+
+// Replaces expo-location's background task for Android telemetry.
+//
+// Everything that proved unreliable lives in
+// Location.startLocationUpdatesAsync()'s dependence on
+// FusedLocationProviderClient to decide *when* to invoke our callback: on
+// some devices it silently never does — sometimes the periodic
+// registration is never created at the OS level at all (confirmed via
+// `adb shell dumpsys location`), with no error observable from JS while
+// the app's own diagnostics still read "Active". Across hours of testing
+// that path produced anything from clean 18-minute runs to total silence,
+// unpredictably, in both dev-client and standalone release builds.
+//
+// A direct one-shot getCurrentLocation() succeeded in every condition
+// tried. This service does exactly that on its own explicit Handler
+// timer, inside a real foreground service, so nothing about delivery
+// depends on the OS scheduling a callback for us — and it keeps running
+// with the app closed, which the JS-side foreground watchdog cannot.
+class LocationForegroundService : Service() {
+    companion object {
+        private const val TAG = "InziraLocationSvc"
+        private const val CHANNEL_ID = "inzira_location_channel"
+        private const val NOTIFICATION_ID = 8821
+        private const val INTERVAL_MS = 15_000L
+        // Matches lib/locationTracking.ts's own deadband: phone GPS speed
+        // jitter routinely reads a few km/h even when parked.
+        private const val STATIONARY_SPEED_DEADBAND_KMH = 5.0
+
+        const val PREFS_NAME = "inzira_native_location"
+        const val KEY_API_BASE = "apiBase"
+        const val KEY_ACCESS_TOKEN = "accessToken"
+        const val KEY_REFRESH_TOKEN = "refreshToken"
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private var running = false
+    private lateinit var prefs: SharedPreferences
+
+    // Guards the native-side refresh: two overlapping ticks both hitting a
+    // 401 must not each rotate the same single-use refresh token, leaving
+    // one holding a value that can never work again. Mirrors the
+    // single-flight guard tokenStore.ts uses on the JS side.
+    private val refreshLock = Object()
+    private var refreshInFlight = false
+
+    private val tickRunnable = object : Runnable {
+        override fun run() {
+            if (!running) return
+            postCurrentLocation()
+            handler.postDelayed(this, INTERVAL_MS)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        createNotificationChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        startForeground(NOTIFICATION_ID, buildNotification())
+        if (!running) {
+            running = true
+            handler.post(tickRunnable)
+        }
+        // START_STICKY: if Android kills us under memory pressure mid-shift,
+        // it should bring the service back rather than leaving dispatch
+        // blind until the driver next opens the app.
+        return START_STICKY
+    }
+
+    override fun onDestroy() {
+        running = false
+        handler.removeCallbacks(tickRunnable)
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Location sharing",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            channel.description = "Shown while your location is being shared with dispatch."
+            getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Inzira Driver")
+            .setContentText("Sharing your location with dispatch during your active shift.")
+            .setSmallIcon(applicationInfo.icon)
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun postCurrentLocation() {
+        val apiBase = prefs.getString(KEY_API_BASE, null) ?: return
+        val accessToken = prefs.getString(KEY_ACCESS_TOKEN, null) ?: return
+
+        // Balanced, not High — same reasoning as the JS implementation:
+        // a continuous poll should blend GPS with network positioning so it
+        // degrades gracefully indoors rather than waiting on a satellite
+        // fix that may never arrive.
+        val request = CurrentLocationRequest.Builder()
+            .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
+            .setMaxUpdateAgeMillis(20_000L)
+            .build()
+
+        try {
+            LocationServices.getFusedLocationProviderClient(this)
+                .getCurrentLocation(request, null)
+                .addOnSuccessListener { location ->
+                    if (location == null) {
+                        Log.w(TAG, "No location fix available this tick")
+                        return@addOnSuccessListener
+                    }
+                    sendTelemetry(apiBase, accessToken, location.latitude, location.longitude, location.speed)
+                }
+                .addOnFailureListener { e -> Log.w(TAG, "getCurrentLocation failed: ${e.message}") }
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Missing location permission: ${e.message}")
+        }
+    }
+
+    private fun sendTelemetry(apiBase: String, token: String, lat: Double, lng: Double, speedMps: Float) {
+        Thread {
+            try {
+                val speedKmh = speedMps * 3.6
+                val body = JSONObject().apply {
+                    put("lat", lat)
+                    put("lng", lng)
+                    put("speedKmh", if (speedKmh < STATIONARY_SPEED_DEADBAND_KMH) 0.0 else speedKmh)
+                }
+                val status = postJson("$apiBase/api/fleet/telemetry", token, body)
+                // The backend returns 403 (not 401) for an expired JWT.
+                if (status == 401 || status == 403) {
+                    refreshTokenSynchronized(apiBase)?.let { fresh ->
+                        postJson("$apiBase/api/fleet/telemetry", fresh, body)
+                    }
+                }
+            } catch (e: Exception) {
+                // Offline: this ping is dropped rather than queued, the same
+                // tradeoff the JS task makes — another follows in 15s.
+                Log.w(TAG, "Telemetry post failed: ${e.message}")
+            }
+        }.start()
+    }
+
+    private fun postJson(urlString: String, token: String, body: JSONObject): Int {
+        val conn = URL(urlString).openConnection() as HttpURLConnection
+        return try {
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.setRequestProperty("Authorization", "Bearer $token")
+            conn.doOutput = true
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.outputStream.use { it.write(body.toString().toByteArray()) }
+            conn.responseCode
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun refreshTokenSynchronized(apiBase: String): String? {
+        synchronized(refreshLock) {
+            if (refreshInFlight) {
+                // Another thread is already refreshing — use whatever token
+                // it has stored rather than rotating a second time.
+                return prefs.getString(KEY_ACCESS_TOKEN, null)
+            }
+            refreshInFlight = true
+        }
+        return try {
+            performRefresh(apiBase)
+        } finally {
+            synchronized(refreshLock) { refreshInFlight = false }
+        }
+    }
+
+    private fun performRefresh(apiBase: String): String? {
+        val refreshToken = prefs.getString(KEY_REFRESH_TOKEN, null) ?: return null
+        val conn = URL("$apiBase/api/auth/refresh").openConnection() as HttpURLConnection
+        return try {
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.doOutput = true
+            conn.connectTimeout = 10_000
+            conn.readTimeout = 10_000
+            conn.outputStream.use {
+                it.write(JSONObject().put("refreshToken", refreshToken).toString().toByteArray())
+            }
+            if (conn.responseCode != 200) return null
+
+            val data = JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).getJSONObject("data")
+            val newAccess = data.getString("token")
+            prefs.edit()
+                .putString(KEY_ACCESS_TOKEN, newAccess)
+                .putString(KEY_REFRESH_TOKEN, data.getString("refreshToken"))
+                .apply()
+            newAccess
+        } catch (e: Exception) {
+            Log.w(TAG, "Native token refresh failed: ${e.message}")
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+}

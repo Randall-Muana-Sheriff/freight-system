@@ -5,6 +5,7 @@ import { setDriverPin, loginDriverPin, logoutDriver, API_BASE, type DriverAuthTo
 import { flushOfflineQueue, getOfflineQueueCount } from './offlineQueue';
 import { registerPushTokenWithBackend } from './pushNotifications';
 import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from './locationTracking';
+import { updateNativeLocationServiceToken } from './nativeLocationService';
 import {
   hydrateTokenStore,
   setTokens as persistTokens,
@@ -137,6 +138,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // rather than leaving the UI in a half-authenticated limbo state.
         stopBackgroundLocationTracking();
         setPendingSyncCount(0);
+      } else if (tokens.refreshToken) {
+        // Hand the rotated pair to the native location service so it keeps
+        // authenticating without having to run its own refresh — two
+        // independent refreshers contending for the same single-use
+        // refresh token is exactly the race to avoid.
+        updateNativeLocationServiceToken(tokens.token, tokens.refreshToken);
       }
     });
     return unsubscribe;

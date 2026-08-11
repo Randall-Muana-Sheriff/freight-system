@@ -4,7 +4,12 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE } from './api';
-import { refreshAccessToken, AUTH_TOKEN_KEY } from './tokenStore';
+import { refreshAccessToken, AUTH_TOKEN_KEY, getCachedTokens } from './tokenStore';
+import {
+  isNativeLocationServiceAvailable,
+  startNativeLocationService,
+  stopNativeLocationService,
+} from './nativeLocationService';
 
 export const LOCATION_TASK_NAME = 'kigali-freight-driver-background-location';
 
@@ -134,6 +139,18 @@ export async function startBackgroundLocationTracking() {
   }
 
   await attemptStartLocationUpdates();
+
+  // Android only: start the native foreground service alongside the
+  // expo-location task. It is the reliable path — the task above is kept
+  // because it is what iOS uses, and on Android it costs nothing when it
+  // does fire. Both post to the same endpoint; the combined worst case is
+  // well inside the telemetry rate limit.
+  if (isNativeLocationServiceAvailable) {
+    const { token, refreshToken } = getCachedTokens();
+    if (token && refreshToken) {
+      await startNativeLocationService(API_BASE, token, refreshToken);
+    }
+  }
 }
 
 // Seen in practice on a freshly-installed app AND on a cold launch right
@@ -176,6 +193,11 @@ async function attemptStartLocationUpdates(retriesLeft = 2): Promise<void> {
 }
 
 export async function stopBackgroundLocationTracking() {
+  // Unconditionally — and first. The native service must stop even when
+  // the expo-location task was never running (the early return below), or
+  // ending a shift would leave it reporting a driver who has clocked off.
+  await stopNativeLocationService();
+
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
   if (!alreadyStarted) return;
   try {

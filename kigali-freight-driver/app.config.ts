@@ -81,6 +81,10 @@ const config: ExpoConfig = {
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
   },
   plugins: [
+    // Injects the native Android foreground-location service (see
+    // plugins/withNativeLocationService.js). Must be a plugin, not files
+    // under android/, because prebuild regenerates that directory.
+    './plugins/withNativeLocationService',
     'expo-secure-store',
     'expo-router',
     'expo-asset',
