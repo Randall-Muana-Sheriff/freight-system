@@ -79,7 +79,7 @@ export default function AppLayout() {
             borderTopColor: theme.colors.border,
             borderWidth: 0,
           },
-          tabBarLabelStyle: { fontSize: 11, fontFamily: theme.fonts.bodySemiBold },
+          tabBarLabelStyle: { ...theme.type.micro, fontFamily: theme.fonts.bodySemiBold },
           tabBarItemStyle: { paddingTop: 0 },
         }}
       >

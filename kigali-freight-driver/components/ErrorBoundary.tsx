@@ -61,12 +61,12 @@ const styles = StyleSheet.create({
     title: {
         color: theme.colors.text,
         fontFamily: theme.fonts.heading,
-        fontSize: 18,
+        ...theme.type.title,
     },
     message: {
         color: theme.colors.muted,
         fontFamily: theme.fonts.body,
-        fontSize: 14,
+        ...theme.type.bodySm,
         textAlign: 'center',
     },
     button: {
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
         marginTop: 16,
         color: theme.colors.muted,
         fontFamily: theme.fonts.mono,
-        fontSize: 11,
+        ...theme.type.micro,
         textAlign: 'center',
     },
 });

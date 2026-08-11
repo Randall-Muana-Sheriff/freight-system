@@ -143,14 +143,14 @@ export default function AssignmentsScreen() {
 
 const styles = StyleSheet.create({
   loaderWrap: { alignItems: 'center', gap: 10, paddingVertical: 40 },
-  loaderText: { color: theme.colors.muted, fontSize: 13, fontFamily: theme.fonts.body },
+  loaderText: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   errorState: {
     alignItems: 'center',
     gap: 8,
     paddingVertical: 40,
   },
-  errorTitle: { color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
-  errorText: { color: theme.colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 18, fontFamily: theme.fonts.body },
+  errorTitle: { color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
+  errorText: { color: theme.colors.muted, ...theme.type.bodySm, textAlign: 'center', fontFamily: theme.fonts.body },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,18 +161,18 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     backgroundColor: theme.colors.danger,
   },
-  retryText: { color: theme.colors.ink, fontSize: 12, fontFamily: theme.fonts.bodySemiBold },
+  retryText: { color: theme.colors.ink, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
   emptyState: {
     alignItems: 'center',
     gap: 8,
     paddingVertical: 48,
   },
-  emptyTitle: { color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
-  emptyText: { color: theme.colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 18, maxWidth: 240, fontFamily: theme.fonts.body },
+  emptyTitle: { color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
+  emptyText: { color: theme.colors.muted, ...theme.type.bodySm, textAlign: 'center', maxWidth: 240, fontFamily: theme.fonts.body },
   group: { marginBottom: 28 },
   groupLabel: {
     color: theme.colors.muted,
-    fontSize: 11,
+    ...theme.type.micro,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginBottom: 6,

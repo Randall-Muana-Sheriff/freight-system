@@ -89,5 +89,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  skip: { color: theme.colors.muted, fontSize: 13, fontFamily: theme.fonts.bodyMedium },
+  skip: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.bodyMedium },
 });

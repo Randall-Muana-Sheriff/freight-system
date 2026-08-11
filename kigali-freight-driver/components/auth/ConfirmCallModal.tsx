@@ -75,8 +75,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  title: { color: theme.colors.text, fontSize: 17, fontFamily: theme.fonts.headingBlack },
-  phone: { color: theme.colors.muted, fontSize: 14, fontFamily: theme.fonts.mono, marginBottom: 18 },
+  title: { color: theme.colors.text, ...theme.type.heading, fontFamily: theme.fonts.headingBlack },
+  phone: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.mono, marginBottom: 18 },
   row: { flexDirection: 'row', gap: 10, width: '100%' },
   button: {
     flex: 1,
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   cancelButton: { backgroundColor: theme.colors.surface3, borderWidth: 1, borderColor: theme.colors.border },
-  cancelText: { color: theme.colors.text, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  cancelText: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   callButton: { backgroundColor: theme.colors.primary },
-  callText: { color: theme.colors.ink, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  callText: { color: theme.colors.ink, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
 });

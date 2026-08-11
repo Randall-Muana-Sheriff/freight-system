@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tagDot: { width: 6, height: 6, borderRadius: 99, backgroundColor: theme.colors.primary },
-  tag: { color: theme.colors.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: theme.fonts.mono },
-  title: { color: theme.colors.text, fontSize: 21, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.2 },
-  subtitle: { color: theme.colors.muted, fontSize: 13, marginTop: 5, lineHeight: 18, fontFamily: theme.fonts.body },
+  tag: { color: theme.colors.muted, ...theme.type.micro, textTransform: 'uppercase', letterSpacing: 1.4, fontFamily: theme.fonts.mono },
+  title: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.2 },
+  subtitle: { color: theme.colors.muted, ...theme.type.bodySm, marginTop: 5, fontFamily: theme.fonts.body },
 });

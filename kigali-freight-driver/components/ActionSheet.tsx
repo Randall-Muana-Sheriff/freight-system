@@ -83,8 +83,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 18,
   },
-  title: { color: theme.colors.text, fontSize: 17, fontFamily: theme.fonts.heading, textAlign: 'center' },
-  message: { color: theme.colors.muted, fontSize: 13, fontFamily: theme.fonts.body, textAlign: 'center', marginTop: 6, lineHeight: 18 },
+  title: { color: theme.colors.text, ...theme.type.heading, fontFamily: theme.fonts.heading, textAlign: 'center' },
+  message: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   options: { marginTop: 18 },
   optionRow: {
     flexDirection: 'row',
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionLabel: { flex: 1, color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  optionLabel: { flex: 1, color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
   cancelButton: {
     marginTop: 14,
     paddingVertical: 14,
@@ -112,5 +112,5 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     alignItems: 'center',
   },
-  cancelText: { color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  cancelText: { color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
 });

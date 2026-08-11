@@ -254,6 +254,14 @@ export default function DashboardScreen() {
           activeOpacity={0.9}
           onPress={onToggleShift}
           disabled={shiftBusy || onShift === null}
+          accessibilityRole="button"
+          accessibilityLabel={onShift ? 'End shift' : 'Start shift'}
+          accessibilityHint={
+            onShift
+              ? 'Stops sharing your location with dispatch'
+              : 'Starts sharing your location so dispatch can assign you jobs'
+          }
+          accessibilityState={{ disabled: shiftBusy || onShift === null, busy: shiftBusy }}
         >
           <Ionicons name={onShift ? 'stop-circle-outline' : 'play-circle-outline'} size={17} color={theme.colors.ink} />
           <Text style={styles.shiftButtonText}>{onShift ? 'End shift' : 'Start shift'}</Text>
@@ -268,6 +276,8 @@ export default function DashboardScreen() {
             style={styles.quickTile}
             activeOpacity={0.8}
             onPress={() => router.push(action.href)}
+            accessibilityRole="button"
+            accessibilityLabel={`${action.label}. ${action.detail}`}
           >
             <View style={[styles.quickIconWrap, { backgroundColor: `${action.color}1F` }]}>
               <Ionicons name={action.icon} size={18} color={action.color} />
@@ -286,13 +296,13 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 24, marginTop: 4 },
   headerTextWrap: { flex: 1 },
-  greeting: { color: theme.colors.muted, fontSize: 13, fontFamily: theme.fonts.bodyMedium },
+  greeting: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.bodyMedium },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-  name: { color: theme.colors.text, fontSize: 26, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.4, flexShrink: 1 },
+  name: { color: theme.colors.text, ...theme.type.display, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.4, flexShrink: 1 },
   shiftChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.pill, borderWidth: 1, marginTop: 4 },
   shiftChipOn: { backgroundColor: `${theme.colors.primary}1A`, borderColor: `${theme.colors.primary}55` },
   shiftChipOff: { backgroundColor: theme.colors.panelSoft, borderColor: theme.colors.border },
-  shiftChipText: { fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.8 },
+  shiftChipText: { ...theme.type.micro, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.8 },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -303,8 +313,8 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   noticeRail: { width: 3, height: 28, borderRadius: 2 },
-  noticeTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
-  noticeDetail: { color: theme.colors.muted, fontSize: 11, lineHeight: 15, marginTop: 2, fontFamily: theme.fonts.body },
+  noticeTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  noticeDetail: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
   shiftCard: {
     backgroundColor: theme.colors.surface2,
     borderRadius: theme.radius.xl,
@@ -316,18 +326,18 @@ const styles = StyleSheet.create({
   shiftCardOn: { borderColor: theme.colors.primary },
   shiftEyebrow: {
     color: theme.colors.muted,
-    fontSize: 11,
+    ...theme.type.micro,
     fontFamily: theme.fonts.mono,
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
-  shiftTitle: { color: theme.colors.text, fontSize: 21, fontFamily: theme.fonts.headingBlack, marginTop: 8, letterSpacing: -0.3 },
-  shiftSubtitle: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, marginTop: 6, fontFamily: theme.fonts.body },
+  shiftTitle: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.headingBlack, marginTop: 8, letterSpacing: -0.3 },
+  shiftSubtitle: { color: theme.colors.muted, ...theme.type.bodySm, marginTop: 6, fontFamily: theme.fonts.body },
   statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 20 },
   statCell: { flex: 1 },
   statDivider: { width: 1, height: 30, backgroundColor: theme.colors.border, marginHorizontal: 12 },
-  statLabel: { color: theme.colors.muted, fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.6 },
-  statValue: { color: theme.colors.text, fontSize: 20, fontFamily: theme.fonts.headingBlack, marginTop: 4, fontVariant: ['tabular-nums'] },
+  statLabel: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.6 },
+  statValue: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.headingBlack, marginTop: 4, fontVariant: ['tabular-nums'] },
   shiftButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -338,10 +348,10 @@ const styles = StyleSheet.create({
   },
   shiftButtonStart: { backgroundColor: theme.colors.primary },
   shiftButtonEnd: { backgroundColor: theme.colors.danger },
-  shiftButtonText: { color: theme.colors.ink, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  shiftButtonText: { color: theme.colors.ink, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   quickLabel: {
     color: theme.colors.muted,
-    fontSize: 11,
+    ...theme.type.micro,
     fontFamily: theme.fonts.mono,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -357,6 +367,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   quickIconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  quickLabelText: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
-  quickDetailText: { color: theme.colors.muted, fontSize: 11, marginTop: 2, fontFamily: theme.fonts.body },
+  quickLabelText: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  quickDetailText: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
 });

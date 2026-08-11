@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   textColumn: { flex: 1, gap: 4 },
-  message: { color: theme.colors.text, fontSize: 13, lineHeight: 18, fontFamily: theme.fonts.body },
+  message: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  note: { flex: 1, color: theme.colors.accent, fontSize: 11.5, lineHeight: 15, fontFamily: theme.fonts.body },
+  note: { flex: 1, color: theme.colors.accent, ...theme.type.label, fontFamily: theme.fonts.body },
 });

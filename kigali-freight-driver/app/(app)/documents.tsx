@@ -236,7 +236,7 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  errorText: { color: theme.colors.danger, fontSize: 13, marginBottom: 12, fontFamily: theme.fonts.body },
+  errorText: { color: theme.colors.danger, ...theme.type.bodySm, marginBottom: 12, fontFamily: theme.fonts.body },
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -247,8 +247,8 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   summaryRail: { width: 3, height: 32, borderRadius: 2 },
-  summaryTitle: { fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
-  summaryDetail: { color: theme.colors.muted, fontSize: 12, lineHeight: 17, marginTop: 3, fontFamily: theme.fonts.body },
+  summaryTitle: { ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
+  summaryDetail: { color: theme.colors.muted, ...theme.type.label, lineHeight: 17, marginTop: 3, fontFamily: theme.fonts.body },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -265,10 +265,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  docLabel: { color: theme.colors.text, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  docLabel: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   docStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  docStatusText: { fontSize: 11, fontFamily: theme.fonts.mono },
-  rejectionText: { color: theme.colors.danger, fontSize: 11, marginTop: 3, lineHeight: 15, fontFamily: theme.fonts.body },
+  docStatusText: { ...theme.type.micro, fontFamily: theme.fonts.mono },
+  rejectionText: { color: theme.colors.danger, ...theme.type.micro, marginTop: 3, fontFamily: theme.fonts.body },
   uploadButton: {
     paddingHorizontal: 12,
     paddingVertical: 9,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     minWidth: 72,
     alignItems: 'center',
   },
-  uploadButtonText: { color: theme.colors.primary, fontSize: 11, fontFamily: theme.fonts.bodySemiBold },
+  uploadButtonText: { color: theme.colors.primary, ...theme.type.micro, fontFamily: theme.fonts.bodySemiBold },
   secondary: {
     marginTop: 20,
     flexDirection: 'row',
@@ -287,5 +287,5 @@ const styles = StyleSheet.create({
     gap: 8,
     alignSelf: 'flex-start',
   },
-  secondaryText: { color: theme.colors.primary, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  secondaryText: { color: theme.colors.primary, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
 });

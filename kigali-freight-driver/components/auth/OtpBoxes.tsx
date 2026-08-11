@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   boxActive: { borderColor: theme.colors.primary },
   boxFilled: { borderColor: theme.colors.primary },
   boxError: { borderColor: theme.colors.danger },
-  boxText: { color: theme.colors.text, fontSize: 20, fontFamily: theme.fonts.bodySemiBold, textAlign: 'center' },
+  boxText: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.bodySemiBold, textAlign: 'center' },
   progressTrack: {
     height: 3,
     borderRadius: 2,

@@ -63,7 +63,7 @@ function StartOverFooter({ children, onStartOver }: { children?: ReactNode; onSt
     <View style={{ gap: 12, alignItems: 'center' }}>
       {children}
       <TouchableOpacity onPress={onStartOver} hitSlop={8}>
-        <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Start over</Text>
+        <Text style={{ color: theme.colors.muted, ...theme.type.label }}>Start over</Text>
       </TouchableOpacity>
     </View>
   );
@@ -276,7 +276,7 @@ export function AuthFlow() {
           onDismissToast={() => setToast(null)}
           footer={
             deviceSeenBefore ? undefined : (
-              <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 17 }}>
+              <Text style={{ color: theme.colors.muted, ...theme.type.label, textAlign: 'center', lineHeight: 17 }}>
                 Your number needs to already be registered with dispatch — contact them if you&apos;re not set up yet.
               </Text>
             )
@@ -308,7 +308,7 @@ export function AuthFlow() {
           footer={
             <StartOverFooter onStartOver={resetFlow}>
               <TouchableOpacity onPress={onResend} hitSlop={8} disabled={resent}>
-                <Text style={{ color: theme.colors.muted, fontSize: 13 }}>
+                <Text style={{ color: theme.colors.muted, ...theme.type.bodySm }}>
                   {resent ? (
                     <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Code resent ✓</Text>
                   ) : (
@@ -335,7 +335,7 @@ export function AuthFlow() {
           onDismissToast={() => setToast(null)}
           footer={
             <StartOverFooter onStartOver={resetFlow}>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'center' }}>
+              <Text style={{ color: theme.colors.muted, ...theme.type.label, textAlign: 'center' }}>
                 Don&apos;t have a code? Contact your dispatcher.{'\n'}Codes expire after 48 hours.
               </Text>
             </StartOverFooter>
@@ -398,7 +398,7 @@ export function AuthFlow() {
             onDismissToast={() => setToast(null)}
             footer={
               <StartOverFooter onStartOver={resetFlow}>
-                <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
+                <Text style={{ color: theme.colors.muted, ...theme.type.label }}>
                   Forgot your PIN?{' '}
                   {dispatchPhone ? (
                     <Text

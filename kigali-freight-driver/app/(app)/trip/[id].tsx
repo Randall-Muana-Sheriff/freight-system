@@ -268,6 +268,12 @@ export default function TripDetailScreen() {
                 activeOpacity={order.recipient_phone ? 0.7 : 1}
                 disabled={!order.recipient_phone}
                 onPress={() => order.recipient_phone && Linking.openURL(`tel:${order.recipient_phone}`)}
+                accessibilityRole={order.recipient_phone ? 'button' : 'text'}
+                accessibilityLabel={
+                  order.recipient_phone
+                    ? `Call recipient ${order.recipient_name ?? ''} on ${order.recipient_phone}`
+                    : `Recipient ${order.recipient_name ?? 'not provided'}`
+                }
               >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.label}>Recipient</Text>
@@ -344,6 +350,12 @@ export default function TripDetailScreen() {
                 style={[styles.button, nextAction === 'DELIVERED' && styles.buttonDelivered, isUpdating && styles.buttonDisabled]}
                 activeOpacity={0.9}
                 disabled={isUpdating}
+                accessibilityRole="button"
+                accessibilityLabel={ACTION_STEPS[nextAction].label}
+                accessibilityHint={ACTION_STEPS[nextAction].helper}
+                // While updating the label is replaced by a spinner, which
+                // announces as nothing at all without an explicit busy state.
+                accessibilityState={{ disabled: isUpdating, busy: isUpdating }}
               >
                 {isUpdating ? (
                   <ActivityIndicator color={theme.colors.paper} size="small" />
@@ -392,26 +404,26 @@ export default function TripDetailScreen() {
 const styles = StyleSheet.create({
   errorText: {
     color: theme.colors.danger,
-    fontSize: 13,
+    ...theme.type.bodySm,
     marginBottom: 12,
     fontFamily: theme.fonts.body,
   },
   divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 18 },
   manifestCodeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  manifestCode: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.mono, letterSpacing: 0.6 },
-  status: { color: theme.colors.primary, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: theme.fonts.mono },
+  manifestCode: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.mono, letterSpacing: 0.6 },
+  status: { color: theme.colors.primary, ...theme.type.micro, textTransform: 'uppercase', letterSpacing: 0.8, fontFamily: theme.fonts.mono },
   summaryRow: { flexDirection: 'row', gap: 20, flexWrap: 'wrap', marginTop: 14 },
   summaryItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  summaryText: { color: theme.colors.text, fontSize: 12, fontFamily: theme.fonts.bodySemiBold },
+  summaryText: { color: theme.colors.text, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
   infoBlock: { flex: 1 },
-  label: { color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, fontSize: 11, fontFamily: theme.fonts.mono },
-  value: { color: theme.colors.text, marginTop: 6, fontSize: 18, fontFamily: theme.fonts.heading },
+  label: { color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, ...theme.type.micro, fontFamily: theme.fonts.mono },
+  value: { color: theme.colors.text, marginTop: 6, ...theme.type.title, fontFamily: theme.fonts.heading },
   recipientRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  recipientPhone: { color: theme.colors.muted, marginTop: 2, fontSize: 13, fontFamily: theme.fonts.mono },
+  recipientPhone: { color: theme.colors.muted, marginTop: 2, ...theme.type.bodySm, fontFamily: theme.fonts.mono },
   callBadge: {
     width: 40,
     height: 40,
@@ -428,7 +440,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: theme.colors.primary, borderRadius: 3 },
-  progressCaption: { color: theme.colors.muted, fontSize: 12, marginTop: 8, fontFamily: theme.fonts.mono },
+  progressCaption: { color: theme.colors.muted, ...theme.type.label, marginTop: 8, fontFamily: theme.fonts.mono },
   timeline: { gap: 10 },
   timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   dot: {
@@ -443,20 +455,20 @@ const styles = StyleSheet.create({
   dotDone: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
   dotActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   timelineLabelWrap: { gap: 2 },
-  timelineText: { color: theme.colors.muted, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
+  timelineText: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   timelineTextActive: { color: theme.colors.text },
-  timelineSub: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.body },
+  timelineSub: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.body },
   nextStep: { gap: 14 },
   nextStepEyebrow: {
     color: theme.colors.muted,
-    fontSize: 11,
+    ...theme.type.micro,
     textTransform: 'uppercase',
     letterSpacing: 1,
     fontFamily: theme.fonts.mono,
   },
   nextStepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  nextStepTitle: { color: theme.colors.text, fontSize: 16, fontFamily: theme.fonts.bodySemiBold },
-  nextStepHelper: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, marginTop: 3, fontFamily: theme.fonts.body },
+  nextStepTitle: { color: theme.colors.text, ...theme.type.heading, fontFamily: theme.fonts.bodySemiBold },
+  nextStepHelper: { color: theme.colors.muted, ...theme.type.bodySm, marginTop: 3, fontFamily: theme.fonts.body },
   button: {
     flexDirection: 'row',
     gap: 8,
@@ -468,14 +480,14 @@ const styles = StyleSheet.create({
   },
   buttonDelivered: { backgroundColor: theme.colors.success },
   buttonDisabled: { opacity: 0.7 },
-  buttonText: { color: theme.colors.ink, fontFamily: theme.fonts.bodySemiBold, fontSize: 13 },
+  buttonText: { color: theme.colors.ink, fontFamily: theme.fonts.bodySemiBold, ...theme.type.bodySm },
   doneRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  doneTitle: { color: theme.colors.text, fontSize: 16, fontFamily: theme.fonts.bodySemiBold },
-  doneHelper: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, marginTop: 3, fontFamily: theme.fonts.body },
+  doneTitle: { color: theme.colors.text, ...theme.type.heading, fontFamily: theme.fonts.bodySemiBold },
+  doneHelper: { color: theme.colors.muted, ...theme.type.bodySm, marginTop: 3, fontFamily: theme.fonts.body },
   secondary: {
     marginTop: 24,
     flexDirection: 'row',
@@ -483,5 +495,5 @@ const styles = StyleSheet.create({
     gap: 8,
     alignSelf: 'flex-start',
   },
-  secondaryText: { color: theme.colors.primary, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  secondaryText: { color: theme.colors.primary, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
 });

@@ -32,6 +32,25 @@ export const theme = {
     bodySemiBold: 'DMSans_600SemiBold',
     mono: 'DMMono_500Medium',
   },
+  // A closed set of seven steps, replacing the 144 inline font sizes that
+  // had accumulated across 17 distinct values (including 11.5, 17, 19 and
+  // 21 — values that only existed because there was nothing to snap to).
+  //
+  // The floor is deliberately higher than it was. 9px and 10px text has no
+  // place in an app read one-handed, in a cab, in daylight, sometimes with
+  // gloves; those are folded into `micro`, which is itself reserved for
+  // status pills. Line heights are paired with each size here so the two
+  // can't drift apart at the call site — roughly 1.5x for reading sizes,
+  // tighter for display type where generous leading just wastes screen.
+  type: {
+    display: { fontSize: 26, lineHeight: 31 },
+    title: { fontSize: 20, lineHeight: 26 },
+    heading: { fontSize: 17, lineHeight: 23 },
+    body: { fontSize: 15, lineHeight: 22 },
+    bodySm: { fontSize: 14, lineHeight: 20 },
+    label: { fontSize: 12, lineHeight: 16 },
+    micro: { fontSize: 11, lineHeight: 15 },
+  },
   // 14-22px on cards, 20px on pills, 50% on avatars (set inline as
   // borderRadius: '50%' per-component, not tokenized here).
   radius: {

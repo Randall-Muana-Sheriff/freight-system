@@ -269,23 +269,41 @@ export default function ProfileScreen() {
 
       <View style={styles.identityCard}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarInitial}>{initial}</Text>
+          {profile ? <Text style={styles.avatarInitial}>{initial}</Text> : null}
         </View>
-        <View style={styles.nameRow}>
-          <Text style={styles.name}>{displayName}</Text>
-          {documentsVerified === true ? <Ionicons name="checkmark-circle" size={18} color={theme.colors.success} /> : null}
-        </View>
+        {/* Until the profile resolves this used to render the literal
+            fallback "Driver" with a "D" avatar, which reads as real data
+            that happens to be wrong rather than as loading — drivers
+            reported their name "disappearing" after a connection wobble.
+            A skeleton block says "not yet" unambiguously. */}
+        {profile ? (
+          <View style={styles.nameRow}>
+            <Text style={styles.name}>{displayName}</Text>
+            {documentsVerified === true ? <Ionicons name="checkmark-circle" size={18} color={theme.colors.success} /> : null}
+          </View>
+        ) : (
+          <View
+            style={[styles.skeleton, styles.skeletonName]}
+            accessibilityLabel="Loading your profile"
+          />
+        )}
         {profile?.staffId ? (
           <View style={styles.staffBadge}>
             <Ionicons name="id-card-outline" size={12} color={theme.colors.primary} />
             <Text style={styles.staffBadgeText}>{profile.staffId} · Freight Driver</Text>
           </View>
-        ) : null}
+        ) : profile ? null : (
+          <View style={[styles.skeleton, styles.skeletonBadge]} />
+        )}
         {vehicle ? (
           <View style={styles.identityVehiclePill}>
             <Ionicons name="car-outline" size={12} color={theme.colors.muted} />
             <Text style={styles.identityVehicleText}>{vehicle.plateNumber}</Text>
           </View>
+        ) : vehicle === undefined ? (
+          // undefined = still loading; null = confirmed no vehicle assigned,
+          // in which case showing nothing is correct.
+          <View style={[styles.skeleton, styles.skeletonPill]} />
         ) : null}
       </View>
 
@@ -492,6 +510,15 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Deliberately sized to match the real content each one stands in for,
+  // so the card doesn't jump when the data arrives.
+  skeleton: {
+    backgroundColor: theme.colors.panelSoft,
+    borderRadius: theme.radius.sm,
+  },
+  skeletonName: { width: 168, height: 26, marginTop: 4 },
+  skeletonBadge: { width: 196, height: 24, marginTop: 10, borderRadius: theme.radius.pill },
+  skeletonPill: { width: 104, height: 20, marginTop: 8, borderRadius: theme.radius.pill },
   identityCard: {
     alignItems: 'center',
     gap: 6,
@@ -511,9 +538,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 6,
   },
-  avatarInitial: { color: theme.colors.primary, fontSize: 26, fontFamily: theme.fonts.headingBlack },
+  avatarInitial: { color: theme.colors.primary, ...theme.type.display, fontFamily: theme.fonts.headingBlack },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  name: { color: theme.colors.text, fontSize: 22, fontFamily: theme.fonts.headingBlack },
+  name: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.headingBlack },
   staffBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -524,9 +551,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.panelSoft,
     marginTop: 6,
   },
-  staffBadgeText: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.8 },
+  staffBadgeText: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.8 },
   identityVehiclePill: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  identityVehicleText: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.mono },
+  identityVehicleText: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.mono },
   notice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -537,8 +564,8 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   noticeRail: { width: 3, height: 28, borderRadius: 2 },
-  noticeTitle: { color: theme.colors.text, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
-  noticeDetail: { color: theme.colors.muted, fontSize: 11, lineHeight: 15, marginTop: 2, fontFamily: theme.fonts.body },
+  noticeTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  noticeDetail: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
   card: {
     backgroundColor: theme.colors.surface2,
     borderRadius: theme.radius.xl,
@@ -548,29 +575,29 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  cardTitle: { flex: 1, color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
-  cardSummary: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.bodySemiBold, maxWidth: 130 },
+  cardTitle: { flex: 1, color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
+  cardSummary: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold, maxWidth: 130 },
   cardBody: { gap: 12 },
   overallStatusRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  overallStatusDetail: { color: theme.colors.muted, fontSize: 12, marginTop: 2, lineHeight: 17, fontFamily: theme.fonts.body },
+  overallStatusDetail: { color: theme.colors.muted, ...theme.type.label, marginTop: 2, lineHeight: 17, fontFamily: theme.fonts.body },
   statusRows: { gap: 10 },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statusLabel: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.body },
+  statusLabel: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.body },
   statusValueWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 7, height: 7, borderRadius: 99 },
-  statusValue: { fontSize: 12, fontFamily: theme.fonts.bodySemiBold },
-  infoValue: { color: theme.colors.text, fontSize: 12, fontFamily: theme.fonts.bodySemiBold, textTransform: 'capitalize' },
+  statusValue: { ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
+  infoValue: { color: theme.colors.text, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold, textTransform: 'capitalize' },
   emptyInline: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  emptyInlineText: { flex: 1, color: theme.colors.muted, fontSize: 13, lineHeight: 18, fontFamily: theme.fonts.body },
+  emptyInlineText: { flex: 1, color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   historyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     paddingVertical: 10,
   },
-  historyTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
-  historyMeta: { color: theme.colors.muted, fontSize: 11, marginTop: 2, fontFamily: theme.fonts.mono },
-  historyMore: { color: theme.colors.muted, fontSize: 11, textAlign: 'center', fontFamily: theme.fonts.body },
+  historyTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  historyMeta: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.mono },
+  historyMore: { color: theme.colors.muted, ...theme.type.micro, textAlign: 'center', fontFamily: theme.fonts.body },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -580,7 +607,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     paddingVertical: 14,
   },
-  primaryButtonText: { color: theme.colors.ink, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  primaryButtonText: { color: theme.colors.ink, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   dangerButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -591,8 +618,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   biometricRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
-  biometricTitle: { color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
-  biometricDetail: { color: theme.colors.muted, fontSize: 11, lineHeight: 15, marginTop: 2, fontFamily: theme.fonts.body },
+  biometricTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  biometricDetail: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
   toggle: {
     width: 46,
     height: 28,
@@ -606,10 +633,10 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: `${theme.colors.primary}33`, borderColor: theme.colors.primary },
   toggleKnob: { width: 20, height: 20, borderRadius: 10, backgroundColor: theme.colors.muted },
   toggleKnobOn: { backgroundColor: theme.colors.primary, alignSelf: 'flex-end' },
-  microcopy: { color: theme.colors.muted, fontSize: 11, textAlign: 'center', marginTop: 14, fontFamily: theme.fonts.body },
-  supportText: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, fontFamily: theme.fonts.body },
+  microcopy: { color: theme.colors.muted, ...theme.type.micro, textAlign: 'center', marginTop: 14, fontFamily: theme.fonts.body },
+  supportText: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   supportButton: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 12 },
-  supportButtonText: { color: theme.colors.danger, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  supportButtonText: { color: theme.colors.danger, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   logout: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -618,10 +645,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingVertical: 14,
   },
-  logoutText: { color: theme.colors.danger, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  logoutText: { color: theme.colors.danger, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
   diagnosticFooter: {
     color: theme.colors.muted,
-    fontSize: 9,
+    ...theme.type.micro,
     lineHeight: 13,
     textAlign: 'center',
     marginTop: 16,
@@ -637,5 +664,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  updateButtonText: { color: theme.colors.muted, fontSize: 10, fontFamily: theme.fonts.mono, opacity: 0.8 },
+  updateButtonText: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono, opacity: 0.8 },
 });

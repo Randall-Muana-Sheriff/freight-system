@@ -52,7 +52,17 @@ export function AssignmentCard({
   const priorityColor = getPriorityColor(priority);
 
   return (
-    <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={styles.row}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      accessibilityRole="button"
+      // Priority and status are conveyed visually by pill colour, so they
+      // have to be spoken too or a screen-reader user cannot tell a HIGH
+      // job from a normal one.
+      accessibilityLabel={`${title}. ${priority} priority, ${status}. Going to ${destination}.`}
+      accessibilityHint="Opens the trip details"
+      style={styles.row}
+    >
       <View style={[styles.iconWrap, { backgroundColor: `${palette.color}1F` }]}>
         <Ionicons name={palette.icon} size={17} color={palette.color} />
       </View>
@@ -89,13 +99,13 @@ const styles = StyleSheet.create({
   iconWrap: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, gap: 3 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  title: { flex: 1, color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
-  status: { fontSize: 10, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.4 },
+  title: { flex: 1, color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
+  status: { ...theme.type.micro, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.4 },
   priorityPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: theme.radius.pill, borderWidth: 1 },
-  priorityPillText: { fontSize: 9, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.6 },
-  route: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono },
+  priorityPillText: { ...theme.type.micro, fontFamily: theme.fonts.mono, textTransform: 'uppercase', letterSpacing: 0.6 },
+  route: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  metaText: { color: theme.colors.text, fontSize: 12, flexShrink: 1, fontFamily: theme.fonts.body },
-  metaDot: { color: theme.colors.muted, fontSize: 12 },
-  metaMono: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono },
+  metaText: { color: theme.colors.text, ...theme.type.label, flexShrink: 1, fontFamily: theme.fonts.body },
+  metaDot: { color: theme.colors.muted, ...theme.type.label },
+  metaMono: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
 });

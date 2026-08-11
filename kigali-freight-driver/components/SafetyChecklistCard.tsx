@@ -84,6 +84,12 @@ export function SafetyChecklistCard() {
             activeOpacity={0.7}
             disabled={loading}
             onPress={() => toggleItem(item.key)}
+            // The tick is drawn as an icon, so without an explicit checkbox
+            // role and state a screen reader announces only the label and
+            // gives no way to tell a completed check from an outstanding one.
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked, disabled: loading }}
+            accessibilityLabel={item.label}
           >
             <Ionicons
               name={checked ? 'checkmark-circle' : 'ellipse-outline'}
@@ -109,9 +115,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  title: { color: theme.colors.text, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
-  progress: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono },
+  title: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  progress: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-  label: { flex: 1, color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.body },
+  label: { flex: 1, color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   labelChecked: { color: theme.colors.muted, textDecorationLine: 'line-through' },
 });

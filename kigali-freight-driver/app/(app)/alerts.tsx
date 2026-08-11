@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
   headerTextWrap: { flex: 1 },
   clearButton: { flexShrink: 0, paddingHorizontal: 4, paddingVertical: 4, marginTop: 2 },
-  clearText: { color: theme.colors.primary, fontSize: 13, fontFamily: theme.fonts.bodySemiBold },
+  clearText: { color: theme.colors.primary, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -61,12 +61,12 @@ const styles = StyleSheet.create({
   statusDot: { width: 8, height: 8, borderRadius: 999 },
   statusDotLive: { backgroundColor: theme.colors.success },
   statusDotIdle: { backgroundColor: theme.colors.warning },
-  statusText: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.bodySemiBold },
+  statusText: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
   emptyState: {
     alignItems: 'center',
     gap: 8,
     paddingVertical: 40,
   },
-  emptyTitle: { color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
-  emptyBody: { color: theme.colors.muted, fontSize: 13, textAlign: 'center', lineHeight: 18, maxWidth: 240, fontFamily: theme.fonts.body },
+  emptyTitle: { color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold, marginTop: 2 },
+  emptyBody: { color: theme.colors.muted, ...theme.type.bodySm, textAlign: 'center', maxWidth: 240, fontFamily: theme.fonts.body },
 });

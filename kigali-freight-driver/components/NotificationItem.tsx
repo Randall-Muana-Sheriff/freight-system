@@ -73,9 +73,9 @@ const styles = StyleSheet.create({
   iconWrap: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, gap: 3 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  time: { color: theme.colors.muted, fontSize: 11, fontFamily: theme.fonts.mono },
-  title: { flex: 1, color: theme.colors.text, fontSize: 14, fontFamily: theme.fonts.bodySemiBold },
-  text: { color: theme.colors.muted, fontSize: 13, lineHeight: 18, fontFamily: theme.fonts.body },
+  time: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
+  title: { flex: 1, color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  text: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   deleteAction: {
     width: 88,
     marginLeft: 8,
@@ -85,5 +85,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
   },
-  deleteText: { color: theme.colors.ink, fontSize: 12, fontFamily: theme.fonts.bodySemiBold },
+  deleteText: { color: theme.colors.ink, ...theme.type.label, fontFamily: theme.fonts.bodySemiBold },
 });

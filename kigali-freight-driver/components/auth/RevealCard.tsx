@@ -75,11 +75,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 12,
   },
-  avatarInitial: { color: theme.colors.primary, fontSize: 24, fontFamily: theme.fonts.headingBlack },
-  name: { color: theme.colors.text, fontSize: 19, fontFamily: theme.fonts.heading, textAlign: 'center' },
+  avatarInitial: { color: theme.colors.primary, ...theme.type.display, fontFamily: theme.fonts.headingBlack },
+  name: { color: theme.colors.text, ...theme.type.title, fontFamily: theme.fonts.heading, textAlign: 'center' },
   role: {
     color: theme.colors.muted,
-    fontSize: 11,
+    ...theme.type.micro,
     fontFamily: theme.fonts.mono,
     marginTop: 4,
     textTransform: 'uppercase',
@@ -87,6 +87,6 @@ const styles = StyleSheet.create({
   },
   divider: { height: 1, backgroundColor: theme.colors.border, alignSelf: 'stretch', marginVertical: 18 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch', paddingVertical: 6, gap: 12 },
-  rowLabel: { color: theme.colors.muted, fontSize: 12, fontFamily: theme.fonts.body },
-  rowValue: { flexShrink: 1, color: theme.colors.text, fontSize: 13, fontFamily: theme.fonts.bodySemiBold, textTransform: 'capitalize' },
+  rowLabel: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.body },
+  rowValue: { flexShrink: 1, color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold, textTransform: 'capitalize' },
 });

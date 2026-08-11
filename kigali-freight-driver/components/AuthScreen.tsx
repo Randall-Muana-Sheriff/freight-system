@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   wordmarkImage: { width: 190, height: 85 },
   tagline: {
     color: theme.colors.muted,
-    fontSize: 12,
+    ...theme.type.label,
     letterSpacing: 0.2,
     fontFamily: theme.fonts.body,
     marginTop: 6,
@@ -319,14 +319,14 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: theme.colors.primary,
-    fontSize: 11,
+    ...theme.type.micro,
     textTransform: 'uppercase',
     letterSpacing: 1.4,
     fontFamily: theme.fonts.mono,
     marginBottom: 8,
   },
-  title: { color: theme.colors.text, fontSize: 26, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.3 },
-  subtitle: { color: theme.colors.muted, fontSize: 13, lineHeight: 19, marginTop: 8, maxWidth: 340, fontFamily: theme.fonts.body },
+  title: { color: theme.colors.text, ...theme.type.display, fontFamily: theme.fonts.headingBlack, letterSpacing: -0.3 },
+  subtitle: { color: theme.colors.muted, ...theme.type.bodySm, marginTop: 8, maxWidth: 340, fontFamily: theme.fonts.body },
   fields: { gap: 16, marginTop: 28 },
   footer: { alignItems: 'center', marginTop: 26 },
 });
@@ -346,9 +346,9 @@ const field = StyleSheet.create({
   },
   rowFocused: { borderColor: theme.colors.primary },
   rowError: { borderColor: theme.colors.danger },
-  input: { flex: 1, color: theme.colors.text, fontSize: 15, fontFamily: theme.fonts.body },
+  input: { flex: 1, color: theme.colors.text, ...theme.type.body, fontFamily: theme.fonts.body },
   inputDisabled: { opacity: 0.5 },
-  errorText: { color: theme.colors.danger, fontSize: 11, marginLeft: 4, fontFamily: theme.fonts.bodyMedium },
+  errorText: { color: theme.colors.danger, ...theme.type.micro, marginLeft: 4, fontFamily: theme.fonts.bodyMedium },
 });
 
 const button = StyleSheet.create({
@@ -363,5 +363,5 @@ const button = StyleSheet.create({
     marginTop: 6,
   },
   disabled: { opacity: 0.6 },
-  text: { color: theme.colors.ink, fontSize: 15, fontFamily: theme.fonts.bodySemiBold },
+  text: { color: theme.colors.ink, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
 });
