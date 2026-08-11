@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { sendContactMessage } from './publicApi';
 import { HeroRoute } from './HeroRoute';
+import { HeroTerrain } from './HeroTerrain';
 import { HERO, SERVICES, JOURNEY, ABOUT, CONTACT } from './content';
 
 // Copy lives in content.ts. This file is layout only, so the writing can
@@ -91,8 +92,11 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
     return (
         <>
             {/* ── THE ROAD ─────────────────────────────────────────────── */}
-            <section className="bg-pub-ink px-5 pb-16 pt-14 sm:pt-20">
-                <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
+            <section className="relative isolate overflow-hidden bg-pub-ink px-5 pb-16 pt-14 sm:pt-20">
+                <HeroTerrain />
+                {/* Sits above the terrain, and re-enables pointer events the
+                    canvas turns off so the buttons underneath still work. */}
+                <div className="relative z-10 mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
                     <div>
                         <p className="data-label mb-7 text-pub-laterite-soft">{HERO.eyebrow}</p>
                         <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink"
