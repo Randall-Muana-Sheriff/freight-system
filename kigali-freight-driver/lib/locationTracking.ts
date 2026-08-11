@@ -118,9 +118,26 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
   }
 });
 
+// Android only. Separated out because the native service has its own
+// lifecycle independent of the expo-location task — it must still be
+// (re)started when the task is already registered, which is the normal
+// case on every app relaunch. Starting it is idempotent: onStartCommand
+// no-ops if the timer is already running.
+async function startNativeServiceIfPossible() {
+  if (!isNativeLocationServiceAvailable) return;
+  const { token, refreshToken } = getCachedTokens();
+  if (!token || !refreshToken) return;
+  await startNativeLocationService(API_BASE, token, refreshToken);
+}
+
 export async function startBackgroundLocationTracking() {
   const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
-  if (alreadyStarted) return;
+  if (alreadyStarted) {
+    // Permissions were necessarily granted when the task was first
+    // registered, so the native service is safe to start straight away.
+    await startNativeServiceIfPossible();
+    return;
+  }
 
   const foreground = await Location.requestForegroundPermissionsAsync();
   if (foreground.status !== 'granted') {
@@ -140,17 +157,11 @@ export async function startBackgroundLocationTracking() {
 
   await attemptStartLocationUpdates();
 
-  // Android only: start the native foreground service alongside the
-  // expo-location task. It is the reliable path — the task above is kept
-  // because it is what iOS uses, and on Android it costs nothing when it
-  // does fire. Both post to the same endpoint; the combined worst case is
-  // well inside the telemetry rate limit.
-  if (isNativeLocationServiceAvailable) {
-    const { token, refreshToken } = getCachedTokens();
-    if (token && refreshToken) {
-      await startNativeLocationService(API_BASE, token, refreshToken);
-    }
-  }
+  // Runs alongside the expo-location task, not instead of it: the task is
+  // what iOS uses, and on Android it costs nothing when it does fire. Both
+  // post to the same endpoint and the combined worst case stays inside the
+  // telemetry rate limit.
+  await startNativeServiceIfPossible();
 }
 
 // Seen in practice on a freshly-installed app AND on a cold launch right
@@ -235,6 +246,12 @@ export async function stopBackgroundLocationTracking() {
 export function useForegroundTelemetryWatchdog(token: string | null) {
   useEffect(() => {
     if (!token) return;
+    // Redundant wherever the native foreground service runs — that service
+    // covers the foreground case too, and running both put two posts on
+    // the wire every 15s (~120 per 15min against a 150 limit) for no gain.
+    // This stays as the fallback for iOS and for any Android build made
+    // before the native module existed.
+    if (isNativeLocationServiceAvailable) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;

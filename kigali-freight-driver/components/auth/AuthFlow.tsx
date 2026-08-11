@@ -367,6 +367,7 @@ export function AuthFlow() {
           toast={toast}
           onDismissToast={() => setToast(null)}
           footer={<StartOverFooter onStartOver={resetFlow} />}
+          showLogo={false}
         >
           <PinPad value={pinValue} onChange={setPinValue} onComplete={onPinSetComplete} />
         </AuthScreen>
@@ -412,6 +413,7 @@ export function AuthFlow() {
                 </Text>
               </StartOverFooter>
             }
+            showLogo={false}
           >
             <PinPad value={pinValue} onChange={setPinValue} onComplete={onPinLoginComplete} error={pinError} />
           </AuthScreen>

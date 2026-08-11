@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Animated, StyleSheet, TextInput, View } from 'react-native';
 import { theme } from '../../lib/theme';
-
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
 // Fire-and-forget, and dynamically imported for the same reason
 // BiometricPrompt.tsx dynamically imports expo-local-authentication: a
@@ -22,11 +19,19 @@ function haptic(kind: 'tap' | 'error') {
     .catch(() => {});
 }
 
-// The numpad + dot-indicator widget shared by PIN set/confirm/login — no
-// submit button anywhere, it auto-completes the instant the 4th digit is
-// entered. Mismatch handling (the red flash + shake) lives here, driven by
-// the `error` prop the caller passes down for one render before clearing
-// the value itself.
+// The PIN entry widget shared by PIN set/confirm/login — no submit button
+// anywhere, it auto-completes the instant the 4th digit is entered.
+// Mismatch handling (the red flash + shake) lives here, driven by the
+// `error` prop the caller passes down for one render before clearing the
+// value itself.
+//
+// Uses the device's own numeric keyboard rather than a custom on-screen
+// keypad: it's the input surface people already know, it inherits
+// system-level accessibility (TalkBack, switch access, larger text) for
+// free, and it stops the layout from shifting when the OS keyboard opens
+// and closes over a hand-drawn grid. Same single-hidden-input approach as
+// OtpBoxes — one real TextInput drives everything and the dots below are
+// purely a rendering of its value.
 export function PinPad({
   length = 4,
   value,
@@ -41,6 +46,8 @@ export function PinPad({
   error?: boolean;
 }) {
   const shakeX = useRef(new Animated.Value(0)).current;
+  const inputRef = useRef<TextInput>(null);
+  const previousLength = useRef(value.length);
 
   useEffect(() => {
     if (!error) return;
@@ -58,23 +65,25 @@ export function PinPad({
     ]).start();
   }, [error, shakeX]);
 
-  const onPressKey = (key: string) => {
-    if (key === '') return;
-    haptic('tap');
-    if (key === 'del') {
-      onChange(value.slice(0, -1));
-      return;
-    }
-    if (value.length >= length) return;
-    const next = (value + key).slice(0, length);
-    onChange(next);
-    if (next.length === length) {
-      onComplete(next);
-    }
+  // Refocus after a failed attempt: the caller clears `value`, and without
+  // this the keyboard can drop away leaving no obvious way back in.
+  useEffect(() => {
+    if (error) inputRef.current?.focus();
+  }, [error]);
+
+  const onChangeText = (raw: string) => {
+    const clean = raw.replace(/[^0-9]/g, '').slice(0, length);
+    // Only on a digit added, not on delete — matching the old keypad,
+    // where backspace was deliberately silent.
+    if (clean.length > previousLength.current) haptic('tap');
+    previousLength.current = clean.length;
+
+    onChange(clean);
+    if (clean.length === length) onComplete(clean);
   };
 
   return (
-    <View>
+    <View style={styles.wrap}>
       <Animated.View
         style={[
           styles.dotsRow,
@@ -85,18 +94,26 @@ export function PinPad({
           <PinDot key={i} filled={i < value.length} error={!!error} />
         ))}
       </Animated.View>
-      <View style={styles.grid}>
-        {KEYS.map((key, index) =>
-          key === '' ? (
-            // A true blank spacer, not a styled-but-empty button — keeps
-            // "0" centered under "8" like a standard phone dialpad without
-            // rendering a dead circle that looks tappable but does nothing.
-            <View key={index} style={styles.keySpacer} />
-          ) : (
-            <PinKey key={index} label={key} onPress={() => onPressKey(key)} />
-          )
-        )}
-      </View>
+
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType="number-pad"
+        // A PIN is a credential, so keep it out of keyboard learning,
+        // suggestion strips and password managers.
+        autoComplete="off"
+        autoCorrect={false}
+        textContentType="none"
+        secureTextEntry
+        maxLength={length}
+        autoFocus
+        caretHidden
+        // Transparent and stretched across the dots so tapping them
+        // reopens the keyboard — this input is the only thing actually
+        // receiving keystrokes.
+        style={[StyleSheet.absoluteFill, styles.hiddenInput]}
+      />
     </View>
   );
 }
@@ -123,71 +140,18 @@ function PinDot({ filled, error }: { filled: boolean; error: boolean }) {
   );
 }
 
-// Replaces the flat opacity-only TouchableOpacity with a real press: the
-// key scales down under the finger and springs back on release, matching
-// the tactile feedback of a native OS PIN keypad instead of just dimming.
-function PinKey({ label, onPress }: { label: string; onPress: () => void }) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const pressIn = () => Animated.spring(scale, { toValue: 0.88, friction: 6, tension: 200, useNativeDriver: true }).start();
-  const pressOut = () => Animated.spring(scale, { toValue: 1, friction: 5, tension: 160, useNativeDriver: true }).start();
-
-  return (
-    <TouchableWithoutFeedback onPress={onPress} onPressIn={pressIn} onPressOut={pressOut}>
-      <Animated.View style={[styles.key, { transform: [{ scale }] }]}>
-        {label === 'del' ? (
-          <Ionicons name="backspace-outline" size={20} color={theme.colors.text} />
-        ) : (
-          <Text style={styles.keyText}>{label}</Text>
-        )}
-      </Animated.View>
-    </TouchableWithoutFeedback>
-  );
-}
-
-const DOT_SIZE = 14;
-const KEY_SIZE = 72;
-const GRID_GAP = 14;
-// flexWrap alone doesn't force exactly 3 per row — it just wraps whenever
-// items stop fitting the container, so on a wide-enough screen a 4th key
-// fits too and the layout silently becomes 4-3-3-2 instead of the intended
-// phone-dialpad 3x4. Pinning the grid's own width to exactly 3 columns
-// makes the wrap point independent of screen width.
-const GRID_WIDTH = KEY_SIZE * 3 + GRID_GAP * 2;
-
 const styles = StyleSheet.create({
-  dotsRow: { flexDirection: 'row', gap: 16, justifyContent: 'center', marginBottom: 32 },
+  wrap: { position: 'relative', paddingVertical: 20 },
+  hiddenInput: { opacity: 0 },
+  dotsRow: { flexDirection: 'row', gap: 18, justifyContent: 'center', alignItems: 'center' },
   dot: {
-    width: DOT_SIZE,
-    height: DOT_SIZE,
-    borderRadius: DOT_SIZE / 2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
     backgroundColor: 'transparent',
   },
-  dotFilled: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-    shadowColor: theme.colors.primary,
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  dotError: { backgroundColor: theme.colors.danger, borderColor: theme.colors.danger, shadowColor: theme.colors.danger },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: GRID_GAP, width: GRID_WIDTH, alignSelf: 'center' },
-  key: {
-    width: KEY_SIZE,
-    height: KEY_SIZE,
-    borderRadius: KEY_SIZE / 2,
-    backgroundColor: theme.colors.surface2,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keySpacer: {
-    width: KEY_SIZE,
-    height: KEY_SIZE,
-  },
-  keyText: { color: theme.colors.text, fontSize: 24, fontFamily: theme.fonts.bodySemiBold },
+  dotFilled: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  dotError: { backgroundColor: theme.colors.danger, borderColor: theme.colors.danger },
 });
