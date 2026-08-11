@@ -61,7 +61,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                 <div className="min-w-0">
                     <div className="text-paper font-bold text-[11px] truncate">{order.cargo_description}</div>
                     <div className="text-[9px] text-steel font-mono">
-                        {order.origin_hub_name} &middot; {order.weight_kg} kg
+                        {order.origin_hub_name || 'No hub yet'} &middot; {order.weight_kg} kg
                         {priority !== 'normal' && (
                             <span className={priority === 'high' ? 'text-rust' : 'text-steel'}>
                                 {' '}&middot; {priority === 'high' ? 'High priority' : 'Low priority'}
@@ -73,6 +73,44 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                     {order.status}
                 </span>
             </div>
+
+            {/* A customer-submitted order carries no coordinates and no hub
+                — the addresses below are free text the customer typed, and
+                are the only thing telling the dispatcher where this goes.
+                Called out rather than blended in, because it needs checking
+                and a phone call before a driver is sent anywhere. */}
+            {order.source === 'public' ? (
+                <div className="rounded border border-tarp/30 bg-tarp/5 p-2 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-tarp">
+                            Customer request
+                        </span>
+                        {order.tracking_token ? (
+                            <span className="text-[9px] font-mono text-steel">{order.tracking_token}</span>
+                        ) : null}
+                    </div>
+                    <div className="text-[10px] text-paper leading-snug">
+                        <span className="text-steel">From </span>{order.pickup_address_text || '—'}
+                        <span className="text-steel"> → </span>{order.delivery_address_text || '—'}
+                    </div>
+                    {order.customer_name || order.customer_phone ? (
+                        <div className="text-[10px] text-paper">
+                            <span className="text-steel">Contact </span>
+                            {order.customer_name}
+                            {order.customer_phone ? (
+                                <a href={`tel:${order.customer_phone}`} className="ml-1 font-mono text-carbon hover:underline">
+                                    {order.customer_phone}
+                                </a>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {order.special_instructions ? (
+                        <div className="text-[10px] text-hazard leading-snug">
+                            <span className="text-steel">Note </span>{order.special_instructions}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
             {suggestions ? (
                 <div className="text-[9px] text-carbon font-mono">
                     {suggestions.length === 0

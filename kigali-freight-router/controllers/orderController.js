@@ -166,7 +166,20 @@ export const OrderController = {
                     pickup_lat,
                     delivery_lng,
                     delivery_lat,
-                    priority
+                    priority,
+                    -- Customer-submitted orders arrive through /api/public
+                    -- with no coordinates (nobody picked points on a map)
+                    -- and no hub. Without these columns the dispatch queue
+                    -- shows such a row as bare cargo and weight, giving the
+                    -- dispatcher no address to place and no number to call,
+                    -- which makes it impossible to action.
+                    source,
+                    tracking_token,
+                    customer_name,
+                    customer_phone,
+                    pickup_address_text,
+                    delivery_address_text,
+                    special_instructions
                 FROM orders
                 WHERE status = 'PENDING'
                 ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;

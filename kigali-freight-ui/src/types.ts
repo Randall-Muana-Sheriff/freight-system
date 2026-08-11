@@ -68,6 +68,16 @@ export interface Order {
     delivery_lng?: number;
     updated_at?: string;
     priority?: 'high' | 'normal' | 'low';
+    // Present on orders submitted through the public site. A 'public' order
+    // has no coordinates and no hub until a dispatcher places it, so these
+    // are the only location and contact information available for it.
+    source?: 'dispatch' | 'public';
+    tracking_token?: string | null;
+    customer_name?: string | null;
+    customer_phone?: string | null;
+    pickup_address_text?: string | null;
+    delivery_address_text?: string | null;
+    special_instructions?: string | null;
 }
 
 export interface OrderActivityEvent {
