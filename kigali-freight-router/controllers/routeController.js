@@ -90,6 +90,25 @@ export const RouteController = {
     // Handle VRP optimization calculations
     optimizeRoute: async (req, res) => {
         const { depot, vehicles, stops, vehicleCapacity } = req.body;
+        // solveVRP reads depot.lat/lng immediately, so a missing depot threw
+        // and surfaced as a 500 ("Cannot read properties of undefined") —
+        // a client payload mistake reported as a server fault.
+        const isPoint = (p) => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng));
+        if (!isPoint(depot)) {
+            return fail(res, {
+                status: 400,
+                code: 'ROUTES_INVALID_PAYLOAD',
+                message: 'A depot with numeric lat and lng is required.',
+            });
+        }
+        if (!Array.isArray(stops) || !stops.every(isPoint)) {
+            return fail(res, {
+                status: 400,
+                code: 'ROUTES_INVALID_PAYLOAD',
+                message: 'Every stop must have a numeric lat and lng.',
+            });
+        }
+
         try {
             const solution = solveVRP({ depot, stops: stops || [], vehicleCapacity: Number(vehicleCapacity) || 100 });
             const routes = await Promise.all(solution.routes.map(async (route, index) => ({

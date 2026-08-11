@@ -29,6 +29,28 @@ export const GeofenceController = {
     // POST /api/geofences
     createGeofence: async (req, res) => {
         const { name, coordinates, speedLimitKmh } = req.body;
+        // Validated up front rather than dereferenced inside the try: a
+        // missing/short `coordinates` used to throw and surface as a 500
+        // ("coordinates is not iterable"), reporting a caller mistake as a
+        // server fault and telling the caller nothing actionable.
+        if (typeof name !== 'string' || !name.trim()) {
+            return fail(res, { status: 400, code: 'GEOFENCE_INVALID_PAYLOAD', message: 'A zone name is required.' });
+        }
+        if (!Array.isArray(coordinates) || coordinates.length < 3) {
+            return fail(res, {
+                status: 400,
+                code: 'GEOFENCE_INVALID_PAYLOAD',
+                message: 'At least 3 [lng, lat] coordinate pairs are required to form a zone.',
+            });
+        }
+        if (!coordinates.every((c) => Array.isArray(c) && c.length >= 2 && Number.isFinite(Number(c[0])) && Number.isFinite(Number(c[1])))) {
+            return fail(res, {
+                status: 400,
+                code: 'GEOFENCE_INVALID_PAYLOAD',
+                message: 'Every coordinate must be a numeric [lng, lat] pair.',
+            });
+        }
+
         try {
             const polyCoords = [...coordinates];
             if (
