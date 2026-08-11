@@ -5,6 +5,7 @@ import AuthForm from './components/AuthForm';
 import ImageLightbox from './components/ImageLightbox';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useDocumentTitle } from './hooks/useDocumentTitle';
+import { setNoIndex } from './utils/seo';
 
 // Only one of these two ever renders at a time (gated by showAdminCenter),
 // and neither is needed at all until after login — code-splitting them
@@ -68,6 +69,11 @@ export default function App() {
   // gets its own tree entirely, not just a different screen inside
   // SocketProvider's dispatcher-only login/CRUD context.
   const path = window.location.pathname;
+
+  // Neither the dispatcher board nor a wall display belongs in a search
+  // result. Set before render so it is in place by the time a crawler
+  // finishes executing the page.
+  if (path.startsWith('/dispatch') || path.startsWith('/kiosk')) setNoIndex();
 
   if (path.startsWith('/kiosk')) {
     return (
