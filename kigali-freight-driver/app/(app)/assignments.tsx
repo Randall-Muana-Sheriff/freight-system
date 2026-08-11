@@ -7,7 +7,7 @@ import { AssignmentCard } from '../../components/AssignmentCard';
 import { SectionHeader } from '../../components/SectionHeader';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { fetchDriverAssignments } from '../../lib/api';
+import { fetchDriverAssignments, isNetworkFailure } from '../../lib/api';
 import { isJobInProgress, toDriverAssignmentCard, type DriverAssignmentCard } from '../../lib/assignments';
 
 function jobsSubtitle(count: number) {
@@ -31,7 +31,19 @@ export default function AssignmentsScreen() {
       setError(null);
     } catch (err) {
       setAssignments([]);
-      setError(err instanceof Error ? err.message : 'Failed to load assignments.');
+      // isNetworkFailure first — a dropped connection surfaces here as
+      // React Native's raw fetch exception (e.g. "fetch failed:
+      // java.net.ConnectException: Failed to connect to /192.168.1.71:5000"),
+      // which reads like a stack trace to a driver, not a signal to check
+      // their signal. Every other screen in this app (trip detail,
+      // incidents) already translates that case; this one just hadn't.
+      setError(
+        isNetworkFailure(err)
+          ? "Can't reach dispatch right now. Check your connection and try again."
+          : err instanceof Error
+            ? err.message
+            : 'Failed to load assignments.'
+      );
     }
   }, [token]);
 

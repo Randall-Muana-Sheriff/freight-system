@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as SecureStore from 'expo-secure-store';
@@ -13,6 +15,11 @@ export const LOCATION_TASK_NAME = 'kigali-freight-driver-background-location';
 // never legitimately reads under this threshold while moving, so clamping
 // anything below it to 0 removes the noise without hiding real movement.
 const STATIONARY_SPEED_DEADBAND_KMH = 5;
+
+// Matches the background task's own timeInterval so the dispatcher map
+// sees the same cadence whether the feed is coming from the OS-scheduled
+// task or the foreground watchdog below.
+const FOREGROUND_WATCHDOG_INTERVAL_MS = 15000;
 
 function toStableSpeedKmh(speed: number | null | undefined): number | undefined {
   if (typeof speed !== 'number' || speed < 0) return undefined;
@@ -182,6 +189,103 @@ export async function stopBackgroundLocationTracking() {
     // never throw an unhandled rejection.
     console.warn('Failed to stop background location tracking:', err);
   }
+}
+
+// A 15s foreground poll that duplicates what the background task is
+// *supposed* to do, using the one code path that proved completely
+// reliable: a direct one-shot getCurrentPositionAsync().
+//
+// Why this exists: the background task registered via
+// startLocationUpdatesAsync() hands scheduling to Android's
+// FusedLocationProviderClient, and on at least some devices it silently
+// never fires — sometimes the periodic registration isn't even created at
+// the OS level (confirmed via `adb shell dumpsys location`), with no error
+// observable from JS, while the app's own diagnostics still read
+// "Active". Across hours of testing, that path produced anywhere from
+// clean 18-minute runs to total silence, unpredictably; a one-shot
+// request in the same conditions succeeded every single time.
+//
+// This deliberately does NOT replace the background task — it runs
+// alongside it, so a driver with the app open gets a dependable feed, and
+// the background task still covers the app-closed case for whatever it
+// does manage to deliver. Combined worst case is 2 posts/15s = 120 per
+// 15min, inside the telemetry endpoint's 150/15min limit.
+export function useForegroundTelemetryWatchdog(token: string | null) {
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const tick = async () => {
+      if (cancelled) return;
+      // Only while actually on shift — the shift toggle is what registers
+      // the background task, so this mirrors it rather than inventing a
+      // second, separate notion of "tracking is on".
+      const onShift = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME).catch(() => false);
+      if (!onShift || cancelled) return;
+
+      try {
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (cancelled) return;
+
+        const { latitude, longitude, speed } = position.coords;
+        const body = JSON.stringify({ lat: latitude, lng: longitude, speedKmh: toStableSpeedKmh(speed) });
+        const post = (bearer: string) =>
+          fetch(`${API_BASE}/api/fleet/telemetry`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+            body,
+          });
+
+        let response = await post(token);
+        // Same 401-or-403 handling as the background task: the backend
+        // returns 403 for an expired JWT, not 401.
+        if (response.status === 401 || response.status === 403) {
+          const refreshed = await refreshAccessToken(API_BASE);
+          if (refreshed && !cancelled) {
+            response = await post(refreshed);
+          }
+        }
+        if (!response.ok && response.status !== 429) {
+          console.warn('Foreground telemetry rejected:', response.status);
+        }
+      } catch {
+        // Offline or no fix available right now — the next tick retries in
+        // 15s, same "a single lost ping isn't worth queueing" tradeoff the
+        // background task already makes.
+      }
+    };
+
+    const start = () => {
+      if (timer) return;
+      tick();
+      timer = setInterval(tick, FOREGROUND_WATCHDOG_INTERVAL_MS);
+    };
+
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    // Paused while backgrounded: this is explicitly the foreground safety
+    // net, and letting it keep firing would just burn battery racing a
+    // background task that the OS may or may not also be running.
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') start();
+      else stop();
+    });
+
+    if (AppState.currentState === 'active') start();
+
+    return () => {
+      cancelled = true;
+      stop();
+      subscription.remove();
+    };
+  }, [token]);
 }
 
 // Diagnostic snapshot for a "why isn't my location showing up" screen —

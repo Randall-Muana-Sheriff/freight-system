@@ -15,8 +15,14 @@ export type DriverAssignmentCard = {
 // so their grouping logic can never drift apart.
 const IN_PROGRESS_STATUSES = ['picked up', 'in transit', 'arrived'];
 
+// Accepts either form of the status: the prettified value the assignment
+// cards carry ("In transit") or the raw API value ("IN_TRANSIT"). Without
+// the underscore swap this silently only ever matched ARRIVED when passed
+// a raw status — which is exactly what trip/[id].tsx does, so the live
+// route-progress section and its polling stayed hidden through PICKED_UP
+// and IN_TRANSIT and only appeared once the driver had already arrived.
 export function isJobInProgress(status: string) {
-  return IN_PROGRESS_STATUSES.includes(status.toLowerCase());
+  return IN_PROGRESS_STATUSES.includes(status.toLowerCase().replace(/_/g, ' '));
 }
 
 function prettyStatus(status?: string) {

@@ -6,6 +6,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { useNotificationResponseHandler } from '../../lib/pushNotifications';
+import { useForegroundTelemetryWatchdog } from '../../lib/locationTracking';
 import { useTabBarMetrics } from '../../lib/tabBarMetrics';
 
 function TabIcon({ name, color, size }: { name: keyof typeof Ionicons.glyphMap; color: ColorValue; size: number }) {
@@ -19,6 +20,7 @@ export default function AppLayout() {
   const tabBar = useTabBarMetrics();
 
   useNotificationResponseHandler();
+  useForegroundTelemetryWatchdog(token);
 
   const tabRoutes = ['/(app)', '/(app)/assignments', '/(app)/incidents', '/(app)/alerts', '/(app)/profile'];
 
