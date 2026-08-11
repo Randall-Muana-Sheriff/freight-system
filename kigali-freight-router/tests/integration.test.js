@@ -6,6 +6,7 @@ import request from 'supertest';
 import { io as socketClient } from 'socket.io-client';
 
 import pool from '../config/db.js';
+import { getRedisClient, isRedisEnabled } from '../config/redisClient.js';
 import { app, server, startServer, shutdownServices } from '../server.js';
 import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
@@ -551,6 +552,124 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         }
 
         socket.disconnect();
+    });
+
+    // The public order limit is deliberately tight (10/hour) and, with
+    // REDIS_URL set, its counters outlive the process — so a second run of
+    // this suite inside the hour would get 429s where it expects 201s and
+    // 400s. Clearing the counters keeps the production limit honest rather
+    // than loosening it for tests.
+    async function resetPublicRateLimits() {
+        if (!isRedisEnabled()) return;
+        const client = await getRedisClient();
+        if (!client) return;
+        for (const prefix of ['public-order', 'public-contact', 'public-track']) {
+            const keys = await client.keys(`ratelimit:${prefix}:*`);
+            if (keys.length) await client.del(keys);
+        }
+    }
+
+    // The public endpoints are the only unauthenticated write surface in
+    // the app, so what matters here is less "does it work" than "does it
+    // still refuse the things it must refuse".
+    test('public: a customer can place an order and track it by code', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app)
+            .post('/api/public/orders')
+            .send({
+                pickupAddress: 'Gikondo Industrial Zone',
+                deliveryAddress: 'Kimironko Market, Shop 14',
+                cargoType: 'Retail stock',
+                weightKg: 150,
+                customerName: 'Integration Customer',
+                customerPhone: '0788123456',
+            });
+        assert.equal(create.statusCode, 201);
+        const token = create.body.data.trackingToken;
+        assert.match(token, /^INZ-[A-Z0-9]{8}$/);
+
+        const tracked = await request(app).get(`/api/public/track/${token}`);
+        assert.equal(tracked.statusCode, 200);
+        assert.equal(tracked.body.data.cargo, 'Retail stock');
+        assert.equal(tracked.body.data.status, 'PENDING');
+        assert.equal(tracked.body.data.delivery, 'Kimironko Market, Shop 14');
+    });
+
+    test('public: tracking never exposes the order id or a driver username', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app)
+            .post('/api/public/orders')
+            .send({
+                pickupAddress: 'Nyabugogo', deliveryAddress: 'Remera',
+                cargoType: 'Documents', weightKg: 2,
+                customerName: 'Privacy Probe', customerPhone: '0788123457',
+            });
+        const tracked = await request(app).get(`/api/public/track/${create.body.data.trackingToken}`);
+
+        // The internal id is precisely the enumeration handle the random
+        // token exists to keep off a public page — leaking it here would
+        // defeat the whole scheme.
+        assert.equal(tracked.body.data.id, undefined);
+        assert.equal(tracked.body.data.assigned_to, undefined);
+        assert.equal(tracked.body.data.driverName, undefined);
+        assert.equal(tracked.body.data.customerPhone, undefined);
+    });
+
+    test('public: sequential and guessed codes cannot find a shipment', async () => {
+        // The shape the driver app renders (KGL-TRIP-0001) and the shape
+        // the original mockup used (KF-0043) must both be dead ends.
+        for (const guess of ['1', '0001', 'KF-0043', 'KGL-TRIP-0001', 'INZ-00000001']) {
+            const response = await request(app).get(`/api/public/track/${guess}`);
+            assert.equal(response.statusCode, 404, `${guess} should not resolve`);
+        }
+    });
+
+    test('public: order submissions are validated', async () => {
+        await resetPublicRateLimits();
+        const base = {
+            pickupAddress: 'A', deliveryAddress: 'B', cargoType: 'Documents',
+            weightKg: 5, customerName: 'V', customerPhone: '0788123458',
+        };
+        const cases = [
+            [{ ...base, pickupAddress: '' }, 'MISSING_LOCATIONS'],
+            [{ ...base, customerPhone: '12345' }, 'INVALID_PHONE'],
+            [{ ...base, cargoType: 'Gold bullion' }, 'INVALID_CARGO_TYPE'],
+            [{ ...base, weightKg: 999999 }, 'INVALID_WEIGHT'],
+            [{ ...base, weightKg: -1 }, 'INVALID_WEIGHT'],
+        ];
+        for (const [payload, expectedCode] of cases) {
+            const response = await request(app).post('/api/public/orders').send(payload);
+            assert.equal(response.statusCode, 400);
+            assert.equal(response.body.error.code, expectedCode);
+        }
+    });
+
+    test('public: submitted orders reach the dispatch queue with their address and contact', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app)
+            .post('/api/public/orders')
+            .send({
+                pickupAddress: 'Gikondo depot gate 3', deliveryAddress: 'Kacyiru, house 22',
+                cargoType: 'General goods', weightKg: 40,
+                customerName: 'Queue Check', customerPhone: '0788123459',
+            });
+        const token = create.body.data.trackingToken;
+
+        // The regression this guards: these orders were correctly PENDING
+        // but getActiveOrders selected only hub and coordinates, which a
+        // public order has neither of — so a dispatcher saw cargo and
+        // weight with nothing to act on.
+        const queue = await request(app)
+            .get('/api/orders/active')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(queue.statusCode, 200);
+
+        const row = queue.body.data.find((order) => order.tracking_token === token);
+        assert.ok(row, 'public order should appear in the dispatch queue');
+        assert.equal(row.source, 'public');
+        assert.equal(row.pickup_address_text, 'Gikondo depot gate 3');
+        assert.equal(row.delivery_address_text, 'Kacyiru, house 22');
+        assert.equal(row.customer_phone, '+250788123459');
     });
 
     test.after(async () => {
