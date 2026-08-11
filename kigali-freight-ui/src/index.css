@@ -17,6 +17,36 @@
   --color-paper: #f4efe4;
   --color-steel: #8a9188;
   --color-line: #f4efe4;
+
+  /* Customer-facing palette. Not the same as the dispatcher tokens above,
+     and deliberately so: those are a warm near-black with route orange,
+     while the Inzira brand everyone outside the office actually sees — the
+     driver app, the launcher icon, the browser favicon — is deep navy with
+     electric jade. The public site is the brand's face, so it matches the
+     brand rather than the internal tool. Values are lifted from the driver
+     app's theme.ts so the two cannot drift. */
+  --color-brand-ink: #050c18;
+  --color-brand-surface: #0a1628;
+  --color-brand-surface2: #0f1e35;
+  --color-brand-jade: #00d97c;
+  --color-brand-jade-deep: #00a85f;
+  --color-brand-text: #f2f6fb;
+  --color-brand-muted: #7c8aa6;
+  --color-brand-line: rgba(242, 246, 251, 0.1);
+
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+}
+
+/* The dispatcher board is a fixed full-screen app, hence overflow:hidden
+   on the root elements below. A marketing page has to scroll, so the
+   public surface opts back out for as long as it is mounted. */
+html.allow-scroll,
+html.allow-scroll body,
+html.allow-scroll #root {
+  overflow-y: auto;
+  height: auto;
+  min-height: 100%;
 }
 
 body, html, #root {

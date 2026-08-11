@@ -17,6 +17,11 @@ const AdminControlCenterPage = lazy(() => import('./components/AdminControlCente
 // Wall displays (control room, dispatch desk, warehouse) — no login, no
 // SocketProvider, code-split for the same reason as the two above.
 const KioskApp = lazy(() => import('./kiosk/KioskApp'));
+// The customer-facing site. Code-split for the same reason as the rest:
+// a dispatcher signing in should not download the marketing pages, and a
+// customer placing an order should not download Leaflet and the admin
+// centre.
+const PublicSite = lazy(() => import('./public/PublicSite'));
 
 function ScreenLoading() {
   return (
@@ -58,15 +63,32 @@ function AppShell() {
 
 export default function App() {
   // Checked once, not routed — there's no router in this app (see the
-  // comment on AppShell above), and one static path for an unattended
-  // device doesn't justify adding one. A kiosk gets its own tree entirely,
-  // not just a different screen inside SocketProvider's dispatcher-only
-  // login/CRUD context.
-  if (window.location.pathname.startsWith('/kiosk')) {
+  // comment on AppShell above), and a handful of static paths for
+  // unattended devices and public pages doesn't justify adding one. Each
+  // gets its own tree entirely, not just a different screen inside
+  // SocketProvider's dispatcher-only login/CRUD context.
+  const path = window.location.pathname;
+
+  if (path.startsWith('/kiosk')) {
     return (
       <ErrorBoundary>
         <Suspense fallback={<ScreenLoading />}>
           <KioskApp />
+        </Suspense>
+      </ErrorBoundary>
+    );
+  }
+
+  // The customer site owns the root, and the dispatcher board moved to
+  // /dispatch. A company's public pages are what a stranger typing the
+  // domain should get; the internal tool is the thing that needs a path.
+  // Deliberately not inside SocketProvider — that context assumes a
+  // dispatcher session and starts fetching authenticated feeds.
+  if (!path.startsWith('/dispatch')) {
+    return (
+      <ErrorBoundary>
+        <Suspense fallback={<ScreenLoading />}>
+          <PublicSite />
         </Suspense>
       </ErrorBoundary>
     );
