@@ -658,8 +658,10 @@ const styles = StyleSheet.create({
   logoutText: { color: theme.colors.danger, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
   diagnosticFooter: {
     color: theme.colors.muted,
+    // No lineHeight override here — the scale pairs 11/15 deliberately,
+    // and the old hardcoded 13 crushed the leading on the one block of
+    // text most likely to wrap onto several lines.
     ...theme.type.micro,
-    lineHeight: 13,
     textAlign: 'center',
     marginTop: 16,
     fontFamily: theme.fonts.mono,

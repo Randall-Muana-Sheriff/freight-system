@@ -78,8 +78,15 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: theme.colors.ink,
-        fontFamily: theme.fonts.body,
-        fontWeight: '700',
+        // Was fontFamily: body + fontWeight: '700'. Only DM Sans 400 is
+        // loaded under `body`, so on Android that asks for a weight that
+        // has no font file behind it and gets a synthesised fake bold
+        // rather than the real SemiBold sitting right there. Naming the
+        // face directly is the only thing that actually selects it.
+        // It also carried no size token at all, so it fell through to
+        // React Native's default 14 instead of the scale.
+        ...theme.type.body,
+        fontFamily: theme.fonts.bodySemiBold,
     },
     detail: {
         marginTop: 16,

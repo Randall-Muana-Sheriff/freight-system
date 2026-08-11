@@ -310,7 +310,7 @@ export function AuthFlow() {
               <TouchableOpacity onPress={onResend} hitSlop={8} disabled={resent}>
                 <Text style={{ color: theme.colors.muted, ...theme.type.bodySm }}>
                   {resent ? (
-                    <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Code resent ✓</Text>
+                    <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bodySemiBold }}>Code resent ✓</Text>
                   ) : (
                     <>
                       Didn&apos;t receive it? <Text style={{ color: theme.colors.primary, fontFamily: theme.fonts.bodySemiBold }}>Resend code</Text>
