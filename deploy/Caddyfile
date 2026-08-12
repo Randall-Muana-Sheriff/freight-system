@@ -35,3 +35,10 @@
 	reverse_proxy ui:80
 	encode gzip
 }
+
+# One canonical home for the public site. Serving it on both the apex and
+# www would show search engines two copies of every page; a redirect keeps
+# the ranking on one address.
+www.{$SITE_DOMAIN:localhost.invalid} {
+	redir https://{$SITE_DOMAIN:localhost.invalid}{uri} permanent
+}
