@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./fonts.css";
 
 /* Freight-brand tokens shared in spirit with the driver mobile app: a
    warm near-black ground (not navy-tech-blue), route-marker orange as the

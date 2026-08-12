@@ -36,6 +36,13 @@ sed "s#__API_CONNECT_SRC__#${CONNECT_SRC}#" /etc/nginx/templates/nginx.conf.temp
 # crawler at pages that do not exist.
 SITE_URL="${SITE_URL:-}"
 
+# Served on the dispatch./admin./ops. hosts (see nginx.conf.template). The
+# board behind them is a private tool; none of it should be indexed.
+cat > /usr/share/nginx/html/robots-staff.txt <<'STAFF_EOF'
+User-agent: *
+Disallow: /
+STAFF_EOF
+
 if [ -n "$SITE_URL" ]; then
     SITE_URL=$(echo "$SITE_URL" | sed 's#/*$##')  # no trailing slash
 
@@ -51,7 +58,7 @@ Disallow: /kiosk
 Sitemap: ${SITE_URL}/sitemap.xml
 EOF
 
-    # Only the three customer-facing routes. /track is included without a
+    # Only the three customer-facing routes. /track is listed without a
     # code because the empty page is a legitimate landing point — someone
     # searching "track inzira shipment" should be able to arrive there.
     cat > /usr/share/nginx/html/sitemap.xml <<EOF
@@ -63,14 +70,16 @@ EOF
 </urlset>
 EOF
 else
-    # Without a known host, refuse to guess. An unrestricted robots.txt is
-    # the safe default; a wrong sitemap is not.
+    # Without a known host, refuse to guess. A permissive robots.txt is a
+    # safe default; a sitemap naming the wrong host is not, so it is simply
+    # not written.
     cat > /usr/share/nginx/html/robots.txt <<'EOF'
 User-agent: *
 Allow: /
 Disallow: /dispatch
 Disallow: /kiosk
 EOF
+    rm -f /usr/share/nginx/html/sitemap.xml
     echo "WARNING: SITE_URL is not set — sitemap.xml was not generated and robots.txt carries no Sitemap line." >&2
 fi
 

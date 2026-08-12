@@ -14,15 +14,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
-    <!-- Archivo is carried on its width axis (wdth), not just weight: set
-         wide and heavy it reads as transport signage, which is the register
-         a freight company should speak in. Plex Mono handles codes,
-         coordinates and times — freight runs on documents, and those want a
-         face that looks like it belongs on one. display=swap so the hero
-         paints in a fallback immediately rather than holding blank. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <!-- Fonts are self-hosted (src/fonts.css) rather than linked from
+         Google: this page's CSP is font-src 'self', so a fonts.gstatic.com
+         face is blocked outright and the whole type system silently falls
+         back. Archivo is carried on its width axis, not just weight — set
+         wide and heavy it reads as transport signage. Plex Mono handles
+         codes, coordinates and times. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#050C18" />
 

@@ -6,7 +6,13 @@
 #
 # Required env vars (set in .env.production, never committed):
 #   API_DOMAIN=api.yourcompany.com
-#   APP_DOMAIN=dispatch.yourcompany.com
+#   APP_DOMAIN=dispatch.yourcompany.com     <- staff board
+#   SITE_DOMAIN=yourcompany.com             <- public site (optional)
+#
+# APP_DOMAIN and SITE_DOMAIN both proxy to the same container; the app
+# decides which face to serve from the hostname (see src/utils/surface.ts),
+# so a host called "dispatch" gets the board at its root and the apex gets
+# the customer site.
 
 {$API_DOMAIN} {
 	reverse_proxy router:5000
@@ -18,6 +24,14 @@
 }
 
 {$APP_DOMAIN} {
+	reverse_proxy ui:80
+	encode gzip
+}
+
+# The public site. Optional: until SITE_DOMAIN's DNS points here, leave it
+# unset and Caddy skips this block rather than failing to start — the
+# customer pages stay reachable on APP_DOMAIN in the meantime.
+{$SITE_DOMAIN:localhost.invalid} {
 	reverse_proxy ui:80
 	encode gzip
 }

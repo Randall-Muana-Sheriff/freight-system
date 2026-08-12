@@ -102,6 +102,8 @@ services:
     environment:
       API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in .env.production (e.g. api.yourcompany.com)}
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.production (e.g. dispatch.yourcompany.com)}
+      # Optional until the apex domain's DNS is pointed at this host.
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost.invalid}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

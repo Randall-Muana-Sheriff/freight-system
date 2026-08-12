@@ -6,6 +6,7 @@ import ImageLightbox from './components/ImageLightbox';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { setNoIndex } from './utils/seo';
+import { resolveSurface } from './utils/surface';
 
 // Only one of these two ever renders at a time (gated by showAdminCenter),
 // and neither is needed at all until after login — code-splitting them
@@ -68,14 +69,17 @@ export default function App() {
   // unattended devices and public pages doesn't justify adding one. Each
   // gets its own tree entirely, not just a different screen inside
   // SocketProvider's dispatcher-only login/CRUD context.
-  const path = window.location.pathname;
+  // Decided by hostname first, then path — see utils/surface.ts. A host
+  // called "dispatch" serves the board at its own root, so the team's
+  // existing bookmarks keep working; /dispatch still works anywhere.
+  const surface = resolveSurface();
 
   // Neither the dispatcher board nor a wall display belongs in a search
   // result. Set before render so it is in place by the time a crawler
   // finishes executing the page.
-  if (path.startsWith('/dispatch') || path.startsWith('/kiosk')) setNoIndex();
+  if (surface !== 'public') setNoIndex();
 
-  if (path.startsWith('/kiosk')) {
+  if (surface === 'kiosk') {
     return (
       <ErrorBoundary>
         <Suspense fallback={<ScreenLoading />}>
@@ -85,12 +89,10 @@ export default function App() {
     );
   }
 
-  // The customer site owns the root, and the dispatcher board moved to
-  // /dispatch. A company's public pages are what a stranger typing the
-  // domain should get; the internal tool is the thing that needs a path.
-  // Deliberately not inside SocketProvider — that context assumes a
-  // dispatcher session and starts fetching authenticated feeds.
-  if (!path.startsWith('/dispatch')) {
+  // The customer site owns the public host. Deliberately not inside
+  // SocketProvider — that context assumes a dispatcher session and starts
+  // fetching authenticated feeds.
+  if (surface === 'public') {
     return (
       <ErrorBoundary>
         <Suspense fallback={<ScreenLoading />}>
