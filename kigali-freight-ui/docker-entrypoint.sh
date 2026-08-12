@@ -58,10 +58,22 @@ Disallow: /kiosk
 Sitemap: ${SITE_URL}/sitemap.xml
 EOF
 
-    # Only the three customer-facing routes. /track is listed without a
-    # code because the empty page is a legitimate landing point — someone
-    # searching "track inzira shipment" should be able to arrive there.
-    cat > /usr/share/nginx/html/sitemap.xml <<EOF
+    # PRE_LAUNCH=1 while the root serves the countdown page. Listing the
+    # booking and tracking pages then would have Google index a bookable
+    # service that the front page says is not open yet — so only the
+    # holding page is offered until launch.
+    if [ "${PRE_LAUNCH:-0}" = "1" ]; then
+        cat > /usr/share/nginx/html/sitemap.xml <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>${SITE_URL}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+</urlset>
+EOF
+    else
+        # /track is listed without a code because the empty page is a
+        # legitimate landing point — someone searching "track inzira
+        # shipment" should be able to arrive there.
+        cat > /usr/share/nginx/html/sitemap.xml <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>${SITE_URL}/</loc><changefreq>monthly</changefreq><priority>1.0</priority></url>
@@ -69,6 +81,7 @@ EOF
   <url><loc>${SITE_URL}/track</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
 </urlset>
 EOF
+    fi
 else
     # Without a known host, refuse to guess. A permissive robots.txt is a
     # safe default; a sitemap naming the wrong host is not, so it is simply

@@ -178,6 +178,7 @@ services:
     container_name: inzira-ui
     environment:
       SITE_URL: ${SITE_URL:-}
+      PRE_LAUNCH: ${PRE_LAUNCH:-0}
       API_BASE_URL: http://localhost:5000
     ports:
       - "5173:80"
