@@ -9,7 +9,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: kigali_freight
     ports:
-      - "5432:5432"
+      # Overridable because another project on the same machine may already
+      # hold 5432. Production doesn't publish this at all (the prod overlay
+      # resets ports), so this only affects local development.
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

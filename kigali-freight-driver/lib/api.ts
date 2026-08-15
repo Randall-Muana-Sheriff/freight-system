@@ -47,6 +47,17 @@ export type DriverAssignment = {
   delivery_lat?: number;
   priority?: 'high' | 'normal' | 'low';
   updated_at?: string;
+  // Customer-placed orders (source 'public') arrive with no hub and no
+  // coordinates until a dispatcher places them on the map. On those, these
+  // free-text fields are the only description of where the job goes, and
+  // the customer is the person to ring — recipient_name/phone are only
+  // filled in when a dispatcher typed them.
+  source?: 'dispatch' | 'public';
+  pickup_address_text?: string | null;
+  delivery_address_text?: string | null;
+  special_instructions?: string | null;
+  customer_name?: string | null;
+  customer_phone?: string | null;
 };
 
 // The rate-limit middleware already computes the exact remaining wait as

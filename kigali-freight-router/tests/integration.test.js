@@ -672,6 +672,47 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(row.customer_phone, '+250788123459');
     });
 
+    test('public: an assigned customer order reaches the driver deliverable', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Gikondo depot, gate 3',
+            deliveryAddress: 'Kimironko Market, shop 14',
+            cargoType: 'Retail stock', weightKg: 180,
+            customerName: 'Aline Uwase', customerPhone: '0788555333',
+            specialInstructions: 'Ask for Claudine at the gate.',
+        });
+        assert.equal(create.statusCode, 201);
+        const token = create.body.data.trackingToken;
+
+        const queue = await request(app).get('/api/orders/active')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const row = queue.body.data.find((o) => o.tracking_token === token);
+        assert.ok(row, 'customer order should be in the dispatch queue');
+
+        const assign = await request(app).post('/api/orders/assign')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [row.id], driverName: driverPhone });
+        assert.equal(assign.statusCode, 200, JSON.stringify(assign.body));
+
+        // The regression this exists for: assignment always worked, but the
+        // driver's payload carried no hub, no coordinates and no recipient,
+        // so a customer order arrived with nowhere to go and nobody to ring
+        // — assignable but undeliverable.
+        const detail = await request(app).get(`/api/orders/${row.id}`)
+            .set('Authorization', `Bearer ${driverToken}`);
+        assert.equal(detail.statusCode, 200);
+        assert.equal(detail.body.data.pickup_address_text, 'Gikondo depot, gate 3');
+        assert.equal(detail.body.data.delivery_address_text, 'Kimironko Market, shop 14');
+        assert.equal(detail.body.data.customer_phone, '+250788555333');
+        assert.match(detail.body.data.special_instructions, /Claudine/);
+
+        const feed = await request(app).get('/api/orders/driver/assignments')
+            .set('Authorization', `Bearer ${driverToken}`);
+        const job = feed.body.data.find((o) => o.id === row.id);
+        assert.ok(job, 'assigned order should appear in the driver feed');
+        assert.equal(job.delivery_address_text, 'Kimironko Market, shop 14');
+    });
+
     test.after(async () => {
         await shutdownServices();
     });

@@ -218,6 +218,14 @@ export default function TripDetailScreen() {
     }
   };
 
+  // On a dispatcher-entered order the person at the door is the recipient.
+  // On a customer-placed one nobody typed a recipient, and the customer is
+  // who the driver needs — without this the call button simply vanished on
+  // every public order, leaving the driver no number at all.
+  const contactName = order?.recipient_name || order?.customer_name || null;
+  const contactPhone = order?.recipient_phone || order?.customer_phone || null;
+  const contactLabel = order?.recipient_name || order?.recipient_phone ? 'Recipient' : 'Customer';
+
   const activeStep = stepIndexForStatus(order?.status);
   const currentStatusIndex = statusOrderIndex(order?.status);
   // The one status ahead of where this job actually is right now — once
@@ -245,7 +253,13 @@ export default function TripDetailScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Ionicons name="location-outline" size={14} color={theme.colors.accent} />
-              <Text style={styles.summaryText}>{order.origin_hub_name || 'Pickup location'}</Text>
+              {/* Customer orders have no hub — the address they typed is
+                  the only pickup there is. Never falls back to the bare
+                  word "Pickup location", which reads like information and
+                  is not. */}
+              <Text style={styles.summaryText}>
+                {order.pickup_address_text || order.origin_hub_name || 'Pickup to be confirmed'}
+              </Text>
             </View>
             <View style={styles.summaryItem}>
               <Ionicons name="cube-outline" size={14} color={theme.colors.primary} />
@@ -260,27 +274,54 @@ export default function TripDetailScreen() {
             <Text style={styles.value}>{order.cargo_description || 'Untitled shipment'}</Text>
           </View>
 
-          {order.recipient_name || order.recipient_phone ? (
+          {order.delivery_address_text ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.infoBlock}>
+                <Text style={styles.label}>Deliver to</Text>
+                <Text style={styles.value}>{order.delivery_address_text}</Text>
+              </View>
+            </>
+          ) : null}
+
+          {/* The customer wrote this for the driver, not for dispatch —
+              access codes, "ask for Claudine at the gate", fragile. It is
+              the one field on the screen that changes what they do on
+              arrival, so it is called out rather than blended in. */}
+          {order.special_instructions ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.noteBlock}>
+                <Ionicons name="alert-circle-outline" size={15} color={theme.colors.warning} />
+                <View style={styles.noteBody}>
+                  <Text style={styles.label}>From the customer</Text>
+                  <Text style={styles.value}>{order.special_instructions}</Text>
+                </View>
+              </View>
+            </>
+          ) : null}
+
+          {contactName || contactPhone ? (
             <>
               <View style={styles.divider} />
               <TouchableOpacity
                 style={styles.recipientRow}
-                activeOpacity={order.recipient_phone ? 0.7 : 1}
-                disabled={!order.recipient_phone}
-                onPress={() => order.recipient_phone && Linking.openURL(`tel:${order.recipient_phone}`)}
-                accessibilityRole={order.recipient_phone ? 'button' : 'text'}
+                activeOpacity={contactPhone ? 0.7 : 1}
+                disabled={!contactPhone}
+                onPress={() => contactPhone && Linking.openURL(`tel:${contactPhone}`)}
+                accessibilityRole={contactPhone ? 'button' : 'text'}
                 accessibilityLabel={
-                  order.recipient_phone
-                    ? `Call recipient ${order.recipient_name ?? ''} on ${order.recipient_phone}`
-                    : `Recipient ${order.recipient_name ?? 'not provided'}`
+                  contactPhone
+                    ? `Call ${contactLabel.toLowerCase()} ${contactName ?? ''} on ${contactPhone}`
+                    : `${contactLabel} ${contactName ?? 'not provided'}`
                 }
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.label}>Recipient</Text>
-                  <Text style={styles.value}>{order.recipient_name || 'Name not provided'}</Text>
-                  {order.recipient_phone ? <Text style={styles.recipientPhone}>{order.recipient_phone}</Text> : null}
+                  <Text style={styles.label}>{contactLabel}</Text>
+                  <Text style={styles.value}>{contactName || 'Name not provided'}</Text>
+                  {contactPhone ? <Text style={styles.recipientPhone}>{contactPhone}</Text> : null}
                 </View>
-                {order.recipient_phone ? (
+                {contactPhone ? (
                   <View style={styles.callBadge}>
                     <Ionicons name="call-outline" size={18} color={theme.colors.paper} />
                   </View>
@@ -418,6 +459,8 @@ const styles = StyleSheet.create({
   infoBlock: { flex: 1 },
   label: { color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, ...theme.type.micro, fontFamily: theme.fonts.mono },
   value: { color: theme.colors.text, marginTop: 6, ...theme.type.title, fontFamily: theme.fonts.headingBlack },
+  noteBlock: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  noteBody: { flex: 1 },
   recipientRow: {
     flexDirection: 'row',
     alignItems: 'center',

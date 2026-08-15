@@ -18,6 +18,16 @@ export const LAUNCH_DATE = new Date('2026-11-02T08:00:00+02:00');
 // pre-launch page — a precise day invites people to hold you to it.
 export const LAUNCH_LABEL = 'November 2026';
 
+// Master switch for the holding page, separate from the date so turning it
+// off does not mean losing or faking LAUNCH_DATE.
+//
+//   true  — the root serves the countdown until LAUNCH_DATE passes
+//   false — the root serves the real site now, whatever the date says
+//
+// Set to false while the booking flow is being worked on. Flip back to
+// true to put the countdown up again; nothing else needs changing.
+export const COUNTDOWN_ENABLED = false;
+
 export function isPreLaunch(now: Date = new Date()) {
-    return now.getTime() < LAUNCH_DATE.getTime();
+    return COUNTDOWN_ENABLED && now.getTime() < LAUNCH_DATE.getTime();
 }

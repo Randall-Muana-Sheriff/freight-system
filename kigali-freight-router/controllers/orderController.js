@@ -76,7 +76,19 @@ export const OrderController = {
                     recipient_name,
                     recipient_phone,
                     priority,
-                    updated_at
+                    updated_at,
+                    -- A customer-placed order has no hub and no coordinates
+                    -- until a dispatcher places it, so without these the
+                    -- driver received a job with no pickup, no destination
+                    -- and nobody to call — assignable but undeliverable.
+                    -- The customer is also the contact here: recipient_name
+                    -- is only filled in when a dispatcher typed one.
+                    source,
+                    pickup_address_text,
+                    delivery_address_text,
+                    special_instructions,
+                    customer_name,
+                    customer_phone
                 FROM orders
                 WHERE LOWER(COALESCE(assigned_to, '')) = LOWER($1)
                   AND UPPER(COALESCE(status, 'PENDING')) NOT IN ('DELIVERED', 'CANCELLED')
@@ -1009,6 +1021,15 @@ export const OrderController = {
                     o.recipient_phone,
                     o.priority,
                     o.updated_at,
+                    -- Same reason as getDriverAssignments: on a
+                    -- customer-placed order these are the only description
+                    -- of where the job goes and who to ring.
+                    o.source,
+                    o.pickup_address_text,
+                    o.delivery_address_text,
+                    o.special_instructions,
+                    o.customer_name,
+                    o.customer_phone,
                     dl.lat AS driver_lat,
                     dl.lng AS driver_lng,
                     EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS telemetry_age_seconds,

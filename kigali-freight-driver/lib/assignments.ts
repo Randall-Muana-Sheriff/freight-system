@@ -33,18 +33,35 @@ function prettyStatus(status?: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+// What a driver needs off a card is where to go, in words. A hub name is
+// words; a coordinate pair is not — "-1.9396, 30.0617" told them nothing
+// they could act on without opening the map. Customer-placed orders carry
+// the address the customer actually typed, so prefer that over both.
+function describePlace(text?: string | null, hub?: string, lat?: number, lng?: number) {
+  if (text && text.trim()) return text.trim();
+  if (hub && hub.trim()) return hub.trim();
+  if (lat != null && lng != null) return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+  return null;
+}
+
 export function toDriverAssignmentCard(order: DriverAssignment): DriverAssignmentCard {
   const title = order.cargo_description || `Shipment #${order.id}`;
-  const origin = order.origin_hub_name || 'Assigned route';
-  const destination = order.delivery_lat != null && order.delivery_lng != null
-    ? `${order.delivery_lat.toFixed(4)}, ${order.delivery_lng.toFixed(4)}`
-    : 'Destination pending';
+  const origin = describePlace(order.pickup_address_text, order.origin_hub_name);
+  const destination = describePlace(
+    order.delivery_address_text,
+    undefined,
+    order.delivery_lat,
+    order.delivery_lng
+  );
 
   return {
     id: order.id,
     title,
-    route: `${origin} -> Delivery`,
-    destination,
+    // Says plainly when dispatch has not set the pickup yet, rather than
+    // inventing "Assigned route" — a driver who reads that heads off with
+    // no idea anything is missing.
+    route: `${origin ?? 'Pickup to be confirmed'} → ${destination ?? 'Destination to be confirmed'}`,
+    destination: destination ?? 'Destination to be confirmed',
     eta: 'Dispatch-managed',
     status: prettyStatus(order.status),
     priority: order.priority || 'normal',
