@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import pool from '../config/db.js';
 import { sendSms } from '../services/smsService.js';
 import { appendAuditLog } from '../services/auditLogService.js';
+import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../services/alertDispatchService.js';
 import { ok, fail } from '../utils/httpResponse.js';
 import { normalizePhone } from '../utils/phone.js';
 import { isValidWeightKg } from '../utils/validators.js';
@@ -196,11 +197,29 @@ export const PublicOrderController = {
                 return fail(res, { status: 400, code: 'INVALID_PHONE', message: 'That phone number does not look right. Use the 07… or +250… form.' });
             }
 
-            await pool.query(
-                `INSERT INTO contact_messages (name, phone, email, message) VALUES ($1, $2, $3, $4)`,
+            const saved = await pool.query(
+                `INSERT INTO contact_messages (name, phone, email, message) VALUES ($1, $2, $3, $4) RETURNING id`,
                 [name, phone, email, message]
             );
-            return ok(res, { received: true }, { status: 201 });
+
+            // Storing it is not the same as anyone reading it. Nothing in
+            // the app surfaces contact_messages, so without this an enquiry
+            // lands in a table no human opens — while the page promises the
+            // sender an answer the same day. The alert goes to the channel
+            // safety alerts already use, so it reaches someone who is
+            // actually watching.
+            //
+            // Not awaited: a customer's "message sent" must not depend on
+            // Telegram being up, and the row is already committed above.
+            dispatchExternalAlert(
+                `*New enquiry* from ${escapeAlertText(name)}\n`
+                + `📞 ${escapeAlertText(phone)}`
+                + (email ? `\n✉️ ${escapeAlertText(email)}` : '')
+                + `\n\n${escapeAlertText(message)}`,
+                ALERT_CATEGORY.ENQUIRY
+            ).catch(() => {});
+
+            return ok(res, { received: true, id: saved.rows[0].id }, { status: 201 });
         } catch (error) {
             console.error(`❌ public submitContact failed [${req.requestId || 'no-request-id'}]:`, error.stack || error.message);
             return fail(res, { status: 500, code: 'CONTACT_FAILED', message: 'Could not send your message just now. Please try again.' });

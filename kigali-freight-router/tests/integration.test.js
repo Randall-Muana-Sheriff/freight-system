@@ -750,6 +750,32 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.ok(ranked.length > 0, 'a placed order should rank drivers by real distance');
     });
 
+    test('public: a contact enquiry is stored and raises an alert', async () => {
+        await resetPublicRateLimits();
+        const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');
+
+        // Text chosen to break Telegram's Markdown parser if it were sent
+        // raw — the API rejects an unbalanced * or _, and dispatchExternal
+        // Alert swallows that, so the enquiry would vanish with no trace.
+        const response = await request(app).post('/api/public/contact').send({
+            name: 'Samuel *Trader*',
+            phone: '0788556444',
+            message: 'Need 2*3 pallets weekly. price_list please [urgent]',
+        });
+        assert.equal(response.statusCode, 201);
+        assert.ok(response.body.data.id, 'the stored row id comes back');
+
+        const after = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');
+        assert.equal(after.rows[0].n, before.rows[0].n + 1);
+
+        const row = await pool.query(
+            'SELECT name, phone, handled_at FROM contact_messages WHERE id = $1',
+            [response.body.data.id]
+        );
+        assert.equal(row.rows[0].phone, '+250788556444', 'phone is normalised like every other number');
+        assert.equal(row.rows[0].handled_at, null, 'a new enquiry starts unhandled');
+    });
+
     test.after(async () => {
         await shutdownServices();
     });

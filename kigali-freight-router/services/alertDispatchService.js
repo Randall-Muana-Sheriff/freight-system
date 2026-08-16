@@ -15,6 +15,10 @@ export const ALERT_CATEGORY = {
     DELIVERY: 'DELIVERY',
     INCIDENT: 'INCIDENT',
     SYSTEM: 'SYSTEM',
+    // A sales enquiry from the public site's contact form. Not an
+    // emergency, but it reaches a human the same way, because otherwise it
+    // reaches nobody at all.
+    ENQUIRY: 'ENQUIRY',
 };
 
 // Critical, time-sensitive alerts (safety incidents, driver-reported
@@ -25,6 +29,14 @@ export const ALERT_CATEGORY = {
 // optional integration in this app. Extracted out of server.js so
 // controllers (incidentController.js) and the process-level crash handler
 // can reach it too, not just the telemetry queue.
+// Telegram's legacy Markdown treats these as syntax, and an unbalanced one
+// makes the API reject the whole message — which the catch below would
+// swallow, losing the alert silently. Everything the app writes itself is
+// safe; anything a customer typed is not, so interpolate it through here.
+export function escapeAlertText(value) {
+    return String(value ?? '').replace(/([_*`\[])/g, '\\$1');
+}
+
 export async function dispatchExternalAlert(message, category) {
     // A hashtag, not a `[SAFETY]`-style bracket tag: square brackets collide
     // with Telegram's Markdown link syntax (`[text](url)`) under
