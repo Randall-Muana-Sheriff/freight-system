@@ -325,6 +325,33 @@ export default function IncidentsScreen() {
         </TouchableOpacity>
       )}
 
+      {/* First in the form, not last. A driver at the roadside can raise
+          a usable report by pointing the camera and sending — the fields
+          below are all optional once there is a photo. It sat underneath
+          them for a while, which buried the fastest path behind two
+          keyboards. */}
+      <Text style={styles.label}>Photo (optional)</Text>
+      {photo ? (
+        <View style={styles.photoPreviewWrap}>
+          <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
+          <TouchableOpacity style={styles.photoRemoveButton} activeOpacity={0.85} onPress={() => setPhoto(null)}>
+            <Ionicons name="close" size={16} color={theme.colors.paper} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.photoAttachButton}
+          activeOpacity={0.8}
+          onPress={() => {
+            setToast(null);
+            setPickingPhotoSource(true);
+          }}
+        >
+          <Ionicons name="camera-outline" size={18} color={theme.colors.primary} />
+          <Text style={styles.photoAttachText}>Attach a photo — we&apos;ll help draft the report</Text>
+        </TouchableOpacity>
+      )}
+
       <Text style={styles.label}>Incident title (optional)</Text>
       {isCustomTitle ? (
         <View style={[styles.input, styles.selectInput]}>
@@ -367,28 +394,6 @@ export default function IncidentsScreen() {
         }}
       />
       {descriptionMissing ? <Text style={styles.fieldError}>Add a few details or attach a photo below.</Text> : null}
-
-      <Text style={styles.label}>Photo (optional)</Text>
-      {photo ? (
-        <View style={styles.photoPreviewWrap}>
-          <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
-          <TouchableOpacity style={styles.photoRemoveButton} activeOpacity={0.85} onPress={() => setPhoto(null)}>
-            <Ionicons name="close" size={16} color={theme.colors.paper} />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.photoAttachButton}
-          activeOpacity={0.8}
-          onPress={() => {
-            setToast(null);
-            setPickingPhotoSource(true);
-          }}
-        >
-          <Ionicons name="camera-outline" size={18} color={theme.colors.primary} />
-          <Text style={styles.photoAttachText}>Attach a photo — we&apos;ll help draft the report</Text>
-        </TouchableOpacity>
-      )}
 
       <TouchableOpacity activeOpacity={0.9} style={styles.button} onPress={onSubmit} disabled={sending}>
         <Ionicons name="warning-outline" size={16} color={theme.colors.paper} />
