@@ -133,6 +133,10 @@ function formatDeliveredDate(value?: string | null) {
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Three is enough to answer "did my last few deliveries go through?"
+// without the card swallowing the screen. The rest are one tap away.
+const HISTORY_PREVIEW = 3;
+
 export default function ProfileScreen() {
   const { token, pendingSyncCount, isOffline, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
   const [profile, setProfile] = useState<MyProfile | null>(null);
@@ -144,6 +148,7 @@ export default function ProfileScreen() {
   // undefined = still loading; null = confirmed there isn't one yet.
   const [vehicle, setVehicle] = useState<MyVehicle | null | undefined>(undefined);
   const [completedDeliveries, setCompletedDeliveries] = useState<CompletedDelivery[] | undefined>(undefined);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const [documentsVerified, setDocumentsVerified] = useState<boolean | null | undefined>(undefined);
   const [approvedDocCount, setApprovedDocCount] = useState(0);
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
@@ -454,7 +459,7 @@ export default function ProfileScreen() {
           ) : (
             <>
               <View>
-                {completedDeliveries.slice(0, 8).map((item) => (
+                {(historyExpanded ? completedDeliveries : completedDeliveries.slice(0, HISTORY_PREVIEW)).map((item) => (
                   <View key={item.id} style={styles.historyRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.historyTitle} numberOfLines={1}>{item.cargo_description || `Shipment #${item.id}`}</Text>
@@ -468,8 +473,33 @@ export default function ProfileScreen() {
                   </View>
                 ))}
               </View>
-              {completedDeliveries.length > 8 ? (
-                <Text style={styles.historyMore}>+{completedDeliveries.length - 8} more in your history</Text>
+              {/* Was a plain line of text saying "+4 more in your
+                  history" — which told a driver more existed and gave
+                  them no way to reach it. */}
+              {completedDeliveries.length > HISTORY_PREVIEW ? (
+                <TouchableOpacity
+                  onPress={() => setHistoryExpanded((open) => !open)}
+                  style={styles.historyToggle}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: historyExpanded }}
+                  accessibilityLabel={
+                    historyExpanded
+                      ? 'Show fewer deliveries'
+                      : `Show all ${completedDeliveries.length} deliveries`
+                  }
+                >
+                  <Text style={styles.historyMore}>
+                    {historyExpanded
+                      ? 'Show less'
+                      : `See all ${completedDeliveries.length} deliveries`}
+                  </Text>
+                  <Ionicons
+                    name={historyExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color={theme.colors.accent}
+                  />
+                </TouchableOpacity>
               ) : null}
             </>
           )}
@@ -607,6 +637,7 @@ const styles = StyleSheet.create({
   },
   historyTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   historyMeta: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.mono },
+  historyToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   historyMore: { color: theme.colors.muted, ...theme.type.micro, textAlign: 'center', fontFamily: theme.fonts.body },
   primaryButton: {
     flexDirection: 'row',
