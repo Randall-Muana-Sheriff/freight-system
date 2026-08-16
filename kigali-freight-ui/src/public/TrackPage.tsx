@@ -67,7 +67,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                         placeholder="INZ-XXXXXXXX"
                         className="min-w-0 flex-1 bg-transparent py-3.5 font-mono text-lg uppercase tracking-wider text-pub-onink placeholder:text-pub-onink-soft/50 focus:outline-none" />
                     <button type="submit" disabled={loading}
-                        className="shrink-0 px-3 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal disabled:opacity-50">
+                        className="focus-ring shrink-0 px-3 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal disabled:opacity-50">
                         {loading ? 'Looking…' : 'Track →'}
                     </button>
                 </form>
@@ -76,7 +76,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                     <div role="alert" className="mt-10 border-l-2 border-pub-laterite pl-5">
                         <p className="text-[15px] text-pub-onink">{error}</p>
                         <button onClick={() => onNavigate('/order')}
-                            className="data-label mt-3 text-pub-laterite-soft hover:text-pub-onink">
+                            className="focus-ring data-label mt-3 text-pub-laterite-soft hover:text-pub-onink">
                             Book a delivery instead →
                         </button>
                     </div>

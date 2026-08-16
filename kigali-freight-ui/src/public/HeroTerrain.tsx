@@ -117,20 +117,50 @@ export function HeroTerrain() {
             return off;
         };
 
-        const resize = () => {
+        // Rebuilding is expensive — a full marching-squares trace, roughly
+        // 31k height() evaluations at hero size — and the browser fires
+        // resize continuously while a window edge is dragged. Doing it per
+        // event saturated the main thread and, because it also allocated a
+        // fresh ~8MB offscreen canvas each time, churned hundreds of MB a
+        // second. So: reuse the canvases, skip when nothing actually
+        // changed, and coalesce a burst of events into one rebuild.
+        const applyResize = () => {
             const rect = canvas.getBoundingClientRect();
-            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const nextDpr = Math.min(window.devicePixelRatio || 1, 2);
+            const nextW = Math.round(rect.width);
+            const nextH = Math.round(rect.height);
+            // Height-only jitter (mobile URL bars) and no-op resize events
+            // are common; neither warrants a retrace.
+            if (nextW === Math.round(width) && nextH === Math.round(height_) && nextDpr === dpr && terrain) return;
+
+            dpr = nextDpr;
             width = rect.width;
             height_ = rect.height;
             canvas.width = Math.max(1, Math.floor(width * dpr));
             canvas.height = Math.max(1, Math.floor(height_ * dpr));
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             terrain = buildTerrain();
-            lit = document.createElement('canvas');
+
+            // Resized in place rather than replaced — setting width/height
+            // already clears it, and a new element per event was the bulk
+            // of the allocation.
+            if (!lit) lit = document.createElement('canvas');
             lit.width = canvas.width;
             lit.height = canvas.height;
+
+            // Reduced motion draws once and stops, so without this the
+            // canvas would stay blank after a resize.
+            if (reduced) draw();
         };
-        resize();
+
+        let resizeFrame = 0;
+        const resize = () => {
+            if (resizeFrame) return;
+            resizeFrame = requestAnimationFrame(() => {
+                resizeFrame = 0;
+                applyResize();
+            });
+        };
 
         const draw = () => {
             if (!terrain || !lit) return;
@@ -174,6 +204,11 @@ export function HeroTerrain() {
                 frame = requestAnimationFrame(draw);
             }
         };
+
+        // After draw is defined, not before: applyResize calls it under
+        // reduced motion, and a const is in its temporal dead zone until
+        // this point — calling earlier threw and left the hero blank.
+        applyResize();
         draw();
 
         // Eased towards the cursor rather than snapped to it, so the light
@@ -199,6 +234,7 @@ export function HeroTerrain() {
 
         return () => {
             cancelAnimationFrame(frame);
+            if (resizeFrame) cancelAnimationFrame(resizeFrame);
             host?.removeEventListener('pointermove', onMove);
             host?.removeEventListener('pointerleave', onLeave);
             window.removeEventListener('resize', resize);

@@ -98,8 +98,18 @@ export default function PublicSite() {
 
     return (
         <div className="min-h-screen bg-pub-paper font-body text-pub-onpaper antialiased">
+            {/* Four section links and a call to action sit between the top of
+                the page and the content itself. This is the one tab that gets
+                past them, and it stays invisible until it is focused. */}
+            <a href="#main"
+                className="focus-ring sr-only focus:not-sr-only focus:fixed focus:left-5 focus:top-5 focus:z-50 focus:bg-pub-laterite focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-pub-onink">
+                Skip to content
+            </a>
             <PublicHeader onNavigate={navigate} />
-            <main>
+            {/* tabIndex lets the skip link actually move focus here rather
+                than only scrolling, which is the half of it screen readers
+                care about. */}
+            <main id="main" tabIndex={-1} className="focus:outline-none">
                 {route.path === '/preview' ? (
                     <Landing onNavigate={navigate} />
                 ) : route.path === '/order' ? (

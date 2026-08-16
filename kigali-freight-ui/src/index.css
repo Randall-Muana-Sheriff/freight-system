@@ -91,6 +91,19 @@
   text-transform: uppercase;
 }
 
+/* Keyboard focus, in one place for the same reason the display setting is:
+   every focusable control on the public site should ring identically, and
+   the colour should be tunable without visiting twenty call sites.
+   Laterite reads on both grounds — it is the one accent that does — and
+   the offset makes it a ring around the control rather than a border on
+   it, so it never shifts a layout on focus. */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--color-pub-laterite);
+    outline-offset: 3px;
+  }
+}
+
 /* The dispatcher board is a fixed full-screen app, hence overflow:hidden
    on the root elements below. A marketing page has to scroll, so the
    public surface opts back out for as long as it is mounted. */

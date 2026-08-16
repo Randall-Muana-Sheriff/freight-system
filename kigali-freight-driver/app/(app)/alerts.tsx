@@ -35,10 +35,16 @@ export default function AlertsScreen() {
           ))}
         </View>
       ) : (
+        // Names what actually arrives — see the five socket listeners in
+        // lib/liveEvents.ts. The old wording promised "trip status
+        // changes", which is wrong twice over: a driver's own status taps
+        // are deliberately filtered out (initiatedByDriver), and it left
+        // out document decisions and incident replies entirely, the two
+        // things a driver most needs to hear about.
         <EmptyState
           icon="notifications-outline"
           title="No alerts yet"
-          body="Trip status changes and safety events for you will show up here as they happen."
+          body="Changes dispatch makes to your trips, decisions on your documents, replies to your reports, and safety alerts all arrive here."
         />
       )}
     </ScreenShell>

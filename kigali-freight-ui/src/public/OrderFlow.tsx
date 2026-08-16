@@ -8,19 +8,55 @@ import { fetchCargoTypes, submitOrder, type OrderDraft } from './publicApi';
 
 const STEPS = ['Cargo', 'Contact', 'Check'] as const;
 
+// The step lives in the URL and the draft in sessionStorage, so a refresh
+// mid-booking — or a back button pressed out of habit — returns someone to
+// the form as they left it rather than to an empty one. Someone booking
+// freight is often doing it standing next to the cargo on a phone, where
+// both are easy to do by accident and retyping it all is the difference
+// between a booking and an abandoned one.
+const DRAFT_KEY = 'inzira.order.draft';
+
+type StoredDraft = { draft: OrderDraft; weightInput: string };
+
+const EMPTY_DRAFT: OrderDraft = {
+    pickupAddress: '', deliveryAddress: '', cargoType: '', weightKg: 0,
+    specialInstructions: '', customerName: '', customerPhone: '', customerEmail: '',
+};
+
+function readStored(): StoredDraft {
+    try {
+        const raw = sessionStorage.getItem(DRAFT_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw) as Partial<StoredDraft>;
+            return {
+                draft: { ...EMPTY_DRAFT, ...parsed.draft },
+                weightInput: typeof parsed.weightInput === 'string' ? parsed.weightInput : '',
+            };
+        }
+    } catch {
+        // sessionStorage throws outright in some private modes. Not worth
+        // surfacing: the form starts empty, which is what it did before.
+    }
+    return { draft: EMPTY_DRAFT, weightInput: '' };
+}
+
+function readStepParam() {
+    const raw = Number(new URLSearchParams(window.location.search).get('step'));
+    return Number.isInteger(raw) && raw > 0 && raw < STEPS.length ? raw : 0;
+}
+
 const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
 export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }) {
-    const [step, setStep] = useState(0);
+    const [stored] = useState(readStored);
+    const [requestedStep, setRequestedStep] = useState(readStepParam);
     const [cargoTypes, setCargoTypes] = useState<string[]>([]);
-    const [draft, setDraft] = useState<OrderDraft>({
-        pickupAddress: '', deliveryAddress: '', cargoType: '', weightKg: 0,
-        specialInstructions: '', customerName: '', customerPhone: '', customerEmail: '',
-    });
-    const [weightInput, setWeightInput] = useState('');
+    const [draft, setDraft] = useState<OrderDraft>(stored.draft);
+    const [weightInput, setWeightInput] = useState(stored.weightInput);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [token, setToken] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         fetchCargoTypes().then(setCargoTypes).catch(() => setCargoTypes([]));
@@ -29,15 +65,64 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
     const cargoValid = draft.pickupAddress.trim() && draft.deliveryAddress.trim() && draft.cargoType && Number(weightInput) > 0;
     const contactValid = draft.customerName.trim() && draft.customerPhone.trim();
 
+    // A step is only reachable once the ones before it are filled in, which
+    // clamps both a stale ?step= left over from a refresh and a hand-edited
+    // URL. Derived rather than corrected in an effect so there is no frame
+    // where the wrong step is on screen.
+    const step = Math.min(requestedStep, !cargoValid ? 0 : !contactValid ? 1 : 2);
+
+    useEffect(() => {
+        try {
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ draft, weightInput }));
+        } catch {
+            // Storage full or unavailable costs the refresh safety net and
+            // nothing else, so the booking carries on regardless.
+        }
+    }, [draft, weightInput]);
+
+    useEffect(() => {
+        const onPop = () => setRequestedStep(readStepParam());
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, []);
+
+    // Forward moves push an entry so Back walks the form; backward moves hand
+    // off to the browser's own stack rather than pushing a second time.
+    const advance = (next: number) => {
+        window.history.pushState({}, '', next === 0 ? '/order' : `/order?step=${next}`);
+        setRequestedStep(next);
+        window.scrollTo({ top: 0 });
+    };
+
     const confirm = async () => {
         setSubmitting(true);
         setError(null);
         try {
             setToken(await submitOrder({ ...draft, weightKg: Number(weightInput) }));
+            // Placed, so the draft has served its purpose. Leaving a name and
+            // phone number sitting in storage after the fact earns nothing.
+            try {
+                sessionStorage.removeItem(DRAFT_KEY);
+            } catch {
+                // Nothing to clean up if it was never writable.
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Could not place your order.');
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const copyCode = async () => {
+        if (!token) return;
+        try {
+            await navigator.clipboard.writeText(token);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2000);
+        } catch {
+            // The clipboard is permission-gated and absent over plain http.
+            // The code is on screen and selectable, so failing quietly is
+            // honest — an error about copying helps nobody read a number.
         }
     };
 
@@ -56,9 +141,19 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                         details now and will call you if anything needs confirming.
                     </p>
 
-                    <p className="mt-10 border-y border-pub-onink/15 py-7 font-mono text-[clamp(1.8rem,6vw,2.6rem)] tracking-[0.12em] text-pub-signal">
-                        {token}
-                    </p>
+                    {/* The copy sits on the same rule as the code rather than
+                        under it: the instruction is "keep this", and the way
+                        to keep it should be within reach of the thing itself. */}
+                    <div className="mt-10 flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3 border-y border-pub-onink/15 py-7">
+                        <p className="font-mono text-[clamp(1.8rem,6vw,2.6rem)] tracking-[0.12em] text-pub-signal">
+                            {token}
+                        </p>
+                        <button onClick={copyCode}
+                            className="focus-ring data-label shrink-0 text-pub-onink-soft transition-colors hover:text-pub-onink">
+                            {copied ? 'Copied' : 'Copy code'}
+                        </button>
+                    </div>
+                    <p aria-live="polite" className="sr-only">{copied ? 'Tracking code copied' : ''}</p>
 
                     <p className="mt-4 text-sm text-pub-onink-soft">
                         Texted to {draft.customerPhone}. Write it down anyway — a text can go astray.
@@ -66,11 +161,11 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
 
                     <div className="mt-10 flex flex-wrap gap-3">
                         <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
-                            className="bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
+                            className="focus-ring bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
                             Track it now
                         </button>
                         <button onClick={() => onNavigate('/')}
-                            className="border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">
+                            className="focus-ring border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">
                             Done
                         </button>
                     </div>
@@ -185,19 +280,19 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                 </div>
 
                 <div className="mt-12 flex items-center justify-between gap-4 border-t border-pub-onpaper/15 pt-7">
-                    <button onClick={() => (step === 0 ? onNavigate('/') : setStep(step - 1))}
-                        className="text-sm font-semibold text-pub-onpaper-soft hover:text-pub-onpaper">
+                    <button onClick={() => (step === 0 ? onNavigate('/') : window.history.back())}
+                        className="focus-ring text-sm font-semibold text-pub-onpaper-soft hover:text-pub-onpaper">
                         {step === 0 ? 'Cancel' : '← Back'}
                     </button>
 
                     {step < 2 ? (
-                        <button onClick={() => setStep(step + 1)} disabled={step === 0 ? !cargoValid : !contactValid}
-                            className="bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:cursor-not-allowed disabled:opacity-30">
+                        <button onClick={() => advance(step + 1)} disabled={step === 0 ? !cargoValid : !contactValid}
+                            className="focus-ring bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:cursor-not-allowed disabled:opacity-30">
                             Continue
                         </button>
                     ) : (
                         <button onClick={confirm} disabled={submitting}
-                            className="bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                            className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
                             {submitting ? 'Placing…' : 'Place the order'}
                         </button>
                     )}

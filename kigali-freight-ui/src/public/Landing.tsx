@@ -78,7 +78,7 @@ function ContactForm() {
 
             <div className="sm:col-span-2">
                 <button type="submit" disabled={state === 'sending'}
-                    className="bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
+                    className="focus-ring bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
                     {state === 'sending' ? 'Sending…' : 'Send message'}
                 </button>
             </div>
@@ -107,7 +107,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
 
                         <div className="mt-9 flex flex-wrap items-center gap-3">
                             <button data-tour="book" onClick={() => onNavigate('/order')}
-                                className="bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                                className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                                 Book a delivery
                             </button>
                             <form data-tour="track"
@@ -116,7 +116,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                                 <label htmlFor="hero-track" className="sr-only">Tracking code</label>
                                 <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"
                                     className="w-40 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none" />
-                                <button type="submit" className="px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">Track →</button>
+                                <button type="submit" className="focus-ring px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">Track →</button>
                             </form>
                         </div>
                     </div>

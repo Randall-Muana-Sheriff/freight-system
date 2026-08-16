@@ -20,7 +20,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
         <header className="bg-pub-ink">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-5">
                 <button onClick={() => onNavigate('/')} aria-label="Inzira home"
-                    className="flex items-baseline gap-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-pub-laterite">
+                    className="focus-ring flex items-baseline gap-3">
                     <InziraMark className="h-6 w-6 translate-y-1" />
                     <span className="display-tight text-xl text-pub-onink">Inzira</span>
                     {/* The word is Kinyarwanda for "the way". Worth saying
@@ -31,14 +31,14 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                 <nav className="hidden items-center gap-8 md:flex">
                     {SECTIONS.map((section) => (
                         <button key={section.id} onClick={() => scrollToSection(section.id)}
-                            className="text-sm text-pub-onink-soft transition-colors hover:text-pub-onink">
+                            className="focus-ring text-sm text-pub-onink-soft transition-colors hover:text-pub-onink">
                             {section.label}
                         </button>
                     ))}
                 </nav>
 
                 <button onClick={() => onNavigate('/order')}
-                    className="bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                    className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                     Book a delivery
                 </button>
             </div>
@@ -47,7 +47,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
 }
 
 export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => void }) {
-    const link = 'text-left text-sm text-pub-onink-soft transition-colors hover:text-pub-onink';
+    const link = 'focus-ring text-left text-sm text-pub-onink-soft transition-colors hover:text-pub-onink';
 
     return (
         <footer className="bg-pub-ink px-5 pb-10 pt-16">
