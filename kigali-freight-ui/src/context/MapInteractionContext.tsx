@@ -35,6 +35,16 @@ interface MapInteractionContextValue {
     newOrderDeliveryCoords: LatLng | null;
     setNewOrderDeliveryCoords: (value: LatLng | null) => void;
     clearNewOrderDeliveryCoords: () => void;
+    // Pinning a customer-placed order to real coordinates. Held here
+    // rather than in OrdersPanel because the clicks land on the map, which
+    // is a sibling component — this context is already how the two talk.
+    placingOrderId: number | null;
+    placementStep: 'pickup' | 'delivery' | null;
+    placementPickup: LatLng | null;
+    placementDelivery: LatLng | null;
+    beginPlacement: (orderId: number) => void;
+    cancelPlacement: () => void;
+    handlePlacementPick: (lat: number, lng: number) => void;
     hubTargetMode: boolean;
     setHubTargetMode: (value: boolean) => void;
     newHubCoords: LatLng | null;
@@ -79,6 +89,10 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
     const [newOrderDeliveryCoords, setNewOrderDeliveryCoords] = useState<LatLng | null>(null);
 
     // Hub location Map Picker (create/edit a hub from the Fleet tab)
+    const [placingOrderId, setPlacingOrderId] = useState<number | null>(null);
+    const [placementStep, setPlacementStep] = useState<'pickup' | 'delivery' | null>(null);
+    const [placementPickup, setPlacementPickup] = useState<LatLng | null>(null);
+    const [placementDelivery, setPlacementDelivery] = useState<LatLng | null>(null);
     const [hubTargetMode, setHubTargetMode] = useState(false);
     const [newHubCoords, setNewHubCoords] = useState<LatLng | null>(null);
 
@@ -223,6 +237,31 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
         stopTargetMode, setStopTargetMode, newStopCoords, setNewStopCoords,
         orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
         clearNewOrderDeliveryCoords: () => setNewOrderDeliveryCoords(null),
+        placingOrderId, placementStep, placementPickup, placementDelivery,
+        beginPlacement: (orderId: number) => {
+            setPlacingOrderId(orderId);
+            setPlacementStep('pickup');
+            setPlacementPickup(null);
+            setPlacementDelivery(null);
+        },
+        cancelPlacement: () => {
+            setPlacingOrderId(null);
+            setPlacementStep(null);
+            setPlacementPickup(null);
+            setPlacementDelivery(null);
+        },
+        // Two clicks, in order. Advancing here rather than in the map keeps
+        // the sequence in one place; the panel just reads which step it is
+        // on to tell the dispatcher what to click next.
+        handlePlacementPick: (lat: number, lng: number) => {
+            if (placementStep === 'pickup') {
+                setPlacementPickup([lat, lng]);
+                setPlacementStep('delivery');
+            } else if (placementStep === 'delivery') {
+                setPlacementDelivery([lat, lng]);
+                setPlacementStep(null);
+            }
+        },
         hubTargetMode, setHubTargetMode, newHubCoords, setNewHubCoords,
         clearNewHubCoords: () => setNewHubCoords(null),
         playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute,

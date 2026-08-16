@@ -66,6 +66,10 @@ export interface Order {
     assigned_to?: string | null;
     delivery_lat?: number;
     delivery_lng?: number;
+    // Null on a customer-placed order until a dispatcher pins it — which is
+    // what the "Place on map" control in OrderRow exists to do.
+    pickup_lat?: number | null;
+    pickup_lng?: number | null;
     updated_at?: string;
     priority?: 'high' | 'normal' | 'low';
     // Present on orders submitted through the public site. A 'public' order

@@ -218,6 +218,16 @@ export async function assignOrders(orderIds: number[], driverName: string, token
     return apiFetch('/api/orders/assign', { method: 'POST', token, body: { orderIds, driverName } });
 }
 
+// Pins a customer-placed order to real coordinates so it appears on the
+// fleet map and its ETA and route progress can be computed.
+export async function placeOrderOnMap(
+    orderId: number,
+    coords: { pickupLat: number; pickupLng: number; deliveryLat: number; deliveryLng: number; originHubId?: number },
+    token: string
+) {
+    return apiFetch(`/api/orders/${orderId}/place`, { method: 'PATCH', token, body: coords });
+}
+
 export async function fetchNearestDrivers(orderId: number, token: string): Promise<{ recommendedDrivers?: DriverSuggestion[] }> {
     return apiFetch(`/api/orders/${orderId}/nearest-drivers`, { method: 'GET', token }) as Promise<{ recommendedDrivers?: DriverSuggestion[] }>;
 }

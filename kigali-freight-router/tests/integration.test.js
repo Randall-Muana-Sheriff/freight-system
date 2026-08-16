@@ -713,6 +713,43 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(job.delivery_address_text, 'Kimironko Market, shop 14');
     });
 
+    test('public: placing an order switches on the coordinate-driven features', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Nyabugogo taxi park', deliveryAddress: 'Remera, Giporoso',
+            cargoType: 'General goods', weightKg: 90,
+            customerName: 'Placement Test', customerPhone: '0788556777',
+        });
+        const trackingToken = create.body.data.trackingToken;
+        const queue = await request(app).get('/api/orders/active')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const row = queue.body.data.find((o) => o.tracking_token === trackingToken);
+        assert.equal(row.pickup_lat, null, 'a customer order starts with no coordinates');
+
+        const placed = await request(app).patch(`/api/orders/${row.id}/place`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ pickupLat: -1.9706, pickupLng: 30.0891, deliveryLat: -1.9396, deliveryLng: 30.0617, originHubId: hubId });
+        assert.equal(placed.statusCode, 200, JSON.stringify(placed.body));
+        assert.equal(Number(placed.body.data.pickup_lat), -1.9706);
+        assert.ok(placed.body.data.origin_hub_name, 'placing against a hub names it');
+
+        // Nonsense coordinates are refused rather than stored.
+        const bad = await request(app).patch(`/api/orders/${row.id}/place`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ pickupLat: 999, pickupLng: 30, deliveryLat: -1.9, deliveryLng: 30 });
+        assert.equal(bad.statusCode, 400);
+        assert.equal(bad.body.error.code, 'ORDERS_PLACE_INVALID_COORDS');
+
+        // The point of placing: distance ranking has something to rank on.
+        // Before this the endpoint returned drivers with a null distance.
+        const nearest = await request(app).get(`/api/orders/${row.id}/nearest-drivers`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(nearest.statusCode, 200);
+        const ranked = (nearest.body.data.recommendedDrivers || [])
+            .filter((d) => d.distanceFromPickupKm !== null);
+        assert.ok(ranked.length > 0, 'a placed order should rank drivers by real distance');
+    });
+
     test.after(async () => {
         await shutdownServices();
     });

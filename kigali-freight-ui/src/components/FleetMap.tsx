@@ -29,6 +29,7 @@ export default function FleetMap() {
     stopTargetMode, setStopTargetMode, newStopCoords, setNewStopCoords,
     orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
     hubTargetMode, setHubTargetMode, newHubCoords, setNewHubCoords,
+    placementStep, handlePlacementPick,
   } = useMapInteraction();
   const now = useNow();
   // Trails are opt-in per vehicle rather than always-on for the whole
@@ -52,6 +53,7 @@ export default function FleetMap() {
     stopTargetMode, setNewStopCoords, setStopTargetMode,
     orderDeliveryTargetMode, setNewOrderDeliveryCoords, setOrderDeliveryTargetMode,
     hubTargetMode, setNewHubCoords, setHubTargetMode,
+    placementStep, onPlacementPick: handlePlacementPick,
   };
 
   return (

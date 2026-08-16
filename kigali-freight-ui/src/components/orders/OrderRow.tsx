@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Send, Navigation } from 'lucide-react';
-import { assignOrders, fetchNearestDrivers } from '../../utils/api';
+import { useEffect, useState } from 'react';
+import { Send, Navigation, MapPin } from 'lucide-react';
+import { assignOrders, fetchNearestDrivers, placeOrderOnMap } from '../../utils/api';
+import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
 import type { Order, StaffUser, DriverSuggestion } from '../../types';
 
@@ -23,6 +24,11 @@ const PRIORITY_BORDER: Record<'high' | 'normal' | 'low', string> = {
 
 export default function OrderRow({ order, drivers, jwtToken, onAssigned }: OrderRowProps) {
     const { resolveDriverName } = useSocket();
+    const {
+        placingOrderId, placementStep, placementPickup, placementDelivery,
+        beginPlacement, cancelPlacement,
+    } = useMapInteraction();
+    const [placing, setPlacing] = useState(false);
     const [selectedDriver, setSelectedDriver] = useState('');
     const [suggestions, setSuggestions] = useState<DriverSuggestion[] | null>(null);
     const [assigning, setAssigning] = useState(false);
@@ -39,6 +45,25 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
             setSuggesting(false);
         }
     };
+
+    // A customer order arrives as free text with no coordinates, so until a
+    // dispatcher pins it the fleet map, the ETA and the route-progress bar
+    // have nothing to work from.
+    const isThisOrder = placingOrderId === order.id;
+    const needsPlacing = order.source === 'public' && order.pickup_lat == null;
+
+    useEffect(() => {
+        if (!isThisOrder || !placementPickup || !placementDelivery || placing) return;
+        setPlacing(true);
+        placeOrderOnMap(order.id, {
+            pickupLat: placementPickup[0], pickupLng: placementPickup[1],
+            deliveryLat: placementDelivery[0], deliveryLng: placementDelivery[1],
+        }, jwtToken)
+            .then(() => { cancelPlacement(); onAssigned(); })
+            .catch((err) => alert((err as Error).message || 'Could not save those locations.'))
+            .finally(() => setPlacing(false));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isThisOrder, placementPickup, placementDelivery]);
 
     const handleAssign = async () => {
         if (!selectedDriver) return;
@@ -108,6 +133,33 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                         <div className="text-[10px] text-hazard leading-snug">
                             <span className="text-steel">Note </span>{order.special_instructions}
                         </div>
+                    ) : null}
+
+                    {needsPlacing ? (
+                        isThisOrder && placementStep ? (
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                                <span className="text-[10px] text-hazard font-mono animate-pulse">
+                                    {placementStep === 'pickup'
+                                        ? 'Click the pickup point on the map…'
+                                        : 'Now click the delivery point…'}
+                                </span>
+                                <button type="button" onClick={cancelPlacement}
+                                    className="text-[9px] font-mono uppercase text-steel hover:text-paper">
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => beginPlacement(order.id)}
+                                disabled={placing}
+                                title="Pin this order's pickup and delivery on the map"
+                                className="w-full mt-1 flex items-center justify-center gap-1.5 bg-panel border border-tarp/40 text-tarp rounded px-2 py-1.5 text-[10px] font-bold disabled:opacity-50"
+                            >
+                                <MapPin size={11} />
+                                {placing ? 'Saving…' : 'Place on map'}
+                            </button>
+                        )
                     ) : null}
                 </div>
             ) : null}

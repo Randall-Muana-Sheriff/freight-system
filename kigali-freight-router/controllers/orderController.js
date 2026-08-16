@@ -7,6 +7,7 @@ import { ok, fail } from '../utils/httpResponse.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { uploadDeliveryPhoto, toSignedUrl } from '../config/r2Client.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
+import { appendAuditLog } from '../services/auditLogService.js';
 import { logError } from '../utils/logger.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
 
@@ -994,6 +995,82 @@ export const OrderController = {
     },
 
     // GET /api/orders/:id - Single order detail (used by the mobile trip screen)
+    // PATCH /api/orders/:id/place — pins a customer-placed order to real
+    // coordinates.
+    //
+    // Orders booked through the public site carry only the free text a
+    // customer typed, because a web form cannot produce a location and
+    // geocoding "Kimironko Market" would guess between several. Everything
+    // downstream is coordinate-driven: the fleet map, nearest-driver
+    // ranking, the ETA and the route-progress bar all stay dark until a
+    // human says where this actually is. This is that step.
+    placeOrder: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { pickupLat, pickupLng, deliveryLat, deliveryLng, originHubId } = req.body || {};
+
+            for (const [label, lat, lng] of [
+                ['Pickup', pickupLat, pickupLng],
+                ['Delivery', deliveryLat, deliveryLng],
+            ]) {
+                if (!isValidLat(lat) || !isValidLng(lng)) {
+                    return fail(res, {
+                        status: 400,
+                        code: 'ORDERS_PLACE_INVALID_COORDS',
+                        message: `${label} coordinates are missing or out of range.`,
+                    });
+                }
+            }
+
+            // Optional: a dispatcher may tie the pickup to a real hub, which
+            // is what keeps origin_hub_id's foreign key (and the "can't
+            // delete a hub in use" protection behind it) meaningful.
+            let hub = null;
+            if (originHubId !== undefined && originHubId !== null && originHubId !== '') {
+                const hubResult = await pool.query(`SELECT id, name FROM hubs WHERE id = $1;`, [originHubId]);
+                if (hubResult.rows.length === 0) {
+                    return fail(res, { status: 400, code: 'ORDERS_HUB_NOT_FOUND', message: 'That pickup hub no longer exists.' });
+                }
+                hub = hubResult.rows[0];
+            }
+
+            const result = await pool.query(
+                `UPDATE orders SET
+                    pickup_lat = $2, pickup_lng = $3,
+                    delivery_lat = $4, delivery_lng = $5,
+                    pickup_coordinates  = ST_SetSRID(ST_MakePoint($3, $2), 4326),
+                    delivery_coordinates = ST_SetSRID(ST_MakePoint($5, $4), 4326),
+                    pickup_geom          = ST_SetSRID(ST_MakePoint($3, $2), 4326),
+                    delivery_geom        = ST_SetSRID(ST_MakePoint($5, $4), 4326),
+                    origin_hub_id   = COALESCE($6, origin_hub_id),
+                    origin_hub_name = COALESCE($7, origin_hub_name),
+                    updated_at = NOW()
+                 WHERE id = $1
+                 RETURNING id, pickup_lat, pickup_lng, delivery_lat, delivery_lng, origin_hub_name;`,
+                [id, pickupLat, pickupLng, deliveryLat, deliveryLng, hub?.id ?? null, hub?.name ?? null]
+            );
+
+            if (result.rows.length === 0) {
+                return fail(res, { status: 404, code: 'ORDERS_NOT_FOUND', message: 'That order no longer exists.' });
+            }
+
+            await appendAuditLog({
+                actionType: 'ORDER_PLACED_ON_MAP',
+                description: `Order #${id} pinned to ${pickupLat.toFixed(5)},${pickupLng.toFixed(5)} -> ${deliveryLat.toFixed(5)},${deliveryLng.toFixed(5)}`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, result.rows[0]);
+        } catch (error) {
+            logError(req, 'Database error', error);
+            return fail(res, {
+                status: 500,
+                code: 'ORDERS_PLACE_FAILED',
+                message: 'Could not save those locations.',
+            });
+        }
+    },
+
     getOrderById: async (req, res) => {
         try {
             const { id } = req.params;

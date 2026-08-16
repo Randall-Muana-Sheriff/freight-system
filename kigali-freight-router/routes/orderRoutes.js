@@ -55,6 +55,9 @@ router.get('/:id', authMiddleware(['admin', 'dispatcher', 'driver']), OrderContr
 // Dispatch Routing & Driver Assignment Trigger
 router.post('/assign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.assignOrderBundle);
 router.patch('/:id/reassign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.reassignOrder);
+// Pins a customer-placed order to real coordinates. Dispatch-only: it is a
+// judgement call about what a customer's free-text address actually means.
+router.patch('/:id/place', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.placeOrder);
 
 // Delivery Lifecycle Milestone Route
 router.patch('/:id/status', authMiddleware(['admin', 'driver', 'dispatcher']), orderWriteLimit, OrderController.updateOrderStatus);
