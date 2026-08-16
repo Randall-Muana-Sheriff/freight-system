@@ -25,6 +25,12 @@ export interface StaffUser {
     // appears as assignable in the dispatcher's driver pickers.
     verified?: boolean | null;
     hasVehicle?: boolean | null;
+    // Today's pre-departure checks. Deliberately not part of
+    // isAssignableDriver below: a missed tick should prompt a conversation,
+    // not strand a driver mid-shift. Null for non-driver accounts.
+    safetyChecksDone?: number | null;
+    safetyChecksTotal?: number | null;
+    safetyChecksAt?: string | null;
 }
 
 // Single definition of "assignable" reused by every driver picker used for
@@ -32,6 +38,17 @@ export interface StaffUser {
 // definition ever changes.
 export function isAssignableDriver(d: StaffUser): boolean {
     return Boolean(d.verified) && Boolean(d.hasVehicle);
+}
+
+// Short, scannable summary of today's pre-departure checks, for the
+// driver pickers. Kept next to isAssignableDriver so the two stay
+// obviously separate: this informs the choice, it does not restrict it.
+export function describeDriverChecks(d: StaffUser): string {
+    if (d.role !== 'driver' || d.safetyChecksTotal == null) return '';
+    const done = d.safetyChecksDone ?? 0;
+    if (done === 0) return 'no checks today';
+    if (done < d.safetyChecksTotal) return `checks ${done}/${d.safetyChecksTotal}`;
+    return 'checks done';
 }
 
 export interface Hub {

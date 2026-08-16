@@ -3,6 +3,7 @@ import { Send, Navigation, MapPin } from 'lucide-react';
 import { assignOrders, fetchNearestDrivers, placeOrderOnMap } from '../../utils/api';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
+import { describeDriverChecks } from '../../types';
 import type { Order, StaffUser, DriverSuggestion } from '../../types';
 
 interface OrderRowProps {
@@ -177,9 +178,19 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                     className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-[10px] text-paper"
                 >
                     <option value="">Select driver</option>
-                    {drivers.map((d) => (
-                        <option key={d.id} value={d.username}>{d.fullName || d.username}</option>
-                    ))}
+                    {/* Today's checks shown inline: the dispatcher is
+                        choosing a driver here, which is the one moment the
+                        information can change a decision. Not a filter —
+                        an unchecked driver is still selectable, and the
+                        dispatcher can ring them. */}
+                    {drivers.map((d) => {
+                        const checks = describeDriverChecks(d);
+                        return (
+                            <option key={d.id} value={d.username}>
+                                {d.fullName || d.username}{checks ? ` — ${checks}` : ''}
+                            </option>
+                        );
+                    })}
                 </select>
                 <button
                     type="button"

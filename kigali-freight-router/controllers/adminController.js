@@ -8,6 +8,7 @@ import { normalizePhone, generateInviteCode } from '../utils/phone.js';
 import { sendSms } from '../services/smsService.js';
 import { revokeAllRefreshTokensForUser } from '../services/refreshTokenService.js';
 import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { SAFETY_CHECKLIST_ITEMS } from './safetyChecklistController.js';
 import { createKioskDevice, listKioskDevices, revokeKioskDevice } from '../services/kioskAuthService.js';
 
 const INVITE_CODE_TTL_HOURS = 48;
@@ -36,7 +37,21 @@ export const AdminController = {
                         CASE WHEN u.role = 'driver' THEN COALESCE(dv.approved_count, 0) = $1 ELSE NULL END AS verified,
                         CASE WHEN u.role = 'driver' THEN EXISTS (
                             SELECT 1 FROM fleet_vehicles fv WHERE fv.current_driver_id = u.id
-                        ) ELSE NULL END AS "hasVehicle"
+                        ) ELSE NULL END AS "hasVehicle",
+                        -- Today's pre-departure checks. Until now the only
+                        -- reader of driver_safety_checklists was the driver
+                        -- who wrote it, so a dispatcher had no way to know
+                        -- whether anyone had checked their tyres — the
+                        -- checklist recorded an answer nobody could see.
+                        -- Deliberately not a gate: a missed tick should
+                        -- start a conversation, not strand a driver
+                        -- mid-shift.
+                        CASE WHEN u.role = 'driver'
+                             THEN COALESCE(sc.done_count, 0) ELSE NULL END AS "safetyChecksDone",
+                        CASE WHEN u.role = 'driver'
+                             THEN $3::int ELSE NULL END AS "safetyChecksTotal",
+                        CASE WHEN u.role = 'driver'
+                             THEN sc.updated_at ELSE NULL END AS "safetyChecksAt"
                  FROM users u
                  LEFT JOIN (
                      SELECT username, COUNT(*)::int AS approved_count
@@ -44,8 +59,17 @@ export const AdminController = {
                      WHERE document_type = ANY($2::text[]) AND status = 'approved'
                      GROUP BY username
                  ) dv ON dv.username = u.username
+                 LEFT JOIN (
+                     -- Only today's row: yesterday's checks say nothing
+                     -- about the vehicle going out this morning.
+                     SELECT driver_username, updated_at,
+                            (SELECT COUNT(*) FROM jsonb_each(items) AS kv
+                              WHERE kv.value = 'true'::jsonb)::int AS done_count
+                     FROM driver_safety_checklists
+                     WHERE checklist_date = CURRENT_DATE
+                 ) sc ON sc.driver_username = u.username
                  ORDER BY u.id DESC;`,
-                [REQUIRED_DOCUMENT_TYPES.length, REQUIRED_DOCUMENT_TYPES]
+                [REQUIRED_DOCUMENT_TYPES.length, REQUIRED_DOCUMENT_TYPES, SAFETY_CHECKLIST_ITEMS.length]
             );
             return ok(res, result.rows);
         } catch (error) {
