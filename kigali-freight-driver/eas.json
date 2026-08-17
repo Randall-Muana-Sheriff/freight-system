@@ -31,6 +31,21 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        // The Apple account already linked to this EAS account — team
+        // 8WDZ75627S, confirmed against the Expo API rather than typed
+        // from memory. Named here so a submission cannot silently go out
+        // under a different team than the one the credentials belong to.
+        //
+        // ascAppId is deliberately absent: it is the numeric ID of the App
+        // Store Connect record, which does not exist yet. `eas submit`
+        // offers to create the record on the first run and prints the ID
+        // it assigned — paste it here afterwards so later submissions
+        // target the same listing instead of asking again.
+        "appleId": "maxwelljenny96@icloud.com",
+        "appleTeamId": "8WDZ75627S"
+      }
+    }
   }
 }
