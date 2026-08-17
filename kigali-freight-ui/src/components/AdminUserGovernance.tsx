@@ -2,7 +2,7 @@
 // creation and role management. Drivers are onboarded separately via
 // InviteDriverPanel, not through this panel.
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { apiFetch } from '../utils/api';
+import { apiFetch, setUserStatus } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import type { StaffUser, UserRole } from '../types';
@@ -17,6 +17,13 @@ export default function AdminUserGovernance() {
     // so filter down to just the accounts this panel is actually meant to
     // manage.
     const staffUsers = useMemo(() => users.filter((u) => u.role !== 'driver'), [users]);
+    // Drivers are listed here too now, for one reason: suspension. When
+    // somebody leaves, this is the only screen that can stop their account
+    // signing back in, and drivers are who actually leave.
+    const driverUsers = useMemo(
+        () => users.filter((u) => u.role === 'driver').sort((a, b) => (a.status === 'suspended' ? -1 : 0) - (b.status === 'suspended' ? -1 : 0)),
+        [users]
+    );
     const [loading, setLoading] = useState(false);
     // Shared by fetchUsers and handleRoleChange, which unlike account
     // creation have no "busy" concept in the UI today — left as plain
@@ -26,6 +33,25 @@ export default function AdminUserGovernance() {
     const [newUser, setNewUser] = useState(EMPTY_NEW_USER);
     const { busy: creating, error: createError, run: runCreate } = useAsyncAction();
     const displayError = error || createError;
+
+    // Confirmed first: suspending signs someone out immediately and stops
+    // dispatch assigning them, which is not something to do on a misclick.
+    const handleStatusChange = async (user: StaffUser) => {
+        const next = user.status === 'suspended' ? 'approved' : 'suspended';
+        const who = user.fullName || user.username;
+        if (next === 'suspended' && !window.confirm(
+            `Suspend ${who}?\n\nThey will be signed out immediately and cannot log in or be assigned work. Their history is kept, and you can reinstate them at any time.`
+        )) return;
+
+        setError(null);
+        try {
+            await setUserStatus(user.id, next, jwtToken);
+            setSuccessMsg(next === 'suspended' ? `${who} suspended` : `${who} reinstated`);
+            await fetchUsers();
+        } catch (err) {
+            setError((err as Error).message || 'Could not change that account.');
+        }
+    };
 
     const fetchUsers = useCallback(async () => {
         setLoading(true);
@@ -161,20 +187,76 @@ export default function AdminUserGovernance() {
                                 {u.status === 'rejected' && (
                                     <span className="text-[8px] bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Rejected</span>
                                 )}
+                                {u.status === 'suspended' && (
+                                    <span className="text-[8px] bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Suspended</span>
+                                )}
                             </div>
                             <div className="text-[9px] text-steel">ID: {u.id}</div>
                         </div>
-                        <select
-                            value={u.role}
-                            onChange={(e) => void handleRoleChange(u.id, e.target.value)}
-                            className="bg-panel border border-line/15 rounded px-2 py-1 text-[10px] text-carbon font-bold focus:outline-none focus:border-route"
-                        >
-                            <option value="dispatcher">DISPATCHER</option>
-                            <option value="admin">ADMIN</option>
-                        </select>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <select
+                                value={u.role}
+                                onChange={(e) => void handleRoleChange(u.id, e.target.value)}
+                                disabled={u.status === 'suspended'}
+                                className="bg-panel border border-line/15 rounded px-2 py-1 text-[10px] text-carbon font-bold focus:outline-none focus:border-route disabled:opacity-40"
+                            >
+                                <option value="dispatcher">DISPATCHER</option>
+                                <option value="admin">ADMIN</option>
+                            </select>
+                            <button
+                                type="button"
+                                onClick={() => void handleStatusChange(u)}
+                                title={u.status === 'suspended' ? 'Reinstate this account' : 'Suspend this account'}
+                                className={`rounded px-2 py-1 text-[9px] font-bold uppercase border ${
+                                    u.status === 'suspended'
+                                        ? 'border-tarp/40 text-tarp hover:bg-tarp/10'
+                                        : 'border-rust/40 text-rust hover:bg-rust/10'
+                                }`}
+                            >
+                                {u.status === 'suspended' ? 'Reinstate' : 'Suspend'}
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
+
+            {/* Drivers, for suspension only — role changes and document
+                verification stay where they already live. Without this the
+                one group that actually leaves a freight company had no
+                account control anywhere in the dashboard. */}
+            {driverUsers.length > 0 && (
+                <div className="pt-3 mt-3 border-t border-line/10 space-y-1.5">
+                    <div className="text-[9px] text-steel uppercase tracking-wider font-mono">
+                        Drivers ({driverUsers.length}) &middot; suspend or reinstate
+                    </div>
+                    <div className="max-h-64 overflow-y-auto space-y-1.5">
+                        {driverUsers.map((d) => (
+                            <div key={d.id} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-center gap-2">
+                                <div className="truncate">
+                                    <div className="text-paper font-bold flex items-center gap-1.5 text-[11px]">
+                                        {d.fullName || d.username}
+                                        {d.status === 'suspended' && (
+                                            <span className="text-[8px] bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Suspended</span>
+                                        )}
+                                    </div>
+                                    <div className="text-[9px] text-steel font-mono">{d.username}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => void handleStatusChange(d)}
+                                    className={`shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase border ${
+                                        d.status === 'suspended'
+                                            ? 'border-tarp/40 text-tarp hover:bg-tarp/10'
+                                            : 'border-rust/40 text-rust hover:bg-rust/10'
+                                    }`}
+                                >
+                                    {d.status === 'suspended' ? 'Reinstate' : 'Suspend'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

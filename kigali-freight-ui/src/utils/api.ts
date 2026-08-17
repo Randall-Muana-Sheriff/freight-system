@@ -326,6 +326,13 @@ export async function inviteDriver(payload: InviteDriverPayload, token: string):
 // The backend half of the driver app's "Forgot your PIN? Contact dispatch"
 // copy — clears the driver's PIN so they're prompted to set a new one at
 // their next sign-in, without sending them through invite-code entry again.
+// Suspend or reinstate. There is no delete: orders, status logs and
+// delivery confirmations reference the username, and that history has to
+// stay attributable after someone leaves.
+export async function setUserStatus(userId: number, status: 'suspended' | 'approved', token: string) {
+    return apiFetch(`/api/users/${userId}/status`, { method: 'PATCH', token, body: { status } });
+}
+
 export async function resetDriverPin(userId: number, token: string) {
     return apiFetch(`/api/users/${userId}/reset-driver-pin`, { method: 'POST', token });
 }
