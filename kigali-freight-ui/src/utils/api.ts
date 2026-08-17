@@ -113,42 +113,9 @@ export interface OptimizeStop {
     [key: string]: unknown;
 }
 
-// VRP Multi-Stop Route Optimization Caller with advanced fleet and time windows
-export async function optimizeMultiStopRoute(depot: unknown, vehicles: unknown, stops: OptimizeStop[], vehicleCapacity: unknown, token: string) {
-    return apiFetch('/api/routes/optimize', {
-        method: 'POST',
-        token,
-        body: { depot, vehicles, stops, vehicleCapacity },
-    });
-}
 
-// Create a new delivery stop caller
-export async function createDeliveryStop(stopData: unknown, token: string) {
-    const result = await apiFetch('/api/stops', {
-        method: 'POST',
-        token,
-        body: stopData,
-    }) as { stop?: unknown };
-    return result?.stop ?? result;
-}
 
-// Delete a delivery stop caller
-export async function deleteDeliveryStop(stopId: number | string, token: string) {
-    return apiFetch(`/api/stops/${stopId}`, {
-        method: 'DELETE',
-        token,
-    });
-}
 
-// Commit finalized route to persistent storage
-export async function commitOptimizedRoute(commitData: unknown, token: string) {
-    const result = await apiFetch('/api/routes/commit', {
-        method: 'POST',
-        token,
-        body: commitData,
-    }) as { route?: unknown };
-    return result?.route ?? result;
-}
 
 // Dispatch hubs, used to pre-fill pickup coordinates on the order form and
 // managed directly from the Fleet tab.

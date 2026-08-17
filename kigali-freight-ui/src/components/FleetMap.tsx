@@ -3,7 +3,7 @@
 // own state) were all defined inline here. Extracted into
 // src/components/map/ — pure code movement, no behavior changes.
 import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, LayerGroup, LayersControl, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, LayersControl, CircleMarker } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
@@ -25,8 +25,6 @@ export default function FleetMap() {
     drawModeActive, drawnPoints, setDrawnPoints,
     dispatchTargetMode, dispatchLocation, setDispatchLocation, handleDispatchClick,
     trailLimit, playbackCoords, playbackIndex,
-    optimizedRoutes,
-    stopTargetMode, setStopTargetMode, newStopCoords, setNewStopCoords,
     orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
     hubTargetMode, setHubTargetMode, newHubCoords, setNewHubCoords,
     placementStep, handlePlacementPick,
@@ -50,7 +48,6 @@ export default function FleetMap() {
     drawModeActive, setDrawnPoints,
     dispatchTargetMode, setDispatchLocation,
     onDispatchClick: (lat: number, lng: number) => { void handleDispatchClick(lat, lng); },
-    stopTargetMode, setNewStopCoords, setStopTargetMode,
     orderDeliveryTargetMode, setNewOrderDeliveryCoords, setOrderDeliveryTargetMode,
     hubTargetMode, setNewHubCoords, setHubTargetMode,
     placementStep, onPlacementPick: handlePlacementPick,
@@ -122,40 +119,6 @@ export default function FleetMap() {
           </>
         )}
 
-        {/* Render Optimized VRP Multi-Stop Routes */}
-        {optimizedRoutes.map((routeGroup, idx) => {
-          // roadGeometry is the real road-snapped path from OSRM (added
-          // server-side in routeController.js); it's null if OSRM couldn't
-          // be reached, in which case we fall back to the straight
-          // stop-to-stop line the solver itself worked with.
-          const routePositions = routeGroup.roadGeometry && routeGroup.roadGeometry.length > 1
-            ? routeGroup.roadGeometry
-            : routeGroup.sequence.map((node) => [node.lat, node.lng] as [number, number]);
-          const colors = ['#FF8A3D', '#5B84A6', '#5B8C6E', '#E0A238'];
-          const strokeColor = colors[idx % colors.length];
-
-          return (
-            <LayerGroup key={`vrp-group-${idx}`}>
-              <Polyline
-                positions={routePositions}
-                pathOptions={{ color: strokeColor, weight: 3.5, opacity: 0.9, dashArray: routeGroup.roadGeometry ? undefined : '6, 6' }}
-              />
-              {routeGroup.sequence.map((node, nodeIdx) => (
-                <Marker key={`node-${idx}-${nodeIdx}`} position={[node.lat, node.lng]}>
-                  <Popup>
-                    <div className="text-xs font-mono text-slate-900 space-y-1">
-                      <div className="font-bold">{node.name || `Stop ${nodeIdx}`}</div>
-                      <div className="text-slate-600 font-bold">Vehicle Route: #{idx + 1}</div>
-                      {node.demand && <div className="text-route-deep font-bold">Demand Load: {node.demand}</div>}
-                      <div className="text-[10px] text-slate-400 font-bold">Sequence Order: {nodeIdx}</div>
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-            </LayerGroup>
-          );
-        })}
-
         {selectedDriverName && (() => {
           const history = routeHistories[selectedDriverName];
           const slicedTrail = history ? history.slice(-trailLimit) : [];
@@ -213,15 +176,6 @@ export default function FleetMap() {
             );
           })}
         </MarkerClusterGroup>
-
-        {/* New stop drop-pin marker */}
-        {newStopCoords && (
-          <Marker position={newStopCoords} icon={flagIcon}>
-            <Popup>
-              <div className="text-xs font-mono text-slate-900 font-bold">New Delivery Stop Target</div>
-            </Popup>
-          </Marker>
-        )}
 
         {/* Picked location for a hub being created/edited */}
         {newHubCoords && (

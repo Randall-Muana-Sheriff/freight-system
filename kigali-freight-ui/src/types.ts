@@ -202,11 +202,6 @@ export interface OptimizedRouteNode {
     demand?: number;
 }
 
-export interface OptimizedRouteGroup {
-    sequence: OptimizedRouteNode[];
-    roadGeometry?: [number, number][];
-}
-
 export interface Incident {
     id: number;
     description?: string;

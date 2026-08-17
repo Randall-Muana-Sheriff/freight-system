@@ -8,7 +8,6 @@ import { Map, Truck, History } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useMapInteraction } from '../context/MapInteractionContext';
 import DispatchPanel from './DispatchPanel';
-import RouteOptimizerPanel from './RouteOptimizerPanel';
 import TripsPanel from './TripsPanel';
 import RoutesPanel from './RoutesPanel';
 import GeofenceDrawer from './GeofenceDrawer';
@@ -35,7 +34,6 @@ export default function SecondaryPanel() {
     const { userRole } = useSocket();
     const {
         dispatchTargetMode, setDispatchTargetMode, dispatchRankings,
-        setOptimizedRoutes, stopTargetMode, setStopTargetMode, newStopCoords,
         savedRoutes, routesLoading, playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute, loadRouteForPlayback, togglePlaybackPlay,
         loadBreadcrumbsForPlayback: onLoadBreadcrumbs, breadcrumbsLoading,
         drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints,
@@ -83,12 +81,6 @@ export default function SecondaryPanel() {
                             dispatchRankings={dispatchRankings}
                         />
                         <TripsPanel />
-                        <RouteOptimizerPanel
-                            onRouteOptimized={setOptimizedRoutes}
-                            stopTargetMode={stopTargetMode}
-                            setStopTargetMode={setStopTargetMode}
-                            newStopCoords={newStopCoords}
-                        />
                         <GeofenceDrawer
                             drawModeActive={drawModeActive}
                             setDrawModeActive={setDrawModeActive}

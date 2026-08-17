@@ -1,0 +1,14 @@
+-- Retires the pre-runs "delivery stops" table.
+--
+-- delivery_stops held free-floating points — name, lat, lng, demand — with
+-- no link to any order. A dispatcher could add them, optimise a route over
+-- them and save the result, and none of it reached a driver, because
+-- nothing downstream could turn a point into work. add_trips_and_stops.sql
+-- replaced it with trip_stops, which reference real orders and drive their
+-- status.
+--
+-- Dropped rather than left in place: a table nobody reads is an invitation
+-- to wire something to it again later on the assumption that it means
+-- something. completed_routes is deliberately NOT touched — that one still
+-- backs the History tab's route playback.
+DROP TABLE IF EXISTS delivery_stops;

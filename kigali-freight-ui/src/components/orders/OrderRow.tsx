@@ -3,8 +3,7 @@ import { Send, Navigation, MapPin } from 'lucide-react';
 import { assignOrders, fetchNearestDrivers, placeOrderOnMap, setOrderPriority } from '../../utils/api';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
-import { describeDriverChecks } from '../../types';
-import type { Order, StaffUser, DriverSuggestion } from '../../types';
+import { describeDriverChecks, type Order, type StaffUser, type DriverSuggestion } from '../../types';
 import { useDialog } from '../DialogProvider';
 
 interface OrderRowProps {

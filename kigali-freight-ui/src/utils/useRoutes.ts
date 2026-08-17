@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchRoutes, commitOptimizedRoute } from './api';
+import { fetchRoutes } from './api';
 import type { SavedRoute } from '../types';
 
 export function useRoutes(jwtToken: string | null | undefined) {
@@ -29,27 +29,11 @@ export function useRoutes(jwtToken: string | null | undefined) {
         }, 0);
     }, [loadRoutes]);
 
-    const commitRoute = async (payload: unknown) => {
-        setLoading(true);
-        setError(null);
-        try {
-            const newRoute = await commitOptimizedRoute(payload, jwtToken as string) as SavedRoute;
-            setRoutes((prev) => [newRoute, ...prev]);
-            return { success: true, route: newRoute };
-        } catch (err) {
-            const message = (err as Error).message;
-            setError(message);
-            return { success: false, error: message };
-        } finally {
-            setLoading(false);
-        }
-    };
 
     return {
         routes,
         loading,
         error,
         refreshRoutes: loadRoutes,
-        commitRoute,
     };
 }

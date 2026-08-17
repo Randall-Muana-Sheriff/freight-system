@@ -13,7 +13,7 @@ import { createContext, useContext, useState, useRef, useEffect, type ReactNode 
 import { useSocket } from './SocketContext';
 import { useRoutes } from '../utils/useRoutes';
 import { fetchDriverBreadcrumbs } from '../utils/api';
-import type { SavedRoute, PlaybackRoute, OptimizedRouteGroup, LatLng } from '../types';
+import type { SavedRoute, PlaybackRoute, LatLng } from '../types';
 import { useDialog } from '../components/DialogProvider';
 
 interface MapInteractionContextValue {
@@ -27,10 +27,6 @@ interface MapInteractionContextValue {
     setDispatchLocation: (value: LatLng | null) => void;
     dispatchRankings: unknown[];
     handleDispatchClick: (lat: number, lng: number) => Promise<void>;
-    stopTargetMode: boolean;
-    setStopTargetMode: (value: boolean) => void;
-    newStopCoords: LatLng | null;
-    setNewStopCoords: (value: LatLng | null) => void;
     orderDeliveryTargetMode: boolean;
     setOrderDeliveryTargetMode: (value: boolean) => void;
     newOrderDeliveryCoords: LatLng | null;
@@ -60,8 +56,6 @@ interface MapInteractionContextValue {
     loadBreadcrumbsForPlayback: (driverName: string, hours: number) => Promise<void>;
     breadcrumbsLoading: boolean;
     trailLimit: number;
-    optimizedRoutes: OptimizedRouteGroup[];
-    setOptimizedRoutes: React.Dispatch<React.SetStateAction<OptimizedRouteGroup[]>>;
     savedRoutes: SavedRoute[];
     routesLoading: boolean;
 }
@@ -85,8 +79,6 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
     const [dispatchRankings, setDispatchRankings] = useState<unknown[]>([]);
 
     // New Stop Map Picker
-    const [stopTargetMode, setStopTargetMode] = useState(false);
-    const [newStopCoords, setNewStopCoords] = useState<LatLng | null>(null);
 
     // New Order delivery-point Map Picker
     const [orderDeliveryTargetMode, setOrderDeliveryTargetMode] = useState(false);
@@ -142,7 +134,6 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
     }, [isPlaying]);
 
     // Multi-stop VRP optimization paths
-    const [optimizedRoutes, setOptimizedRoutes] = useState<OptimizedRouteGroup[]>([]);
     const trailLimit = 15;
 
     // Historical breadcrumbs (live telemetry trail, not a committed route)
@@ -238,7 +229,6 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
         drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints,
         dispatchTargetMode, setDispatchTargetMode, dispatchLocation, setDispatchLocation, dispatchRankings,
         handleDispatchClick,
-        stopTargetMode, setStopTargetMode, newStopCoords, setNewStopCoords,
         orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
         clearNewOrderDeliveryCoords: () => setNewOrderDeliveryCoords(null),
         placingOrderId, placementStep, placementPickup, placementDelivery,
@@ -271,7 +261,6 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
         playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute,
         loadRouteForPlayback, togglePlaybackPlay, loadBreadcrumbsForPlayback, breadcrumbsLoading,
         trailLimit,
-        optimizedRoutes, setOptimizedRoutes,
         savedRoutes, routesLoading,
     };
 

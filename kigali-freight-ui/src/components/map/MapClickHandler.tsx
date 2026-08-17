@@ -6,8 +6,8 @@ interface MapClickHandlerProps extends PickHandlers {
 }
 
 export default function MapClickHandler({ onBackgroundClick, ...pickHandlers }: MapClickHandlerProps) {
-  const { drawModeActive, dispatchTargetMode, stopTargetMode, orderDeliveryTargetMode, hubTargetMode, placementStep } = pickHandlers;
-  const anyPickModeActive = drawModeActive || dispatchTargetMode || stopTargetMode || orderDeliveryTargetMode || hubTargetMode || Boolean(placementStep);
+  const { drawModeActive, dispatchTargetMode, orderDeliveryTargetMode, hubTargetMode, placementStep } = pickHandlers;
+  const anyPickModeActive = drawModeActive || dispatchTargetMode || orderDeliveryTargetMode || hubTargetMode || Boolean(placementStep);
   useMapEvents({
     click(e) {
       if (anyPickModeActive) {

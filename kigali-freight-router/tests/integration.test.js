@@ -436,11 +436,15 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             .send({ name: 'No Coordinates Zone' });
         assert.equal(geofence.statusCode, 400, JSON.stringify(geofence.body));
 
-        const optimize = await request(app)
-            .post('/api/routes/optimize')
+        // Was /api/routes/optimize until multi-stop runs replaced it; the
+        // point of the test is that a missing required field is a client
+        // error, so it now guards the endpoint that actually plans work.
+        const run = await request(app)
+            .post('/api/trips')
             .set('Authorization', `Bearer ${dispatcherToken}`)
-            .send({ stops: [{ lat: -1.95, lng: 30.06 }] });
-        assert.equal(optimize.statusCode, 400, JSON.stringify(optimize.body));
+            .send({ orderIds: [] });
+        assert.equal(run.statusCode, 400, JSON.stringify(run.body));
+        assert.equal(run.body.error.code, 'TRIP_NO_ORDERS');
     });
 
     // Tenancy isolation: a driver must never be able to act on an order

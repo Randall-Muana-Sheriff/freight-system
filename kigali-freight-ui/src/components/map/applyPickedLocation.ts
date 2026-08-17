@@ -6,9 +6,6 @@ export interface PickHandlers {
   dispatchTargetMode: boolean;
   setDispatchLocation: (value: LatLng) => void;
   onDispatchClick: (lat: number, lng: number) => void;
-  stopTargetMode: boolean;
-  setNewStopCoords: (value: LatLng) => void;
-  setStopTargetMode: (value: boolean) => void;
   orderDeliveryTargetMode: boolean;
   setNewOrderDeliveryCoords: (value: LatLng) => void;
   setOrderDeliveryTargetMode: (value: boolean) => void;
@@ -28,7 +25,6 @@ export interface PickHandlers {
 export function applyPickedLocation(lat: number, lng: number, {
   drawModeActive, setDrawnPoints,
   dispatchTargetMode, setDispatchLocation, onDispatchClick,
-  stopTargetMode, setNewStopCoords, setStopTargetMode,
   orderDeliveryTargetMode, setNewOrderDeliveryCoords, setOrderDeliveryTargetMode,
   hubTargetMode, setNewHubCoords, setHubTargetMode,
   placementStep, onPlacementPick,
@@ -38,10 +34,7 @@ export function applyPickedLocation(lat: number, lng: number, {
   } else if (dispatchTargetMode) {
     setDispatchLocation([lat, lng]);
     onDispatchClick(lat, lng);
-  } else if (stopTargetMode) {
-    setNewStopCoords([lat, lng]);
-    setStopTargetMode(false);
-  } else if (orderDeliveryTargetMode) {
+    } else if (orderDeliveryTargetMode) {
     setNewOrderDeliveryCoords([lat, lng]);
     setOrderDeliveryTargetMode(false);
   } else if (hubTargetMode) {
