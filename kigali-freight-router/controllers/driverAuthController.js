@@ -286,7 +286,10 @@ export const DriverAuthController = {
 
         try {
             const userResult = await pool.query(
-                `SELECT id, username, role, pin_hash FROM users WHERE phone_number = $1 AND role = 'driver'`,
+                // status included deliberately: this path had no account
+                // check at all, so a suspended driver could still sign in
+                // with their PIN — the one case suspension exists for.
+                `SELECT id, username, role, pin_hash, status FROM users WHERE phone_number = $1 AND role = 'driver'`,
                 [session.phone]
             );
             const user = userResult.rows[0];
@@ -296,6 +299,19 @@ export const DriverAuthController = {
             // in authController.login.
             if (!user || !user.pin_hash || !(await bcrypt.compare(pin, user.pin_hash))) {
                 return fail(res, { status: 401, code: 'DRIVER_AUTH_PIN_LOGIN_FAILED', message: 'Incorrect PIN.' });
+            }
+
+            // Checked only once the PIN is proven, for the same reason as
+            // the comment above: answering "suspended" to an unauthenticated
+            // guess would confirm the account exists to anyone working
+            // through phone numbers. A driver who knows their own PIN has
+            // already proven who they are and deserves the real reason.
+            if (user.status === 'suspended') {
+                return fail(res, {
+                    status: 403,
+                    code: 'DRIVER_AUTH_ACCOUNT_SUSPENDED',
+                    message: 'This account has been suspended. Contact dispatch.',
+                });
             }
 
             return ok(res, await issueFinalTokens(user));

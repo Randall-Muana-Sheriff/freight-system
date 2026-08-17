@@ -28,6 +28,10 @@ const inviteLimit = rateLimit({
 router.get('/users', withKioskAccess(['admin', 'dispatcher', 'kiosk']), AdminController.getUsers);
 router.post('/users', authMiddleware(['admin']), adminWriteLimit, AdminController.createUser);
 router.patch('/users/:id/role', authMiddleware(['admin']), adminWriteLimit, AdminController.updateUserRole);
+// Suspend/reinstate. There is deliberately no DELETE — orders, status
+// logs, incidents and delivery confirmations all reference the username,
+// and that history must stay attributable after someone leaves.
+router.patch('/users/:id/status', authMiddleware(['admin']), adminWriteLimit, AdminController.updateUserStatus);
 router.post('/drivers/invite', authMiddleware(['admin', 'dispatcher']), inviteLimit, AdminController.inviteDriver);
 router.post('/users/:id/reset-driver-pin', authMiddleware(['admin']), adminWriteLimit, AdminController.resetDriverPin);
 router.post('/users/:id/revoke-sessions', authMiddleware(['admin']), adminWriteLimit, AdminController.revokeUserSessions);

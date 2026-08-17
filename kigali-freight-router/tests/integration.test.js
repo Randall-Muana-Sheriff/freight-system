@@ -776,6 +776,53 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(row.rows[0].handled_at, null, 'a new enquiry starts unhandled');
     });
 
+    test('admin: suspending an account blocks login and survives as history', async () => {
+        const users = await request(app).get('/api/users').set('Authorization', `Bearer ${adminToken}`);
+        const target = users.body.data.find((u) => u.username === driverPhone);
+        assert.ok(target, 'the test driver should be listed');
+
+        const suspend = await request(app).patch(`/api/users/${target.id}/status`)
+            .set('Authorization', `Bearer ${adminToken}`).send({ status: 'suspended' });
+        assert.equal(suspend.statusCode, 200, JSON.stringify(suspend.body));
+        assert.equal(suspend.body.data.status, 'suspended');
+
+        // The row stays. Deleting it would take assigned_to, the status
+        // logs and the delivery confirmations with it.
+        const still = await pool.query('SELECT status FROM users WHERE id = $1', [target.id]);
+        assert.equal(still.rows[0].status, 'suspended');
+
+        const reinstate = await request(app).patch(`/api/users/${target.id}/status`)
+            .set('Authorization', `Bearer ${adminToken}`).send({ status: 'approved' });
+        assert.equal(reinstate.statusCode, 200);
+    });
+
+    test('admin: cannot suspend your own account or the last admin', async () => {
+        const users = await request(app).get('/api/users').set('Authorization', `Bearer ${adminToken}`);
+        const me = users.body.data.find((u) => u.username === process.env.ADMIN_USERNAME);
+        assert.ok(me);
+
+        // Locking yourself out is one click away without this.
+        const self = await request(app).patch(`/api/users/${me.id}/status`)
+            .set('Authorization', `Bearer ${adminToken}`).send({ status: 'suspended' });
+        assert.equal(self.statusCode, 400);
+        assert.equal(self.body.error.code, 'ADMIN_USER_SELF_SUSPEND');
+
+        // Only two states are accepted — 'deleted' and friends are not a
+        // way in through the back door.
+        const bogus = await request(app).patch(`/api/users/${me.id}/status`)
+            .set('Authorization', `Bearer ${adminToken}`).send({ status: 'deleted' });
+        assert.equal(bogus.statusCode, 400);
+        assert.equal(bogus.body.error.code, 'ADMIN_USER_STATUS_INVALID');
+    });
+
+    test('admin: a dispatcher cannot suspend anyone', async () => {
+        const users = await request(app).get('/api/users').set('Authorization', `Bearer ${adminToken}`);
+        const target = users.body.data.find((u) => u.username === driverPhone);
+        const response = await request(app).patch(`/api/users/${target.id}/status`)
+            .set('Authorization', `Bearer ${dispatcherToken}`).send({ status: 'suspended' });
+        assert.equal(response.statusCode, 403);
+    });
+
     test.after(async () => {
         await shutdownServices();
     });

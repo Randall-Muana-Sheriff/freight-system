@@ -102,6 +102,13 @@ export const AuthController = {
                     message: 'Your account is awaiting admin approval.',
                 });
             }
+            if (user.status === 'suspended') {
+                return fail(res, {
+                    status: 403,
+                    code: 'AUTH_ACCOUNT_SUSPENDED',
+                    message: 'This account has been suspended. Contact an administrator.',
+                });
+            }
             if (user.status === 'rejected') {
                 return fail(res, {
                     status: 403,

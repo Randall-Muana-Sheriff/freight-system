@@ -37,7 +37,10 @@ export interface StaffUser {
 // order assignment/reassignment — keeps them from drifting apart if this
 // definition ever changes.
 export function isAssignableDriver(d: StaffUser): boolean {
-    return Boolean(d.verified) && Boolean(d.hasVehicle);
+    // status matters as much as the documents: a suspended driver is
+    // blocked at login, and offering them in a picker would only produce
+    // an assignment nobody can act on.
+    return d.status !== 'suspended' && Boolean(d.verified) && Boolean(d.hasVehicle);
 }
 
 // Short, scannable summary of today's pre-departure checks, for the

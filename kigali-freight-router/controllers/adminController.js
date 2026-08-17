@@ -326,6 +326,83 @@ export const AdminController = {
     // verification instead, both of which have their own dedicated review
     // flows; folding them into generic role-editing here would let a role
     // change silently bypass those.
+    // PATCH /api/users/:id/status — disable or restore an account.
+    //
+    // The answer to "this person left" that deleting a row would get
+    // wrong: orders, status logs, incidents and delivery confirmations all
+    // reference the username, and that history has to stay attributable
+    // long after the person is gone.
+    updateUserStatus: async (req, res) => {
+        const { id } = req.params;
+        const { status } = req.body || {};
+
+        if (status !== 'suspended' && status !== 'approved') {
+            return fail(res, {
+                status: 400,
+                code: 'ADMIN_USER_STATUS_INVALID',
+                message: "Status must be 'suspended' or 'approved'.",
+            });
+        }
+
+        try {
+            const target = await pool.query('SELECT id, username, role, status FROM users WHERE id = $1', [id]);
+            if (target.rows.length === 0) {
+                return fail(res, { status: 404, code: 'ADMIN_USER_NOT_FOUND', message: 'That account no longer exists.' });
+            }
+            const user = target.rows[0];
+
+            // Two ways an admin could lock the business out of its own
+            // system, both cheap to prevent and expensive to recover from.
+            if (status === 'suspended') {
+                if (user.username === req.user?.username) {
+                    return fail(res, {
+                        status: 400,
+                        code: 'ADMIN_USER_SELF_SUSPEND',
+                        message: 'You cannot suspend your own account.',
+                    });
+                }
+                if (user.role === 'admin') {
+                    const others = await pool.query(
+                        `SELECT COUNT(*)::int AS n FROM users
+                          WHERE role = 'admin' AND status = 'approved' AND id <> $1`,
+                        [id]
+                    );
+                    if (others.rows[0].n === 0) {
+                        return fail(res, {
+                            status: 400,
+                            code: 'ADMIN_USER_LAST_ADMIN',
+                            message: 'This is the only active admin — promote another before suspending this one.',
+                        });
+                    }
+                }
+            }
+
+            await pool.query('UPDATE users SET status = $1 WHERE id = $2', [status, id]);
+
+            // Suspension has to bite immediately. Without this, an existing
+            // refresh token would keep minting access tokens for a person
+            // who was just removed — the login gate alone only stops the
+            // next sign-in, not the session already in their pocket.
+            if (status === 'suspended') {
+                await revokeAllRefreshTokensForUser(user.username);
+            }
+
+            await appendAuditLog({
+                actionType: status === 'suspended' ? 'USER_SUSPENDED' : 'USER_REINSTATED',
+                description: `${user.username} (${user.role}) was ${status === 'suspended' ? 'suspended' : 'reinstated'}`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, { id: user.id, username: user.username, status });
+        } catch (error) {
+            return fail(res, {
+                status: 500,
+                code: 'ADMIN_USER_STATUS_FAILED',
+                message: errorMessage(error, 'Could not change that account.'),
+            });
+        }
+    },
+
     updateUserRole: async (req, res) => {
         const { id } = req.params;
         const { role } = req.body;
