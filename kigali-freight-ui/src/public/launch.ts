@@ -24,9 +24,9 @@ export const LAUNCH_LABEL = 'November 2026';
 //   true  — the root serves the countdown until LAUNCH_DATE passes
 //   false — the root serves the real site now, whatever the date says
 //
-// Set to false while the booking flow is being worked on. Flip back to
-// true to put the countdown up again; nothing else needs changing.
-export const COUNTDOWN_ENABLED = false;
+// Flip to false to open the site early; true holds the countdown until
+// LAUNCH_DATE passes, after which the real site takes over on its own.
+export const COUNTDOWN_ENABLED = true;
 
 export function isPreLaunch(now: Date = new Date()) {
     return COUNTDOWN_ENABLED && now.getTime() < LAUNCH_DATE.getTime();
