@@ -13,6 +13,44 @@ import { appendAuditLog } from '../services/auditLogService.js';
 // session issued through this new phone/PIN flow must be indistinguishable
 // from one issued through the old username/password login as far as every
 // other route (authMiddleware, orders, telemetry) is concerned.
+// One phone number whose verification code is fixed instead of texted.
+//
+// App Review runs on a fresh install from California with no Rwandan SIM.
+// Sign-in here is phone -> SMS code -> PIN, and the PIN screen cannot be
+// reached without passing the code step, so a reviewer gets stuck on the
+// second screen no matter what credentials they are given. That is a
+// guideline 2.1 rejection, and demo credentials in the review notes do not
+// address it, because the credentials were never the obstacle — the text
+// message was.
+//
+// Deliberately not a bypass. The code is still generated, still stored
+// hashed, still expires on the same clock, still rate-limited, and the
+// number must still belong to a registered driver who then still has to
+// enter the right PIN. The only differences for this one number are that
+// the code is a known constant rather than random, and no SMS is sent.
+// Every other number is untouched.
+//
+// Inert unless both variables are set, so the default — including every
+// existing deployment — behaves exactly as before. Keep it enabled after
+// launch: each update is reviewed too, and the reviewer hits this same
+// wall every time.
+const REVIEW_DEMO_PHONE = normalizePhone(process.env.APP_REVIEW_DEMO_PHONE || '');
+const REVIEW_DEMO_OTP = String(process.env.APP_REVIEW_DEMO_OTP || '').trim();
+const REVIEW_DEMO_ENABLED = Boolean(REVIEW_DEMO_PHONE) && /^\d{6}$/.test(REVIEW_DEMO_OTP);
+
+if (process.env.APP_REVIEW_DEMO_PHONE && !REVIEW_DEMO_ENABLED) {
+    // Silence here would mean a reviewer waiting for a text that is never
+    // coming, and nobody finding out until the rejection arrives.
+    console.warn(
+        '⚠️  APP_REVIEW_DEMO_PHONE is set but the review sign-in is NOT active — ' +
+        'APP_REVIEW_DEMO_OTP must also be set to exactly six digits, and the phone must be a valid number.'
+    );
+}
+
+function isReviewDemoPhone(phone) {
+    return REVIEW_DEMO_ENABLED && phone === REVIEW_DEMO_PHONE;
+}
+
 const ACCESS_TOKEN_TTL = '15m';
 const OTP_TTL_MINUTES = 5;
 const OTP_SESSION_TTL = '10m';
@@ -76,14 +114,24 @@ export const DriverAuthController = {
                 });
             }
 
-            const code = generateOtpCode();
+            // Same row, same hashing, same expiry for both paths — only the
+            // value differs, and only for the review number.
+            const forReview = isReviewDemoPhone(phone);
+            const code = forReview ? REVIEW_DEMO_OTP : generateOtpCode();
             const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
             await pool.query(
                 `INSERT INTO otp_codes (phone_number, code_hash, expires_at) VALUES ($1, $2, $3)`,
                 [phone, hashCode(code), expiresAt]
             );
 
-            await sendSms(phone, `Your Inzira verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
+            if (forReview) {
+                // No SMS: the number belongs to App Review, not to a driver
+                // holding a handset, and texting a real code to it would
+                // both cost money and leak the constant over SMS.
+                console.log('ℹ️  Review sign-in code issued (no SMS sent).');
+            } else {
+                await sendSms(phone, `Your Inzira verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
+            }
 
             return ok(res, { accepted: true });
         } catch (error) {

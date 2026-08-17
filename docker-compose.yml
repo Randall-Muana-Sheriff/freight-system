@@ -136,6 +136,16 @@ services:
       AT_USERNAME: ${AT_USERNAME:-}
       AT_SENDER_ID: ${AT_SENDER_ID:-}
       AT_DELIVERY_REPORT_SECRET: ${AT_DELIVERY_REPORT_SECRET:-}
+      # One phone number whose sign-in code is a known constant instead of
+      # a text message, so Apple's and Google's reviewers can actually get
+      # into the app — sign-in is phone -> SMS code -> PIN, and a reviewer
+      # on another continent never receives the text. Both must be set (the
+      # code being exactly six digits) or the whole thing stays off, which
+      # is the default everywhere including here. See
+      # controllers/driverAuthController.js for what it does and, more
+      # importantly, what it still enforces.
+      APP_REVIEW_DEMO_PHONE: ${APP_REVIEW_DEMO_PHONE:-}
+      APP_REVIEW_DEMO_OTP: ${APP_REVIEW_DEMO_OTP:-}
       # Push notifications (order-assigned, document approved/rejected).
       # Leave unset for local dev — config/firebaseAdmin.js treats a missing
       # path as "push disabled" rather than failing to boot.
