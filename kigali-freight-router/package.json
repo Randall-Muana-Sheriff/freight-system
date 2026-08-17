@@ -13,6 +13,8 @@
     "test:integration": "npm run db:migrate && node --test tests/integration.test.js",
     "docker:build": "docker build -f Dockerfile -t kigali-freight-router ..",
     "db:migrate": "node bin/migrate.js",
+    "seed:demo": "node ops/seed-demo-data.js",
+    "seed:demo:clear": "node ops/seed-demo-data.js --clear",
     "build:info": "node bin/write-build-info.js",
     "db:migrate:down": "node bin/migrate-down.js",
     "backup:db": "node ops/backup-db.js",
