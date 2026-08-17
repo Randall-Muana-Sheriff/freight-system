@@ -140,14 +140,26 @@ export default function PrivacyPolicy() {
             </Section>
 
             <Section id="contact" title="Contact">
+                {/* Deliberately the on-site form and a postal address rather
+                    than an email address. inzira.systems publishes no MX
+                    record, so every mailbox on the domain — including the
+                    privacy@ this page used to advertise — silently bounces.
+                    A policy whose only contact route is dead is worse than
+                    one with no route at all, because it looks answerable.
+                    Swap in a real address here once mail is set up. */}
                 <p>
-                    Questions about this policy, or a request about your own
-                    data, can be sent to{' '}
-                    <a href="mailto:privacy@inzira.systems"
+                    Questions about this policy, or a request to see, correct
+                    or delete your own data, can be sent through the{' '}
+                    <a href="/#contact"
                         className="focus-ring font-medium text-pub-laterite underline underline-offset-4">
-                        privacy@inzira.systems
+                        contact form on our website
                     </a>
-                    , or to Inzira, Gikondo Industrial Zone, Kigali, Rwanda.
+                    , which reaches our office directly.
+                </p>
+                <p>
+                    By post: Inzira, Gikondo Industrial Zone, Kigali, Rwanda.
+                    Drivers can also raise anything about their own data
+                    directly with dispatch.
                 </p>
             </Section>
         </div>
