@@ -82,7 +82,7 @@ function groupByDriver(rows: DriverDocument[]): Record<string, Partial<Record<Do
 }
 
 export default function DriverDocumentReview() {
-    const { confirm } = useDialog();
+    const { confirm, prompt } = useDialog();
     const { jwtToken, userRole, setViewingImage, resolveDriverName } = useSocket();
     const [rows, setRows] = useState<DriverDocument[]>([]);
     const [loading, setLoading] = useState(false);
@@ -108,8 +108,17 @@ export default function DriverDocumentReview() {
     }, [userRole, load]);
 
     const handleDecision = async (id: number, status: 'approved' | 'rejected') => {
-        const rejectionReason = status === 'rejected' ? window.prompt('Reason for rejecting this document (shown to the driver):') : undefined;
-        if (status === 'rejected' && rejectionReason === null) return; // cancelled the prompt
+        const rejectionReason = status === 'rejected'
+            ? await prompt({
+                title: 'Why is this being rejected?',
+                body: 'The driver sees this, so say what they need to fix.',
+                placeholder: 'e.g. Photo is blurred — the expiry date is unreadable',
+                confirmLabel: 'Reject',
+                tone: 'danger',
+                required: true,
+            })
+            : undefined;
+        if (status === 'rejected' && rejectionReason === null) return; // cancelled
 
         setError(null);
         setDecidingId(id);
@@ -129,7 +138,7 @@ export default function DriverDocumentReview() {
     // revoking an approved one actively pulls this driver back out of
     // "verified" — assignOrderBundle/reassignOrder recompute that live off
     // every document's current status, so the effect is immediate. The
-    // confirm() step exists specifically so that's a deliberate choice,
+    // confirmation step exists specifically so that's a deliberate choice,
     // not a misclick.
     const handleRevoke = async (id: number, driverLabel: string, docLabel: string) => {
         const confirmed = await confirm({
@@ -140,8 +149,15 @@ export default function DriverDocumentReview() {
         });
         if (!confirmed) return;
 
-        const rejectionReason = window.prompt('Reason for revoking this approval (shown to the driver):');
-        if (rejectionReason === null) return; // cancelled the prompt
+        const rejectionReason = await prompt({
+            title: 'Why is this approval being revoked?',
+            body: 'The driver sees this, so say what they need to fix.',
+            placeholder: 'e.g. Insurance certificate has expired',
+            confirmLabel: 'Revoke',
+            tone: 'danger',
+            required: true,
+        });
+        if (rejectionReason === null) return; // cancelled
 
         setError(null);
         setDecidingId(id);
@@ -158,7 +174,7 @@ export default function DriverDocumentReview() {
     // The one-click payoff of the whole feature: the AI already wrote the
     // exact reason ("name mismatch...", "wrong document type...") — an
     // admin agreeing with it shouldn't have to retype what's already on
-    // screen into a window.prompt(). Still one explicit confirm, since
+    // screen into a free-text box. Still one explicit confirm, since
     // rejecting is still a real decision the AI doesn't get to make alone.
     const handleRejectWithAiReason = async (id: number, reason: string) => {
         if (!(await confirm({

@@ -29,9 +29,19 @@ interface AlertOptions {
     tone?: DialogTone;
 }
 
+interface PromptOptions extends ConfirmOptions {
+    placeholder?: string;
+    /** Reject with an empty box and the confirm button stays disabled —
+     *  the native prompt happily returned "" and left callers to notice. */
+    required?: boolean;
+}
+
 interface DialogContextValue {
     confirm: (options: ConfirmOptions) => Promise<boolean>;
     alert: (options: AlertOptions) => Promise<void>;
+    /** Resolves to the typed text, or null if cancelled — same shape as
+     *  window.prompt, so call sites keep their null check. */
+    prompt: (options: PromptOptions) => Promise<string | null>;
 }
 
 const DialogContext = createContext<DialogContextValue | null>(null);
@@ -42,18 +52,22 @@ export function useDialog(): DialogContextValue {
     return value;
 }
 
-interface OpenDialog extends ConfirmOptions {
-    kind: 'confirm' | 'alert';
-    resolve: (result: boolean) => void;
+interface OpenDialog extends PromptOptions {
+    kind: 'confirm' | 'alert' | 'prompt';
+    resolve: (result: boolean | string | null) => void;
 }
 
 export function DialogProvider({ children }: { children: ReactNode }) {
     const [dialog, setDialog] = useState<OpenDialog | null>(null);
+    const [value, setValue] = useState('');
     const confirmRef = useRef<HTMLButtonElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const confirm = useCallback(
         (options: ConfirmOptions) =>
-            new Promise<boolean>((resolve) => setDialog({ ...options, kind: 'confirm', resolve })),
+            new Promise<boolean>((resolve) => {
+                setDialog({ ...options, kind: 'confirm', resolve: (r) => resolve(r === true) });
+            }),
         []
     );
 
@@ -65,7 +79,16 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         []
     );
 
-    const close = useCallback((result: boolean) => {
+    const prompt = useCallback(
+        (options: PromptOptions) =>
+            new Promise<string | null>((resolve) => {
+                setValue('');
+                setDialog({ ...options, kind: 'prompt', resolve: (r) => resolve(typeof r === 'string' ? r : null) });
+            }),
+        []
+    );
+
+    const close = useCallback((result: boolean | string | null) => {
         setDialog((current) => {
             current?.resolve(result);
             return null;
@@ -76,9 +99,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     // box did — Enter to proceed, Escape to back out.
     useEffect(() => {
         if (!dialog) return;
-        confirmRef.current?.focus();
+        // A prompt wants the cursor in the box; everything else wants the
+        // primary action, so Enter still means "yes".
+        if (dialog.kind === 'prompt') inputRef.current?.focus();
+        else confirmRef.current?.focus();
         const onKey = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') close(false);
+            if (event.key === 'Escape') close(dialog.kind === 'prompt' ? null : false);
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
@@ -87,7 +113,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     const danger = dialog?.tone === 'danger';
 
     return (
-        <DialogContext.Provider value={{ confirm, alert }}>
+        <DialogContext.Provider value={{ confirm, alert, prompt }}>
             {children}
             {dialog ? (
                 <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
@@ -95,7 +121,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                         alert — the same thing the native box allowed. */}
                     <button
                         aria-label="Dismiss"
-                        onClick={() => close(false)}
+                        onClick={() => close(dialog.kind === 'prompt' ? null : false)}
                         className="absolute inset-0 h-full w-full cursor-default bg-ink/80"
                     />
                     <div
@@ -114,11 +140,24 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                             </p>
                         ) : null}
 
+                        {dialog.kind === 'prompt' ? (
+                            <input
+                                ref={inputRef}
+                                value={value}
+                                onChange={(e) => setValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && !(dialog.required && !value.trim())) close(value);
+                                }}
+                                placeholder={dialog.placeholder}
+                                className="mt-4 w-full rounded border border-line/20 bg-ink px-2.5 py-2 font-mono text-[11px] text-paper placeholder:text-steel/60 focus:border-route focus:outline-none"
+                            />
+                        ) : null}
+
                         <div className="mt-5 flex justify-end gap-2">
-                            {dialog.kind === 'confirm' ? (
+                            {dialog.kind !== 'alert' ? (
                                 <button
                                     type="button"
-                                    onClick={() => close(false)}
+                                    onClick={() => close(dialog.kind === 'prompt' ? null : false)}
                                     className="rounded border border-line/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase text-steel hover:text-paper"
                                 >
                                     {dialog.cancelLabel || 'Cancel'}
@@ -127,12 +166,13 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                             <button
                                 ref={confirmRef}
                                 type="button"
-                                onClick={() => close(true)}
-                                className={`rounded px-3 py-1.5 font-mono text-[10px] font-bold uppercase ${
+                                onClick={() => close(dialog.kind === 'prompt' ? value : true)}
+                                disabled={dialog.kind === 'prompt' && Boolean(dialog.required) && !value.trim()}
+                                className={`rounded px-3 py-1.5 font-mono text-[10px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${
                                     danger ? 'bg-rust text-paper hover:bg-rust/85' : 'bg-route text-ink hover:bg-route-deep'
                                 }`}
                             >
-                                {dialog.confirmLabel || (dialog.kind === 'confirm' ? 'Confirm' : 'OK')}
+                                {dialog.confirmLabel || (dialog.kind === 'alert' ? 'OK' : 'Confirm')}
                             </button>
                         </div>
                     </div>
