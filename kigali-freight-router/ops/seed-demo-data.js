@@ -22,6 +22,12 @@
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db.js';
+// Imported rather than listed again here. A driver only counts as verified
+// when *every* required document is approved, so a seeder holding its own
+// copy of that list silently produces drivers the dispatcher cannot assign
+// the moment the two fall out of step — which is exactly what happened when
+// this file hardcoded four of the five.
+import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
 // Demo drivers all share this PIN so the app can be opened as any of them
 // during a walkthrough. Fine for a laptop, which is the only place this
@@ -177,6 +183,15 @@ async function seed() {
     try {
         await client.query('BEGIN');
 
+        // Seeding replaces the demo rather than adding to it. Running this
+        // twice used to fail partway through on a unique constraint — the
+        // second fortnight's runs colliding with the first's — which left
+        // the operator reading a Postgres error to learn they should have
+        // passed --clear. Clearing inside the same transaction means a
+        // failure anywhere still rolls back to the data that was there
+        // before, so a broken seed can never leave an empty board.
+        await clearDemoData(client);
+
         const pinHash = await bcrypt.hash(DEMO_PIN, 10);
         const hubs = (await client.query('SELECT id, name FROM hubs ORDER BY id')).rows;
         const hubByPlace = {
@@ -206,7 +221,7 @@ async function seed() {
             );
 
             // A driver who has been working for weeks has their paperwork in.
-            for (const doc of ['national_id', 'drivers_license', 'vehicle_registration', 'insurance_certificate']) {
+            for (const doc of REQUIRED_DOCUMENT_TYPES) {
                 await client.query(
                     `INSERT INTO driver_documents (username, document_type, file_url, status, uploaded_at, reviewed_by, reviewed_at)
                      VALUES ($1, $2, $3, 'approved', $4, 'peter', $5)
@@ -224,7 +239,11 @@ async function seed() {
         const orders = [];
         for (let daysAgo = 14; daysAgo >= 0; daysAgo--) {
             const isToday = daysAgo === 0;
-            const count = isToday ? 7 : between(3, 6);
+            // Today carries more than a typical day because today is the day
+            // being demonstrated: the runs below consume six of these, and
+            // what is left has to still look like a working queue with
+            // something in it to plan.
+            const count = isToday ? 10 : between(3, 6);
             for (let i = 0; i < count; i++) {
                 const cargo = pick(CARGO);
                 const load = describeCargo(cargo);
@@ -343,8 +362,17 @@ async function seed() {
         // and was correctly rejected.
         const spokenFor = new Set();
         for (const spec of runSpecs) {
+            // PENDING orders are deliberately left off. Planning a run
+            // assigns its orders, so a PENDING order sitting on a live run
+            // is a state the real endpoint cannot produce — and the first
+            // version of this script produced exactly that, which left the
+            // multi-stop panel offering the only two plannable orders on
+            // the board while the server rejected both as already spoken
+            // for. What stays PENDING is the queue there is still work to
+            // do with.
             const chosen = orders
-                .filter((o) => o.daysAgo === spec.daysAgo && o.dest && !spokenFor.has(o.id))
+                .filter((o) => o.daysAgo === spec.daysAgo && o.dest
+                    && o.status !== 'PENDING' && !spokenFor.has(o.id))
                 .slice(0, 3);
             if (chosen.length < 2) continue;
             chosen.forEach((o) => spokenFor.add(o.id));

@@ -19,6 +19,7 @@ import { appendAuditLog } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { logError } from '../utils/logger.js';
 import { sequenceStops, plannedDistanceMetres } from '../utils/routeSequencing.js';
+import { isDriverVerified } from '../services/driverVerificationService.js';
 
 const STOP_KINDS = ['PICKUP', 'DROP'];
 const OPEN_STOP_STATUSES = ['PENDING', 'ARRIVED'];
@@ -32,6 +33,54 @@ const STOP_COMPLETION_ORDER_STATUS = { PICKUP: 'PICKED_UP', DROP: 'DELIVERED' };
 // Orders already finished or cancelled cannot be planned onto a run, and
 // neither can an order with no cargo left to move.
 const PLANNABLE_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED'];
+
+// Whether this driver may be given work at all.
+//
+// Assigning a run assigns its orders (see createTrip below), so a run is a
+// dispatch decision by another name and has to clear the same bar the
+// single-order path clears in orderController: approved account, a vehicle
+// to carry the cargo, and all required compliance documents approved.
+// Without this, planning a run was a way to route cargo to a driver the
+// order endpoint would have refused — the multi-stop screen quietly became
+// the softer door into the same building.
+//
+// Returns null when the driver is fine, or a ready-to-send failure body.
+async function driverAssignmentProblem(client, username) {
+    if (!username) return null;
+
+    const driver = await client.query(
+        `SELECT id, status FROM users WHERE username = $1 AND role = 'driver'`,
+        [username]
+    );
+    if (driver.rows.length === 0) {
+        return { status: 404, code: 'TRIP_DRIVER_NOT_FOUND', message: `${username} is not a driver on this fleet.` };
+    }
+    if (driver.rows[0].status === 'suspended') {
+        return { status: 409, code: 'TRIP_DRIVER_SUSPENDED', message: `${username} is suspended and cannot be given a run.` };
+    }
+
+    const vehicle = await client.query(
+        `SELECT id FROM fleet_vehicles WHERE current_driver_id = $1 LIMIT 1`,
+        [driver.rows[0].id]
+    );
+    if (vehicle.rows.length === 0) {
+        return {
+            status: 409,
+            code: 'TRIP_DRIVER_NO_VEHICLE',
+            message: `${username} has no vehicle assigned. Assign a vehicle before planning a run for them.`,
+        };
+    }
+
+    if (!(await isDriverVerified(client, username))) {
+        return {
+            status: 409,
+            code: 'TRIP_DRIVER_UNVERIFIED',
+            message: `${username} has not completed document verification yet.`,
+        };
+    }
+
+    return null;
+}
 
 async function loadTrip(client, tripId) {
     const trip = await client.query(
@@ -95,6 +144,12 @@ export const TripController = {
             }
 
             await client.query('BEGIN');
+
+            const driverProblem = await driverAssignmentProblem(client, driverUsername);
+            if (driverProblem) {
+                await client.query('ROLLBACK');
+                return fail(res, driverProblem);
+            }
 
             const orders = await client.query(
                 `SELECT id, status, pickup_lat, pickup_lng, delivery_lat, delivery_lng,
@@ -398,6 +453,22 @@ export const TripController = {
             }
 
             const nextDriver = driverUsername === undefined ? current.rows[0].driver_username : driverUsername;
+
+            // Checked when a driver is being put on the run, and again when
+            // the run is actually started — the two moments where cargo
+            // becomes someone's responsibility. Deliberately not checked on
+            // the way to CANCELLED: a driver whose insurance lapsed
+            // mid-shift is precisely when dispatch most needs to be able to
+            // pull the run, and a gate that blocks that has stopped
+            // protecting anyone.
+            if (driverUsername !== undefined || status === 'ACTIVE') {
+                const driverProblem = await driverAssignmentProblem(client, nextDriver);
+                if (driverProblem) {
+                    await client.query('ROLLBACK');
+                    return fail(res, driverProblem);
+                }
+            }
+
             try {
                 await client.query(
                     `UPDATE trips
