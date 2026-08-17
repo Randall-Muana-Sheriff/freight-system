@@ -39,6 +39,7 @@ let driverId = null;
 let vehicleId = null;
 let hubId = null;
 let createdOrderId = null;
+let tripUnderTest = null;
 let socketPort = null;
 
 async function login(username, password) {
@@ -877,6 +878,105 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         const asDriver = await request(app).patch(`/api/orders/${row.id}/priority`)
             .set('Authorization', `Bearer ${driverToken}`).send({ priority: 'low' });
         assert.equal(asDriver.statusCode, 403);
+    });
+
+    test('trips: a run sequences its stops, never dropping before collecting', async () => {
+        await resetPublicRateLimits();
+        // Two orders whose pickups and drops interleave geographically, so a
+        // pure nearest-neighbour pass would happily plan a drop first.
+        const mk = async (pickup, delivery) => {
+            const res = await request(app).post('/api/orders')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send({
+                    cargo_description: 'Run test cargo', weight_kg: 10, origin_hub_id: hubId,
+                    pickup_lat: pickup[0], pickup_lng: pickup[1],
+                    delivery_lat: delivery[0], delivery_lng: delivery[1],
+                });
+            assert.equal(res.statusCode, 201, JSON.stringify(res.body));
+            return res.body.data?.order?.id ?? res.body.data?.id;
+        };
+        const orderA = await mk([-1.9700, 30.1300], [-1.9440, 30.0620]);
+        const orderB = await mk([-1.9450, 30.0630], [-1.9550, 30.0900]);
+
+        const created = await request(app).post('/api/trips')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [orderA, orderB], driverUsername: driverPhone });
+        assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+        const trip = created.body.data;
+        assert.equal(trip.stopCount, 4);
+
+        const positionOf = (orderId, kind) =>
+            trip.stops.findIndex((s) => s.order_id === orderId && s.kind === kind);
+        for (const id of [orderA, orderB]) {
+            assert.ok(positionOf(id, 'PICKUP') < positionOf(id, 'DROP'),
+                `order ${id} was planned to be delivered before it was collected`);
+        }
+        // Sequence numbers are 1..n with no gaps, which the driver app relies
+        // on to show "stop 3 of 4".
+        assert.deepEqual(trip.stops.map((s) => s.sequence), [1, 2, 3, 4]);
+
+        // Assigning the run assigns its orders, so the driver's own job list
+        // and the run agree rather than showing the same work twice under
+        // two different owners. (The active queue is PENDING-only, so an
+        // assigned order correctly drops out of it — check the order.)
+        const rowA = await request(app).get(`/api/orders/${orderA}`).set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(rowA.body.data.assigned_to, driverPhone);
+        assert.equal(rowA.body.data.status, 'ASSIGNED');
+
+        tripUnderTest = trip;
+    });
+
+    test('trips: an order cannot be planned onto two live runs at once', async () => {
+        const orderId = tripUnderTest.stops[0].order_id;
+        const clash = await request(app).post('/api/trips')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [orderId] });
+        assert.equal(clash.statusCode, 409);
+        assert.equal(clash.body.error.code, 'TRIP_ORDER_ALREADY_PLANNED');
+    });
+
+    test('trips: working a stop drives its order status, and closes the run', async () => {
+        const stops = tripUnderTest.stops;
+        let latest = tripUnderTest;
+
+        const pickup = stops.find((s) => s.kind === 'PICKUP');
+        const done = await request(app).patch(`/api/trips/stops/${pickup.id}`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ status: 'DONE' });
+        assert.equal(done.statusCode, 200, JSON.stringify(done.body));
+        // The run starts itself the moment real work happens on it.
+        assert.equal(done.body.data.status, 'ACTIVE');
+
+        const order = await request(app).get(`/api/orders/${pickup.order_id}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(order.body.data.status, 'PICKED_UP');
+
+        // A stop that did not happen must say why.
+        const other = stops.find((s) => s.id !== pickup.id);
+        const noReason = await request(app).patch(`/api/trips/stops/${other.id}`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ status: 'FAILED' });
+        assert.equal(noReason.statusCode, 400);
+        assert.equal(noReason.body.error.code, 'STOP_REASON_REQUIRED');
+
+        // Close out everything still open; the run should finish on its own.
+        for (const stop of stops) {
+            const res = await request(app).patch(`/api/trips/stops/${stop.id}`)
+                .set('Authorization', `Bearer ${driverToken}`)
+                .send({ status: 'DONE' });
+            if (res.statusCode === 200) latest = res.body.data;
+        }
+        assert.equal(latest.status, 'COMPLETED');
+        assert.equal(latest.completedStopCount, latest.stopCount);
+
+        const drop = stops.find((s) => s.kind === 'DROP');
+        const delivered = await request(app).get(`/api/orders/${drop.order_id}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(delivered.body.data.status, 'DELIVERED');
+
+        // A finished stop cannot be reopened or double-counted.
+        const again = await request(app).patch(`/api/trips/stops/${drop.id}`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ status: 'DONE' });
+        assert.equal(again.statusCode, 409);
+        assert.equal(again.body.error.code, 'STOP_ALREADY_CLOSED');
     });
 
     test.after(async () => {

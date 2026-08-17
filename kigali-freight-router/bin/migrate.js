@@ -45,6 +45,7 @@ const MIGRATIONS = [
     { id: 'add_public_orders.sql', destructive: false },
     { id: 'add_user_suspension.sql', destructive: false },
     { id: 'add_order_needed_by.sql', destructive: false },
+    { id: 'add_trips_and_stops.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';
