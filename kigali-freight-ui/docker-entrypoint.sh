@@ -9,9 +9,14 @@
 set -eu
 
 API_BASE_URL="${API_BASE_URL:-}"
+# The board's canonical host. Links to the staff board point here, and the
+# board redirects to it when reached by any other route, so that exactly
+# one origin ever holds a session — see src/utils/surface.ts. Left empty
+# when there is no staff subdomain, which keeps the path fallback.
+APP_DOMAIN="${APP_DOMAIN:-}"
 
 cat > /usr/share/nginx/html/config.js <<EOF
-window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}" };
+window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}" };
 EOF
 
 if [ -n "$API_BASE_URL" ]; then

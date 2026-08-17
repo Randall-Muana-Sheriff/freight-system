@@ -91,6 +91,12 @@ services:
       # localhost, and not the router's internal compose hostname (a
       # browser/phone can't resolve "router", only Caddy's public domain).
       API_BASE_URL: ${API_BASE_URL:?Set API_BASE_URL in .env.production to your real https://api.yourcompany.com}
+      # The same value Caddy serves the board on. The app uses it to send
+      # every "staff sign in" link to one canonical origin, and to move
+      # itself there if reached via the apex's /dispatch fallback — the
+      # session is a per-origin localStorage token, so two origins means a
+      # sign-out that cannot clear the other one's session.
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.production (e.g. dispatch.yourcompany.com)}
 
   caddy:
     image: caddy:2.8-alpine

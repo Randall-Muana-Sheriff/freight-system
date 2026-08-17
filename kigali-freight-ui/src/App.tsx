@@ -7,7 +7,8 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { DialogProvider } from './components/DialogProvider';
 import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { setNoIndex } from './utils/seo';
-import { resolveSurface } from './utils/surface';
+import { resolveSurface, shouldRedirectToStaffHost, staffUrl } from './utils/surface';
+import { getStaffDomain } from './utils/runtimeConfig';
 
 // Only one of these two ever renders at a time (gated by showAdminCenter),
 // and neither is needed at all until after login — code-splitting them
@@ -80,6 +81,25 @@ export default function App() {
   // called "dispatch" serves the board at its own root, so the team's
   // existing bookmarks keep working; /dispatch still works anywhere.
   const surface = resolveSurface();
+
+  // The board has exactly one home.
+  //
+  // It answers on the apex's /dispatch path too, so old bookmarks survive,
+  // but a session signed in there is stranded on that origin: the JWT
+  // lives in localStorage, which is per-origin, so it does not carry to
+  // the canonical host and — the part that actually matters — signing out
+  // there cannot clear a token sitting in the other origin's storage.
+  // Moving before anything renders means only one origin ever holds a
+  // session, so the sign-out button can always reach it.
+  //
+  // replace() rather than assign() so the wrong origin does not sit in
+  // history for the back button to return to. No-ops entirely when no
+  // staff domain is configured, which is every local checkout.
+  const staffDomain = getStaffDomain();
+  if (shouldRedirectToStaffHost(surface, staffDomain)) {
+    window.location.replace(staffUrl(staffDomain));
+    return <ScreenLoading />;
+  }
 
   // Neither the dispatcher board nor a wall display belongs in a search
   // result. Set before render so it is in place by the time a crawler

@@ -3,6 +3,8 @@
 // on the road with the paperwork in between.
 import { InziraMark } from './InziraMark';
 import { restartTour } from './SiteTour';
+import { staffUrl } from '../utils/surface';
+import { getStaffDomain } from '../utils/runtimeConfig';
 
 const SECTIONS = [
     { id: 'services', label: 'What we move' },
@@ -75,8 +77,19 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                         <p className="data-label mb-1 text-pub-onink-soft/60">Company</p>
                         <span className="text-sm text-pub-onink-soft">Gikondo Industrial Zone</span>
                         <span className="text-sm text-pub-onink-soft">Kigali, Rwanda</span>
-                        <button className={link} onClick={() => onNavigate('/dispatch')}>Staff sign in</button>
                         <button className={link} onClick={restartTour}>Show me around</button>
+                        {/* A real anchor to the board's canonical host, not a
+                            path nav. The session is per-origin, so sending
+                            staff to this site's own /dispatch would give them
+                            a login that does not carry to the host they are
+                            meant to be using — and a sign-out that cannot
+                            reach the other origin's token. Its own row rather
+                            than filed under Company: it is not company
+                            information, and the people who need it are
+                            looking for it rather than reading the footer. */}
+                        <a className={`${link} mt-3`} href={staffUrl(getStaffDomain())}>
+                            Staff sign in
+                        </a>
                     </div>
                 </div>
 
