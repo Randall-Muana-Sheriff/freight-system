@@ -252,6 +252,29 @@ export async function fetchLiveFleetStatus(token: string) {
     return apiFetch('/api/fleet/telemetry-sheet', { method: 'GET', token });
 }
 
+// Compliance documents that have lapsed or are close to it. A lapsed one
+// un-verifies its driver immediately, so this is the difference between a
+// dispatcher renewing something on Monday and a driver vanishing from the
+// assignable list on Tuesday with no explanation.
+export interface ComplianceIssue {
+    holderKind: 'driver' | 'vehicle';
+    holder: string | null;
+    plateNumber: string | null;
+    documentType: string;
+    expiresAt: string;
+    expired: boolean;
+}
+
+export interface ComplianceReport {
+    warningDays: number;
+    expired: ComplianceIssue[];
+    expiringSoon: ComplianceIssue[];
+}
+
+export async function fetchComplianceIssues(token: string) {
+    return apiFetch('/api/fleet/compliance', { method: 'GET', token }) as Promise<ComplianceReport>;
+}
+
 export interface BreadcrumbsResult {
     trail: [number, number][];
     survivingPointsCount: number;
@@ -323,11 +346,26 @@ export async function fetchDriverDocuments(token: string) {
     return apiFetch('/api/driver-documents', { method: 'GET', token });
 }
 
-export async function updateDriverDocumentStatus(id: number, status: string, rejectionReason: string | null, token: string) {
+// holderKind is required because driver and vehicle documents live in
+// separate tables with independent id sequences — an id alone does not say
+// which. expiresAt is read off the certificate the reviewer is looking at;
+// it is the one moment anyone actually has the document in front of them.
+export async function updateDriverDocumentStatus(
+    id: number,
+    status: string,
+    rejectionReason: string | null,
+    token: string,
+    options: { holderKind?: 'driver' | 'vehicle'; expiresAt?: string | null } = {}
+) {
     return apiFetch(`/api/driver-documents/${id}/status`, {
         method: 'PATCH',
         token,
-        body: { status, rejectionReason },
+        body: {
+            status,
+            rejectionReason,
+            holderKind: options.holderKind ?? 'driver',
+            expiresAt: options.expiresAt ?? null,
+        },
     });
 }
 

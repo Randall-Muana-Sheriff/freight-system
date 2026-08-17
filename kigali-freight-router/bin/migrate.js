@@ -47,6 +47,10 @@ const MIGRATIONS = [
     { id: 'add_order_needed_by.sql', destructive: false },
     { id: 'add_trips_and_stops.sql', destructive: false },
     { id: 'retire_delivery_stops.sql', destructive: false },
+    // Must run after add_full_schema (fleet_vehicles) and
+    // create_driver_documents: it reads both to move vehicle paperwork onto
+    // the vehicle it describes.
+    { id: 'add_document_expiry_and_vehicle_documents.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

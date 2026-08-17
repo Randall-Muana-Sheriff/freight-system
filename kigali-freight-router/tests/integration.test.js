@@ -304,10 +304,13 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
                 .attach('document', photoFor(index), `${documentType}.png`);
             assert.equal(upload.statusCode, 201, `${documentType}: ${JSON.stringify(upload.body)}`);
 
+            // holderKind comes back from the upload because the driver and
+            // vehicle document tables have separate id sequences — the
+            // reviewer has to say which one the id belongs to.
             const approve = await request(app)
                 .patch(`/api/driver-documents/${upload.body.data.id}/status`)
                 .set('Authorization', `Bearer ${adminToken}`)
-                .send({ status: 'approved' });
+                .send({ status: 'approved', holderKind: upload.body.data.holderKind });
             assert.equal(approve.statusCode, 200, `${documentType}: ${JSON.stringify(approve.body)}`);
         }
 
@@ -316,6 +319,49 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             .set('Authorization', `Bearer ${driverToken}`);
         assert.equal(mine.statusCode, 200);
         assert.equal(mine.body.data.verified, true, JSON.stringify(mine.body.data));
+    });
+
+    test('driver documents: an expiry in the past is refused at review time', async () => {
+        const all = await request(app)
+            .get('/api/driver-documents')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(all.statusCode, 200);
+        const doc = all.body.data.find((d) => d.username === driverPhone);
+        assert.ok(doc, 'expected the driver to have a document to review');
+
+        const backdated = await request(app)
+            .patch(`/api/driver-documents/${doc.id}/status`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ status: 'approved', holderKind: doc.holderKind, expiresAt: '2000-01-01T00:00:00Z' });
+
+        // Approving onto a date already gone would clear a driver on a
+        // lapsed document, which is the exact failure expiry exists to stop.
+        assert.equal(backdated.statusCode, 400, JSON.stringify(backdated.body));
+        assert.equal(backdated.body.code, 'DRIVER_DOCUMENT_EXPIRY_PAST');
+    });
+
+    test('fleet compliance: reports documents inside the warning window', async () => {
+        const all = await request(app)
+            .get('/api/driver-documents')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const doc = all.body.data.find((d) => d.username === driverPhone);
+
+        const soon = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+        const approved = await request(app)
+            .patch(`/api/driver-documents/${doc.id}/status`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ status: 'approved', holderKind: doc.holderKind, expiresAt: soon });
+        assert.equal(approved.statusCode, 200, JSON.stringify(approved.body));
+
+        const compliance = await request(app)
+            .get('/api/fleet/compliance')
+            .set('Authorization', `Bearer ${dispatcherToken}`);
+        assert.equal(compliance.statusCode, 200, JSON.stringify(compliance.body));
+
+        const flagged = compliance.body.data.expiringSoon
+            .find((i) => i.documentType === doc.documentType && i.holder === driverPhone);
+        assert.ok(flagged, `expected ${doc.documentType} in expiringSoon: ${JSON.stringify(compliance.body.data)}`);
+        assert.equal(flagged.expired, false);
     });
 
     test('delivery lifecycle: assign -> IN_TRANSIT -> ARRIVED -> confirm-delivery', async () => {

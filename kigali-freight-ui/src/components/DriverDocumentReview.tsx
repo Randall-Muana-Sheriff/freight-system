@@ -12,6 +12,11 @@ import { useDialog } from './DialogProvider';
 type DocumentType = 'national_id' | 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'roadworthiness_certificate';
 type DocumentStatus = 'approved' | 'rejected' | 'pending' | 'not_submitted';
 
+// The three that always carry a date in Rwanda. A national ID and a
+// registration document may not, so their expiry stays optional rather than
+// forcing a reviewer to invent one.
+const EXPIRY_REQUIRED = ['drivers_license', 'insurance_certificate', 'roadworthiness_certificate'];
+
 // Purely an admin-facing triage aid — see documentAnalysisService.js.
 // Never changes what buttons render or what status means; an admin's own
 // Approve/Reject/Revoke click is still the only thing that actually
@@ -35,6 +40,11 @@ interface DriverDocument {
     rejectionReason?: string;
     fileUrl?: string;
     aiAnalysis?: DocumentAiAnalysis | null;
+    // Which table this row came from — the two have independent id
+    // sequences, so the review PATCH has to say which one it means.
+    holderKind?: 'driver' | 'vehicle';
+    expiresAt?: string | null;
+    plateNumber?: string | null;
 }
 
 // Short, unambiguous verdict tags computed straight from the model's
@@ -107,7 +117,12 @@ export default function DriverDocumentReview() {
         }
     }, [userRole, load]);
 
-    const handleDecision = async (id: number, status: 'approved' | 'rejected') => {
+    const handleDecision = async (
+        id: number,
+        status: 'approved' | 'rejected',
+        documentType?: string,
+        holderKind?: 'driver' | 'vehicle'
+    ) => {
         const rejectionReason = status === 'rejected'
             ? await prompt({
                 title: 'Why is this being rejected?',
@@ -120,10 +135,30 @@ export default function DriverDocumentReview() {
             : undefined;
         if (status === 'rejected' && rejectionReason === null) return; // cancelled
 
+        // Asked at approval because this is the only point in the process
+        // where a person is actually holding the certificate. Required for
+        // the three that always carry a date — approving an insurance
+        // certificate without one re-creates exactly the hole this closes.
+        let expiresAt: string | null = null;
+        if (status === 'approved') {
+            const needsExpiry = EXPIRY_REQUIRED.includes(documentType || '');
+            const answer = await prompt({
+                title: 'When does this document expire?',
+                body: needsExpiry
+                    ? 'Read it off the document. The driver stops being assignable on this date, and dispatch is warned three weeks before.'
+                    : 'Optional for this document. Leave blank if it does not carry an expiry date.',
+                placeholder: 'YYYY-MM-DD',
+                confirmLabel: 'Approve',
+                required: needsExpiry,
+            });
+            if (answer === null) return; // cancelled
+            expiresAt = answer.trim() ? new Date(`${answer.trim()}T23:59:59`).toISOString() : null;
+        }
+
         setError(null);
         setDecidingId(id);
         try {
-            await updateDriverDocumentStatus(id, status, rejectionReason ?? null, jwtToken);
+            await updateDriverDocumentStatus(id, status, rejectionReason ?? null, jwtToken, { holderKind, expiresAt });
             void load();
         } catch (err) {
             setError((err as Error).message);
@@ -209,34 +244,34 @@ export default function DriverDocumentReview() {
             <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                     <FileCheck size={15} strokeWidth={2.5} className="text-steel" />
-                    <h2 className="text-sm font-bold tracking-tight text-paper font-sans">Driver document verification</h2>
+                    <h2 className="text-body font-bold tracking-tight text-paper font-sans">Driver document verification</h2>
                 </div>
                 <div className="flex items-center gap-1.5">
                     {flaggedCount > 0 && (
-                        <span className="flex items-center gap-1 bg-rust/15 text-rust rounded-full px-2 py-0.5 text-[10px] font-bold font-mono">
+                        <span className="flex items-center gap-1 bg-rust/15 text-rust rounded-full px-2 py-0.5 text-micro font-bold font-mono">
                             <Sparkles size={9} strokeWidth={2.5} />
                             {flaggedCount} AI-flagged
                         </span>
                     )}
                     {pendingCount > 0 && (
-                        <span className="bg-hazard/15 text-hazard rounded-full px-2 py-0.5 text-[10px] font-bold font-mono">{pendingCount} pending review</span>
+                        <span className="bg-hazard/15 text-hazard rounded-full px-2 py-0.5 text-micro font-bold font-mono">{pendingCount} pending review</span>
                     )}
                 </div>
             </div>
 
             {error && (
-                <div className="p-2 bg-rust/10 border border-rust/30 text-rust rounded text-[11px] font-mono mb-3">{error}</div>
+                <div className="p-2 bg-rust/10 border border-rust/30 text-rust rounded text-data font-mono mb-3">{error}</div>
             )}
 
             {drivers.length === 0 && !loading ? (
-                <div className="bg-panel border border-line/10 rounded-md p-4 text-steel text-[11px] font-mono text-center">
+                <div className="bg-panel border border-line/10 rounded-md p-4 text-steel text-data font-mono text-center">
                     No driver documents submitted yet.
                 </div>
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     {drivers.map((username) => (
                         <div key={username} className="bg-panel border border-line/10 rounded-md p-4 space-y-2">
-                            <div className="text-paper font-bold text-sm font-sans mb-1">{resolveDriverName(username)}</div>
+                            <div className="text-paper font-bold text-body font-sans mb-1">{resolveDriverName(username)}</div>
                             {REQUIRED_TYPES.map((type) => {
                                 const doc = byDriver[username][type];
                                 const status: DocumentStatus = doc?.status || 'not_submitted';
@@ -248,11 +283,11 @@ export default function DriverDocumentReview() {
                                 // same neutral border every other row already has.
                                 const railClass = hasIssues === null ? 'border-line/10' : hasIssues ? 'border-l-rust' : 'border-l-tarp';
                                 return (
-                                    <div key={type} className={`relative flex items-start justify-between gap-2 bg-ink/60 rounded border ${railClass} ${hasIssues !== null ? 'border-l-[3px]' : ''} px-2.5 py-2 text-[11px] font-mono`}>
+                                    <div key={type} className={`relative flex items-start justify-between gap-2 bg-ink/60 rounded border ${railClass} ${hasIssues !== null ? 'border-l-[3px]' : ''} px-2.5 py-2 text-data font-mono`}>
                                         <div className="min-w-0">
                                             <div className="text-paper truncate">{LABELS[type]}</div>
                                             {status === 'rejected' && doc?.rejectionReason ? (
-                                                <div className="text-[9px] text-rust mt-0.5">Reason: {doc.rejectionReason}</div>
+                                                <div className="text-micro text-rust mt-0.5">Reason: {doc.rejectionReason}</div>
                                             ) : null}
                                             {analysis && tags !== null && hasIssues !== null ? (
                                                 <div className="mt-1 space-y-1">
@@ -261,7 +296,7 @@ export default function DriverDocumentReview() {
                                                             {tags.length > 0 && (
                                                                 <div className="flex flex-wrap gap-1">
                                                                     {tags.map((tag) => (
-                                                                        <span key={tag} className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-rust/15 text-rust">
+                                                                        <span key={tag} className="px-1.5 py-0.5 rounded text-micro font-bold uppercase bg-rust/15 text-rust">
                                                                             {tag}
                                                                         </span>
                                                                     ))}
@@ -275,7 +310,7 @@ export default function DriverDocumentReview() {
                                                                 type="button"
                                                                 disabled={decidingId === doc!.id}
                                                                 onClick={() => void handleRejectWithAiReason(doc!.id, analysis.summary)}
-                                                                className="text-[9px] text-rust underline decoration-dotted hover:text-hazard disabled:opacity-50"
+                                                                className="text-micro text-rust underline decoration-dotted hover:text-hazard disabled:opacity-50"
                                                             >
                                                                 Reject with this reason
                                                             </button>
@@ -289,8 +324,8 @@ export default function DriverDocumentReview() {
                                                             <button
                                                                 type="button"
                                                                 disabled={decidingId === doc!.id}
-                                                                onClick={() => void handleDecision(doc!.id, 'approved')}
-                                                                className="text-[9px] text-tarp underline decoration-dotted hover:text-paper disabled:opacity-50"
+                                                                onClick={() => void handleDecision(doc!.id, 'approved', doc!.documentType, doc!.holderKind)}
+                                                                className="text-micro text-tarp underline decoration-dotted hover:text-paper disabled:opacity-50"
                                                             >
                                                                 Approve
                                                             </button>
@@ -300,7 +335,7 @@ export default function DriverDocumentReview() {
                                             ) : null}
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
-                                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${STATUS_STYLE[status]}`}>
+                                            <span className={`px-1.5 py-0.5 rounded text-micro font-bold uppercase ${STATUS_STYLE[status]}`}>
                                                 {status.replace('_', ' ')}
                                             </span>
                                             {doc?.fileUrl && (
@@ -318,7 +353,7 @@ export default function DriverDocumentReview() {
                                                     <button
                                                         type="button"
                                                         disabled={decidingId === doc.id}
-                                                        onClick={() => void handleDecision(doc.id, 'approved')}
+                                                        onClick={() => void handleDecision(doc.id, 'approved', doc.documentType, doc.holderKind)}
                                                         className="bg-tarp/15 hover:bg-tarp/25 text-tarp rounded p-1 disabled:opacity-50"
                                                         title="Approve"
                                                     >
@@ -327,7 +362,7 @@ export default function DriverDocumentReview() {
                                                     <button
                                                         type="button"
                                                         disabled={decidingId === doc.id}
-                                                        onClick={() => void handleDecision(doc.id, 'rejected')}
+                                                        onClick={() => void handleDecision(doc.id, 'rejected', doc.documentType, doc.holderKind)}
                                                         className="bg-rust/15 hover:bg-rust/25 text-rust rounded p-1 disabled:opacity-50"
                                                         title="Reject"
                                                     >

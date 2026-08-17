@@ -6,6 +6,10 @@
 import pool from '../config/db.js';
 import { ok, fail } from '../utils/httpResponse.js';
 import { telemetryQueue } from '../server.js';
+import {
+    getComplianceIssues as findComplianceIssues,
+    EXPIRY_WARNING_DAYS,
+} from '../services/driverVerificationService.js';
 import { logError } from '../utils/logger.js';
 
 export const FleetController = {
@@ -232,6 +236,34 @@ export const FleetController = {
                 status: 500,
                 code: 'FLEET_PERFORMANCE_FAILED',
                 message: 'Failed to compile fleet operational analytics reports.',
+            });
+        }
+    },
+
+    // GET /api/fleet/compliance - documents that have lapsed or are about to.
+    //
+    // Without this the expiry rule is worse than no rule from the office's
+    // point of view: a driver available on Tuesday is simply gone on
+    // Wednesday, with nothing on any screen saying why. This is the warning
+    // that makes an expiry actionable instead of a trapdoor.
+    getComplianceIssues: async (req, res) => {
+        try {
+            const days = Number(req.query.days);
+            const issues = await findComplianceIssues(
+                pool,
+                Number.isFinite(days) && days > 0 && days <= 180 ? Math.floor(days) : EXPIRY_WARNING_DAYS
+            );
+            return ok(res, {
+                warningDays: EXPIRY_WARNING_DAYS,
+                expired: issues.filter((i) => i.expired),
+                expiringSoon: issues.filter((i) => !i.expired),
+            });
+        } catch (error) {
+            logError(req, 'Compliance expiry lookup failed', error);
+            return fail(res, {
+                status: 500,
+                code: 'FLEET_COMPLIANCE_FAILED',
+                message: 'Failed to check document expiry.',
             });
         }
     }

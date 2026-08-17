@@ -25,6 +25,11 @@ router.post('/telemetry', authMiddleware(['driver']), telemetryLimit, FleetContr
 // Ensure FleetController.getLiveFleetStatus is fully defined here
 router.get('/telemetry-sheet', withKioskAccess(['admin', 'dispatcher', 'kiosk']), FleetController.getLiveFleetStatus);
 
+// Documents that have lapsed or are about to. Read-only and office-only:
+// this is what a dispatcher acts on before a driver silently drops out of
+// the assignable list.
+router.get('/compliance', authMiddleware(['admin', 'dispatcher']), FleetController.getComplianceIssues);
+
 //Historical Breadcrumbs Route
 router.get('/history/:driverName', authMiddleware(['admin', 'dispatcher']), FleetController.getDriverBreadcrumbs);
 

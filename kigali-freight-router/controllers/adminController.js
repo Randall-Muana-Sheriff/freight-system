@@ -7,7 +7,7 @@ import { ok, fail, errorMessage } from '../utils/httpResponse.js';
 import { normalizePhone, generateInviteCode } from '../utils/phone.js';
 import { sendSms } from '../services/smsService.js';
 import { revokeAllRefreshTokensForUser } from '../services/refreshTokenService.js';
-import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { SAFETY_CHECKLIST_ITEMS } from './safetyChecklistController.js';
 import { createKioskDevice, listKioskDevices, revokeKioskDevice } from '../services/kioskAuthService.js';
 
@@ -25,16 +25,24 @@ const STAFF_ROLES = ['admin', 'dispatcher'];
 export const AdminController = {
     // `verified`/`hasVehicle` are only meaningful for role='driver' rows
     // (null for staff accounts) — computed here with the exact same
-    // "all 5 required documents approved" definition isDriverVerified
-    // uses for actual assignment enforcement, so the dispatcher's driver
-    // picker (which filters on these) can never drift out of sync with
-    // what the backend will actually allow.
+    // definition isDriverVerified uses for actual assignment enforcement,
+    // so the dispatcher's driver picker (which filters on these) can never
+    // drift out of sync with what the backend will actually allow.
+    //
+    // That definition is now in two halves and counts expiry: the driver's
+    // own documents, and the documents of whichever active vehicle they are
+    // currently in. A lapsed certificate un-verifies exactly as a missing
+    // one does, and a driver moved to a different truck is judged on that
+    // truck's paperwork rather than on the one they left.
     getUsers: async (req, res) => {
         try {
             const result = await pool.query(
                 `SELECT u.id, u.username, u.role, u.status,
                         u.phone_number AS "phoneNumber", u.staff_id AS "staffId", u.full_name AS "fullName",
-                        CASE WHEN u.role = 'driver' THEN COALESCE(dv.approved_count, 0) = $1 ELSE NULL END AS verified,
+                        CASE WHEN u.role = 'driver'
+                             THEN COALESCE(dv.approved_count, 0) = $1
+                              AND COALESCE(vv.approved_count, 0) = $5
+                             ELSE NULL END AS verified,
                         CASE WHEN u.role = 'driver' THEN EXISTS (
                             SELECT 1 FROM fleet_vehicles fv WHERE fv.current_driver_id = u.id
                         ) ELSE NULL END AS "hasVehicle",
@@ -57,8 +65,21 @@ export const AdminController = {
                      SELECT username, COUNT(*)::int AS approved_count
                      FROM driver_documents
                      WHERE document_type = ANY($2::text[]) AND status = 'approved'
+                       AND (expires_at IS NULL OR expires_at > NOW())
                      GROUP BY username
                  ) dv ON dv.username = u.username
+                 -- The vehicle half. Joined through fleet_vehicles rather
+                 -- than through the driver, which is what makes a change of
+                 -- truck re-qualify someone without any separate step.
+                 LEFT JOIN (
+                     SELECT fv.current_driver_id AS driver_id, COUNT(*)::int AS approved_count
+                     FROM vehicle_documents vd
+                     JOIN fleet_vehicles fv ON fv.id = vd.vehicle_id
+                     WHERE vd.document_type = ANY($4::text[]) AND vd.status = 'approved'
+                       AND (vd.expires_at IS NULL OR vd.expires_at > NOW())
+                       AND fv.status = 'ACTIVE'
+                     GROUP BY fv.current_driver_id
+                 ) vv ON vv.driver_id = u.id
                  LEFT JOIN (
                      -- Only today's row: yesterday's checks say nothing
                      -- about the vehicle going out this morning.
@@ -69,7 +90,11 @@ export const AdminController = {
                      WHERE checklist_date = CURRENT_DATE
                  ) sc ON sc.driver_username = u.username
                  ORDER BY u.id DESC;`,
-                [REQUIRED_DOCUMENT_TYPES.length, REQUIRED_DOCUMENT_TYPES, SAFETY_CHECKLIST_ITEMS.length]
+                [
+                    DRIVER_DOCUMENT_TYPES.length, DRIVER_DOCUMENT_TYPES,
+                    SAFETY_CHECKLIST_ITEMS.length,
+                    VEHICLE_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES.length,
+                ]
             );
             return ok(res, result.rows);
         } catch (error) {
