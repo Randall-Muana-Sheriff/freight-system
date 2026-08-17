@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
@@ -10,6 +10,7 @@ import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { fetchMyDocuments, uploadDriverDocument, type DriverDocumentStatus, type DocumentType } from '../../lib/api';
+import { useUpNavigation } from '../../lib/navigation';
 
 const DOCUMENT_ICON: Record<DocumentType, keyof typeof Ionicons.glyphMap> = {
   national_id: 'card-outline',
@@ -27,6 +28,9 @@ const STATUS_META: Record<DriverDocumentStatus['status'], { label: string; color
 };
 
 export default function DocumentsScreen() {
+  // Reached from Profile, and the hardware back button had the same
+  // wrong answer here as on the trip screen — it just had not been hit yet.
+  const goToProfile = useUpNavigation('/(app)/profile');
   const { token } = useAuth();
   const [checklist, setChecklist] = useState<DriverDocumentStatus[] | null>(null);
   const [verified, setVerified] = useState(false);
@@ -213,7 +217,7 @@ export default function DocumentsScreen() {
         </>
       )}
 
-      <TouchableOpacity onPress={() => router.replace('/(app)/profile')} style={styles.secondary} activeOpacity={0.8}>
+      <TouchableOpacity onPress={goToProfile} style={styles.secondary} activeOpacity={0.8}>
         <Ionicons name="arrow-back-outline" color={theme.colors.primary} size={16} />
         <Text style={styles.secondaryText}>Back to profile</Text>
       </TouchableOpacity>

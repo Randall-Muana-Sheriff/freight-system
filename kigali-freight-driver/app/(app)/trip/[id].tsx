@@ -1,4 +1,4 @@
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { updateOrderStatus, fetchOrderById, confirmDelivery, isNetworkFailure, type OrderDetail } from '../../../lib/api';
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
 import { isJobInProgress } from '../../../lib/assignments';
+import { useUpNavigation } from '../../../lib/navigation';
 
 // How often to re-fetch the order while it's actively in progress, so the
 // route-progress bar/ETA below feels alive without needing a socket. Not
@@ -70,6 +71,10 @@ const ACTION_STEPS: Record<ActionStatus, { icon: keyof typeof Ionicons.glyphMap;
 
 export default function TripDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  // A trip is opened from the Jobs list, so that is where both back
+  // gestures lead — see the note in lib/navigation.ts for why neither
+  // works on its own here.
+  const goToJobs = useUpNavigation('/(app)/assignments');
   const { token } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -420,9 +425,12 @@ export default function TripDetailScreen() {
         </View>
       ) : null}
 
-      <TouchableOpacity onPress={() => router.back()} style={styles.secondary} activeOpacity={0.8}>
+      <TouchableOpacity onPress={goToJobs} style={styles.secondary} activeOpacity={0.8}>
         <Ionicons name="arrow-back-outline" color={theme.colors.primary} size={16} />
-        <Text style={styles.secondaryText}>Back to dashboard</Text>
+        {/* Named for where it actually goes. It said "dashboard" while
+            calling router.back(), so on the one occasion the label was
+            accurate would have been the one where the button did nothing. */}
+        <Text style={styles.secondaryText}>Back to jobs</Text>
       </TouchableOpacity>
     </ScreenShell>
 
