@@ -5,8 +5,40 @@ import { uploadDriverDocument, toSignedUrl, assertRealFileType } from '../config
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { analyzeDriverDocument } from '../services/documentAnalysisService.js';
-import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { REQUIRED_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
+
+// Three of the five documents describe the truck, not the person, and now
+// live in vehicle_documents keyed by vehicle. The upload still comes from
+// the driver's phone — they are the one standing next to the vehicle — so
+// everything below has to know which table a given type belongs in and, for
+// the vehicle ones, which vehicle that driver is currently in.
+//
+// Table names here are chosen by a closed branch on a validated document
+// type, never taken from request input, so interpolating them is safe.
+function isVehicleDoc(documentType) {
+    return VEHICLE_DOCUMENT_TYPES.includes(documentType);
+}
+
+// Resolves where a document goes and what identifies it there. Returns null
+// for a vehicle document when the driver has no active vehicle — there is
+// no truck for the paperwork to describe, so the upload cannot be filed.
+async function resolveTarget(queryable, username, documentType) {
+    if (!isVehicleDoc(documentType)) {
+        return { table: 'driver_documents', keyColumn: 'username', keyValue: username, ownerColumn: 'username' };
+    }
+    const result = await queryable.query(
+        `SELECT fv.id
+           FROM fleet_vehicles fv
+           JOIN users u ON u.id = fv.current_driver_id
+          WHERE u.username = $1 AND fv.status = 'ACTIVE'
+          ORDER BY fv.id
+          LIMIT 1;`,
+        [username]
+    );
+    if (!result.rows[0]) return null;
+    return { table: 'vehicle_documents', keyColumn: 'vehicle_id', keyValue: result.rows[0].id, ownerColumn: 'uploaded_by' };
+}
 
 // Below this, a file is essentially certain to not be a legible ID/license/
 // certificate photo — real phone-camera captures of a physical document
@@ -100,11 +132,25 @@ export const DriverDocumentController = {
     getMyDocuments: async (req, res) => {
         try {
             const username = req.user?.username;
+            // Both halves: the driver's own papers, and those of whichever
+            // active vehicle they are currently in. A driver with no vehicle
+            // simply gets no rows from the second half, so the three vehicle
+            // documents show as not submitted — which is accurate, since
+            // there is no truck for them to describe yet.
             const result = await pool.query(
                 `SELECT id, document_type AS "documentType", file_url AS "fileUrl", status,
-                        rejection_reason AS "rejectionReason", uploaded_at AS "uploadedAt", reviewed_at AS "reviewedAt"
-                 FROM driver_documents
-                 WHERE username = $1;`,
+                        rejection_reason AS "rejectionReason", uploaded_at AS "uploadedAt",
+                        reviewed_at AS "reviewedAt", expires_at AS "expiresAt"
+                   FROM driver_documents
+                  WHERE username = $1
+                  UNION ALL
+                 SELECT vd.id, vd.document_type, vd.file_url, vd.status,
+                        vd.rejection_reason, vd.uploaded_at,
+                        vd.reviewed_at, vd.expires_at
+                   FROM vehicle_documents vd
+                   JOIN fleet_vehicles fv ON fv.id = vd.vehicle_id
+                   JOIN users u ON u.id = fv.current_driver_id
+                  WHERE u.username = $1 AND fv.status = 'ACTIVE';`,
                 [username]
             );
             const byType = Object.fromEntries(result.rows.map((row) => [row.documentType, row]));
@@ -112,17 +158,27 @@ export const DriverDocumentController = {
             // file_url stores the object's storage KEY, not a public URL
             // (the bucket is private) — sign a short-lived download link
             // per document at response time instead.
-            const checklist = await Promise.all(REQUIRED_DOCUMENT_TYPES.map(async (type) => ({
-                documentType: type,
-                label: DOCUMENT_LABELS[type],
-                status: byType[type]?.status || 'not_submitted',
-                fileUrl: await toSignedUrl(byType[type]?.fileUrl),
-                rejectionReason: byType[type]?.rejectionReason || null,
-                uploadedAt: byType[type]?.uploadedAt || null,
-                reviewedAt: byType[type]?.reviewedAt || null,
-            })));
+            const now = Date.now();
+            const checklist = await Promise.all(REQUIRED_DOCUMENT_TYPES.map(async (type) => {
+                const row = byType[type];
+                const expiresAt = row?.expiresAt || null;
+                return {
+                    documentType: type,
+                    label: DOCUMENT_LABELS[type],
+                    status: row?.status || 'not_submitted',
+                    fileUrl: await toSignedUrl(row?.fileUrl),
+                    rejectionReason: row?.rejectionReason || null,
+                    uploadedAt: row?.uploadedAt || null,
+                    reviewedAt: row?.reviewedAt || null,
+                    // Surfaced to the driver so a renewal is their own to
+                    // chase rather than a surprise when work stops arriving.
+                    expiresAt,
+                    expired: Boolean(expiresAt && new Date(expiresAt).getTime() <= now),
+                    belongsTo: isVehicleDoc(type) ? 'vehicle' : 'driver',
+                };
+            }));
 
-            const verified = checklist.every((doc) => doc.status === 'approved');
+            const verified = checklist.every((doc) => doc.status === 'approved' && !doc.expired);
             return ok(res, { checklist, verified });
         } catch (error) {
             return fail(res, {
@@ -169,9 +225,18 @@ export const DriverDocumentController = {
                 });
             }
 
+            const target = await resolveTarget(pool, username, documentType);
+            if (!target) {
+                return fail(res, {
+                    status: 409,
+                    code: 'DRIVER_DOCUMENT_NO_VEHICLE',
+                    message: 'This document belongs to a vehicle, and you do not have one assigned yet. Ask dispatch to assign your vehicle first.',
+                });
+            }
+
             const existing = await pool.query(
-                `SELECT status FROM driver_documents WHERE username = $1 AND document_type = $2`,
-                [username, documentType]
+                `SELECT status FROM ${target.table} WHERE ${target.keyColumn} = $1 AND document_type = $2`,
+                [target.keyValue, documentType]
             );
             const currentStatus = existing.rows[0]?.status;
             if (currentStatus === 'approved' || currentStatus === 'pending') {
@@ -192,11 +257,15 @@ export const DriverDocumentController = {
             // off as another. Either way it's not worth an admin's time to
             // catch by eye; block it here with a message that assumes good
             // faith (retake/re-select) rather than accusing anyone.
+            // Scoped to the same holder the upload is being filed against —
+            // for a vehicle document that is the truck, so re-using one
+            // photo across two of a vehicle's certificates is still caught,
+            // while two drivers of the same truck no longer collide.
             const duplicate = await pool.query(
-                `SELECT document_type AS "documentType" FROM driver_documents
-                 WHERE username = $1 AND document_type != $2 AND file_hash = $3
+                `SELECT document_type AS "documentType" FROM ${target.table}
+                 WHERE ${target.keyColumn} = $1 AND document_type != $2 AND file_hash = $3
                        AND status IN ('pending', 'approved')`,
-                [username, documentType, fileHash]
+                [target.keyValue, documentType, fileHash]
             );
             if (duplicate.rows.length > 0) {
                 return fail(res, {
@@ -213,15 +282,26 @@ export const DriverDocumentController = {
                 documentType,
             });
 
+            // A re-upload clears the previous expiry along with the previous
+            // review — the new certificate has its own date, which the
+            // reviewer records when they approve it.
+            // For a driver document the key and the owner are the same column
+            // (username), so it is named once; for a vehicle document the key
+            // is the vehicle and the owner is whoever sent the photo in.
+            const ownsSeparately = target.ownerColumn !== target.keyColumn;
             const result = await pool.query(
-                `INSERT INTO driver_documents (username, document_type, file_url, status, file_hash)
-                 VALUES ($1, $2, $3, 'pending', $4)
-                 ON CONFLICT (username, document_type)
+                `INSERT INTO ${target.table} (${target.keyColumn}, ${ownsSeparately ? `${target.ownerColumn}, ` : ''}document_type, file_url, status, file_hash)
+                 VALUES ($1, ${ownsSeparately ? '$5, ' : ''}$2, $3, 'pending', $4)
+                 ON CONFLICT (${target.keyColumn}, document_type)
                  DO UPDATE SET file_url = $3, status = 'pending', rejection_reason = NULL,
                                reviewed_by = NULL, reviewed_at = NULL, uploaded_at = NOW(), file_hash = $4,
+                               expires_at = NULL,
+                               ${ownsSeparately ? `${target.ownerColumn} = $5,` : ''}
                                ai_analysis = NULL, ai_analyzed_at = NULL
                  RETURNING id, document_type AS "documentType", file_url AS "fileUrl", status, uploaded_at::text AS "uploadedAt";`,
-                [username, documentType, fileKey, fileHash]
+                ownsSeparately
+                    ? [target.keyValue, documentType, fileKey, fileHash, username]
+                    : [target.keyValue, documentType, fileKey, fileHash]
             );
 
             await appendAuditLog({
@@ -244,6 +324,11 @@ export const DriverDocumentController = {
             );
             delete doc.uploadedAt;
 
+            // The reviewer has to send this back on the PATCH: the two
+            // document tables have independent id sequences, so an id alone
+            // does not say which one a row is in.
+            doc.holderKind = isVehicleDoc(documentType) ? 'vehicle' : 'driver';
+
             doc.fileUrl = await toSignedUrl(doc.fileUrl);
             return ok(res, doc, { status: 201 });
         } catch (error) {
@@ -264,13 +349,35 @@ export const DriverDocumentController = {
     // rather than having to hunt for what still needs a decision.
     getAllDocuments: async (req, res) => {
         try {
+            // holderKind tells the reviewer — and the PATCH that follows —
+            // which table a row came from, since the two have separate id
+            // sequences and an id alone is ambiguous across them.
+            // The UNION is wrapped so the ordering can be applied to the
+            // combined result. Postgres allows only bare output-column names
+            // directly after a UNION — not an expression, and not a column
+            // name the union does not actually expose. Ordering the two
+            // halves in place instead would not work either: it sorts each
+            // branch separately and the reviewer gets driver documents
+            // interleaved by nothing in particular.
             const result = await pool.query(
-                `SELECT id, username, document_type AS "documentType", file_url AS "fileUrl", status,
-                        rejection_reason AS "rejectionReason", uploaded_at AS "uploadedAt",
-                        reviewed_by AS "reviewedBy", reviewed_at AS "reviewedAt",
-                        ai_analysis AS "aiAnalysis", ai_analyzed_at AS "aiAnalyzedAt"
-                 FROM driver_documents
-                 ORDER BY (status = 'pending') DESC, uploaded_at DESC;`
+                `SELECT * FROM (
+                    SELECT id, username, 'driver' AS "holderKind", NULL::text AS "plateNumber",
+                           document_type AS "documentType", file_url AS "fileUrl", status,
+                           rejection_reason AS "rejectionReason", uploaded_at AS "uploadedAt",
+                           reviewed_by AS "reviewedBy", reviewed_at AS "reviewedAt", expires_at AS "expiresAt",
+                           ai_analysis AS "aiAnalysis", ai_analyzed_at AS "aiAnalyzedAt"
+                      FROM driver_documents
+                     UNION ALL
+                    SELECT vd.id, COALESCE(u.username, vd.uploaded_by), 'vehicle', fv.plate_number,
+                           vd.document_type, vd.file_url, vd.status,
+                           vd.rejection_reason, vd.uploaded_at,
+                           vd.reviewed_by, vd.reviewed_at, vd.expires_at,
+                           vd.ai_analysis, vd.ai_analyzed_at
+                      FROM vehicle_documents vd
+                      JOIN fleet_vehicles fv ON fv.id = vd.vehicle_id
+                      LEFT JOIN users u ON u.id = fv.current_driver_id
+                 ) documents
+                 ORDER BY (status = 'pending') DESC, "uploadedAt" DESC;`
             );
             const rows = await Promise.all(result.rows.map(async (row) => ({
                 ...row,
@@ -292,7 +399,7 @@ export const DriverDocumentController = {
     // fix before resubmitting.
     updateDocumentStatus: async (req, res) => {
         const { id } = req.params;
-        const { status, rejectionReason } = req.body || {};
+        const { status, rejectionReason, expiresAt, holderKind } = req.body || {};
         const ALLOWED_STATUSES = ['approved', 'rejected'];
 
         if (!ALLOWED_STATUSES.includes(status)) {
@@ -303,13 +410,43 @@ export const DriverDocumentController = {
             });
         }
 
+        // Defaults to the driver table so an older client that does not send
+        // holderKind keeps working exactly as it did.
+        const table = holderKind === 'vehicle' ? 'vehicle_documents' : 'driver_documents';
+
+        // The expiry is read off the document in the reviewer's hand — it is
+        // the one moment somebody is actually looking at the certificate, so
+        // it is the only honest place to capture the date. Rejecting clears
+        // any previous one along with the approval.
+        let expiry = null;
+        if (status === 'approved' && expiresAt) {
+            const parsed = new Date(expiresAt);
+            if (Number.isNaN(parsed.getTime())) {
+                return fail(res, {
+                    status: 400,
+                    code: 'DRIVER_DOCUMENT_EXPIRY_INVALID',
+                    message: 'Expiry date is not a valid date.',
+                });
+            }
+            if (parsed.getTime() <= Date.now()) {
+                return fail(res, {
+                    status: 400,
+                    code: 'DRIVER_DOCUMENT_EXPIRY_PAST',
+                    message: 'That expiry date has already passed — approving it would clear the driver on a lapsed document.',
+                });
+            }
+            expiry = parsed.toISOString();
+        }
+
         try {
             const result = await pool.query(
-                `UPDATE driver_documents
-                 SET status = $1, rejection_reason = $2, reviewed_by = $3, reviewed_at = NOW()
+                `UPDATE ${table}
+                 SET status = $1, rejection_reason = $2, reviewed_by = $3, reviewed_at = NOW(),
+                     expires_at = $5
                  WHERE id = $4
-                 RETURNING id, username, document_type AS "documentType", status;`,
-                [status, status === 'rejected' ? (rejectionReason || null) : null, req.user?.username || 'System', id]
+                 RETURNING id, ${table === 'vehicle_documents' ? 'uploaded_by AS username' : 'username'},
+                           document_type AS "documentType", status;`,
+                [status, status === 'rejected' ? (rejectionReason || null) : null, req.user?.username || 'System', id, expiry]
             );
 
             if (result.rows.length === 0) {
