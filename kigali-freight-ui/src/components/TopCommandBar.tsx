@@ -35,14 +35,14 @@ function ChangePasswordForm({ jwtToken }: { jwtToken: string }) {
 
     return (
         <form onSubmit={(e) => void handleSubmit(e)} className="space-y-2 p-3">
-            <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Change password</div>
+            <div className="text-micro text-steel uppercase tracking-wider font-mono">Change password</div>
             <input
                 type="password"
                 placeholder="Current password"
                 required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-data text-paper focus:outline-none focus:border-route transition-colors"
             />
             <input
                 type="password"
@@ -51,13 +51,13 @@ function ChangePasswordForm({ jwtToken }: { jwtToken: string }) {
                 minLength={8}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-data text-paper focus:outline-none focus:border-route transition-colors"
             />
-            {status && <div className={`text-[10px] ${status.type === 'error' ? 'text-rust' : 'text-tarp'}`}>{status.message}</div>}
+            {status && <div className={`text-micro ${status.type === 'error' ? 'text-rust' : 'text-tarp'}`}>{status.message}</div>}
             <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-micro font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
             >
                 {submitting ? 'Updating...' : 'Update password'}
             </button>
@@ -143,17 +143,17 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
 
     return (
         <div className="p-3 border-t border-line/10 space-y-2">
-            <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Two-factor authentication</div>
-            {error && <div className="text-[10px] text-rust">{error}</div>}
+            <div className="text-micro text-steel uppercase tracking-wider font-mono">Two-factor authentication</div>
+            {error && <div className="text-micro text-rust">{error}</div>}
 
             {step === 'off' && (
                 <>
-                    <p className="text-[10px] text-steel leading-relaxed">Add a code from an authenticator app to your login, on top of your password.</p>
+                    <p className="text-micro text-steel leading-relaxed">Add a code from an authenticator app to your login, on top of your password.</p>
                     <button
                         type="button"
                         onClick={() => void startEnroll()}
                         disabled={submitting}
-                        className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                        className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-micro font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
                     >
                         {submitting ? 'Starting...' : 'Enable'}
                     </button>
@@ -162,9 +162,9 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
 
             {step === 'confirming' && enrollment && (
                 <form onSubmit={(e) => void handleConfirm(e)} className="space-y-2">
-                    <p className="text-[10px] text-steel leading-relaxed">Scan this with Google Authenticator, Authy, or 1Password:</p>
+                    <p className="text-micro text-steel leading-relaxed">Scan this with Google Authenticator, Authy, or 1Password:</p>
                     <img src={enrollment.qrCodeDataUrl} alt="MFA QR code" className="w-32 h-32 mx-auto rounded bg-paper p-1.5" />
-                    <p className="text-[9px] text-steel text-center">Can&apos;t scan? Enter this manually: <span className="font-mono text-carbon break-all">{enrollment.manualEntrySecret}</span></p>
+                    <p className="text-micro text-steel text-center">Can&apos;t scan? Enter this manually: <span className="font-mono text-carbon break-all">{enrollment.manualEntrySecret}</span></p>
                     <input
                         type="text"
                         inputMode="numeric"
@@ -173,12 +173,12 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
                         maxLength={6}
                         value={code}
                         onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                        className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper text-center tracking-[0.3em] font-mono focus:outline-none focus:border-route transition-colors"
+                        className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-data text-paper text-center tracking-[0.3em] font-mono focus:outline-none focus:border-route transition-colors"
                     />
                     <button
                         type="submit"
                         disabled={submitting || code.length !== 6}
-                        className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                        className="w-full bg-route hover:bg-route-deep disabled:opacity-50 rounded py-1.5 text-micro font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
                     >
                         {submitting ? 'Confirming...' : 'Confirm'}
                     </button>
@@ -187,16 +187,16 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
 
             {step === 'recovery-codes' && (
                 <div className="space-y-2">
-                    <div className="p-2 bg-hazard/10 border border-hazard/30 rounded text-[10px] text-hazard leading-relaxed">
+                    <div className="p-2 bg-hazard/10 border border-hazard/30 rounded text-micro text-hazard leading-relaxed">
                         Save these recovery codes now — each works once, and this is the only time they&apos;ll be shown. Use one if you lose your authenticator device.
                     </div>
-                    <div className="grid grid-cols-2 gap-1 font-mono text-[10px] text-paper bg-ink rounded p-2">
+                    <div className="grid grid-cols-2 gap-1 font-mono text-micro text-paper bg-ink rounded p-2">
                         {recoveryCodes.map((rc) => <div key={rc}>{rc}</div>)}
                     </div>
                     <button
                         type="button"
                         onClick={copyRecoveryCodes}
-                        className="w-full flex items-center justify-center gap-1.5 border border-line/15 rounded py-1.5 text-[10px] font-bold text-steel hover:text-paper uppercase tracking-wide transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 border border-line/15 rounded py-1.5 text-micro font-bold text-steel hover:text-paper uppercase tracking-wide transition-colors"
                     >
                         {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
                         {copied ? 'Copied' : 'Copy all'}
@@ -204,7 +204,7 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
                     <button
                         type="button"
                         onClick={() => setStep('on')}
-                        className="w-full bg-route hover:bg-route-deep rounded py-1.5 text-[10px] font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
+                        className="w-full bg-route hover:bg-route-deep rounded py-1.5 text-micro font-bold text-ink hover:text-paper uppercase tracking-wide transition-colors"
                     >
                         Done
                     </button>
@@ -213,11 +213,11 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
 
             {step === 'on' && (
                 <>
-                    <p className="text-[10px] text-tarp font-bold">Enabled</p>
+                    <p className="text-micro text-tarp font-bold">Enabled</p>
                     <button
                         type="button"
                         onClick={() => setStep('disabling')}
-                        className="w-full border border-rust/30 text-rust hover:bg-rust/10 rounded py-1.5 text-[10px] font-bold uppercase tracking-wide transition-colors"
+                        className="w-full border border-rust/30 text-rust hover:bg-rust/10 rounded py-1.5 text-micro font-bold uppercase tracking-wide transition-colors"
                     >
                         Disable
                     </button>
@@ -232,20 +232,20 @@ function TwoFactorSection({ jwtToken }: { jwtToken: string }) {
                         required
                         value={disablePassword}
                         onChange={(e) => setDisablePassword(e.target.value)}
-                        className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                        className="w-full bg-ink border border-line/15 rounded px-2 py-1.5 text-data text-paper focus:outline-none focus:border-route transition-colors"
                     />
                     <div className="flex gap-1.5">
                         <button
                             type="button"
                             onClick={() => { setStep('on'); setError(null); setDisablePassword(''); }}
-                            className="flex-1 border border-line/15 rounded py-1.5 text-[10px] font-bold text-steel hover:text-paper uppercase tracking-wide transition-colors"
+                            className="flex-1 border border-line/15 rounded py-1.5 text-micro font-bold text-steel hover:text-paper uppercase tracking-wide transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={submitting}
-                            className="flex-1 bg-rust hover:bg-rust/80 disabled:opacity-50 rounded py-1.5 text-[10px] font-bold text-paper uppercase tracking-wide transition-colors"
+                            className="flex-1 bg-rust hover:bg-rust/80 disabled:opacity-50 rounded py-1.5 text-micro font-bold text-ink uppercase tracking-wide transition-colors"
                         >
                             {submitting ? 'Disabling...' : 'Confirm'}
                         </button>
@@ -260,16 +260,25 @@ interface StatChipProps {
     icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
     label: string;
     value: number;
-    tone?: string;
+    /* Whether this figure is currently a problem — not what category it
+       belongs to. These four chips each used to carry a fixed colour, so
+       "Incidents" was permanently rust-tinted whether there were incidents
+       or none, and the row was four different colours at rest. Colour that
+       is always on cannot signal anything. Now the row sits neutral while
+       the operation is healthy, and exactly the chip that needs a
+       dispatcher goes hot. */
+    alert?: boolean;
 }
 
-function StatChip({ icon: Icon, label, value, tone = 'text-paper' }: StatChipProps) {
+function StatChip({ icon: Icon, label, value, alert = false }: StatChipProps) {
     return (
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-ink/60 border border-line/10 shrink-0">
-            <Icon size={13} strokeWidth={2.5} className="text-steel" />
+        <div className={`flex items-center gap-2.5 px-3 py-1.5 rounded-md border shrink-0 transition-colors ${
+            alert ? 'bg-rust/10 border-rust/40' : 'bg-ink/60 border-line/10'
+        }`}>
+            <Icon size={14} strokeWidth={2.5} className={alert ? 'text-rust' : 'text-steel'} />
             <div className="leading-none">
-                <div className={`text-sm font-bold font-mono ${tone}`}>{value}</div>
-                <div className="text-[8px] text-steel uppercase tracking-wider font-mono whitespace-nowrap">{label}</div>
+                <div className={`ops-figure text-lead ${alert ? 'text-rust' : 'text-paper'}`}>{value}</div>
+                <div className="data-label mt-1 text-steel whitespace-nowrap">{label}</div>
             </div>
         </div>
     );
@@ -324,7 +333,7 @@ function NotificationBell() {
             >
                 <Bell size={14} strokeWidth={2.5} />
                 {unseenCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rust text-paper text-[9px] font-bold flex items-center justify-center leading-none">
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rust text-ink text-micro font-bold flex items-center justify-center leading-none">
                         {unseenCount > 9 ? '9+' : unseenCount}
                     </span>
                 )}
@@ -334,15 +343,15 @@ function NotificationBell() {
                     <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
                     <div className="absolute right-0 top-full mt-2 w-80 bg-panel border border-line/15 rounded-md shadow-xl z-40 max-h-[80vh] overflow-y-auto p-3 space-y-3">
                         {orderActivity.length === 0 && recentDeliveries.length === 0 ? (
-                            <div className="text-[10px] text-steel text-center py-4">No recent activity yet.</div>
+                            <div className="text-micro text-steel text-center py-4">No recent activity yet.</div>
                         ) : (
                             <>
                                 {orderActivity.length > 0 && (
                                     <div className="space-y-1">
-                                        <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Recent activity</div>
+                                        <div className="text-micro text-steel uppercase tracking-wider font-mono">Recent activity</div>
                                         <div className="space-y-1">
                                             {orderActivity.map((a, idx) => (
-                                                <div key={`${a.orderId}-${a.timestamp}-${idx}`} className="flex justify-between text-[10px] font-mono text-steel">
+                                                <div key={`${a.orderId}-${a.timestamp}-${idx}`} className="flex justify-between text-micro font-mono text-steel">
                                                     <span className="truncate max-w-[180px]">#{a.orderId} {a.cargo_description}</span>
                                                     <span className="text-carbon font-bold">{a.status}</span>
                                                 </div>
@@ -352,10 +361,10 @@ function NotificationBell() {
                                 )}
                                 {recentDeliveries.length > 0 && (
                                     <div className="space-y-1 pt-2 border-t border-line/10">
-                                        <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Recent deliveries &middot; proof of delivery</div>
+                                        <div className="text-micro text-steel uppercase tracking-wider font-mono">Recent deliveries &middot; proof of delivery</div>
                                         <div className="space-y-1">
                                             {recentDeliveries.map((d) => (
-                                                <div key={d.id} className={`flex justify-between items-center p-1.5 rounded border text-[10px] ${d.location_flagged ? 'bg-hazard/10 border-hazard/40' : 'bg-ink/60 border-line/10'}`}>
+                                                <div key={d.id} className={`flex justify-between items-center p-1.5 rounded border text-micro ${d.location_flagged ? 'bg-hazard/10 border-hazard/40' : 'bg-ink/60 border-line/10'}`}>
                                                     <div className="min-w-0">
                                                         <div className="text-paper truncate max-w-[160px] flex items-center gap-1">
                                                             {d.location_flagged && (
@@ -410,16 +419,19 @@ export default function TopCommandBar() {
                     <InziraMark size={24} />
                 </div>
                 <div className="hidden sm:block">
-                    <h1 className="text-sm font-bold tracking-tight text-paper leading-tight">Inzira</h1>
-                    <p className="text-[9px] text-steel uppercase font-mono tracking-wider">Dispatch Control</p>
+                    {/* The wordmark is the one place on the board that uses the
+                        display face, so the tool reads as the same product as
+                        the site rather than as generic admin software. */}
+                    <h1 className="display-tight text-lead text-paper leading-none">Inzira</h1>
+                    <p className="data-label mt-1 text-steel">Dispatch Control</p>
                 </div>
             </div>
 
             <div className="flex items-center gap-2 overflow-x-auto min-w-0">
-                <StatChip icon={Truck} label="Active assets" value={activeAssetCount} tone="text-tarp" />
+                <StatChip icon={Truck} label="Active assets" value={activeAssetCount} />
                 <StatChip icon={Package} label="Dispatch queue" value={activeOrders.length} />
-                <StatChip icon={Radio} label="In flight" value={inFlightOrders.length} tone="text-carbon" />
-                <StatChip icon={AlertTriangle} label="Incidents" value={violations.length} tone={violations.length > 0 ? 'text-rust' : 'text-paper'} />
+                <StatChip icon={Radio} label="In flight" value={inFlightOrders.length} />
+                <StatChip icon={AlertTriangle} label="Incidents" value={violations.length} alert={violations.length > 0} />
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
@@ -427,7 +439,7 @@ export default function TopCommandBar() {
                     <button
                         onClick={() => setShowAdminCenter(true)}
                         title="Open admin control center"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border border-route/30 bg-route/10 text-route hover:bg-route/20 transition-colors"
+                        className="focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-micro font-semibold uppercase tracking-wide border border-route/30 bg-route/10 text-route hover:bg-route/20 transition-colors"
                     >
                         <ShieldCheck size={12} strokeWidth={2.5} />
                         Admin center
@@ -436,7 +448,7 @@ export default function TopCommandBar() {
                 <button
                     onClick={toggleNetworkStream}
                     title={isConnected ? 'Click to disconnect' : 'Click to reconnect'}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wide border transition-colors ${
+                    className={`focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-micro font-semibold uppercase tracking-wide border transition-colors ${
                         isConnected ? 'bg-tarp/10 border-tarp/30 text-tarp' : 'bg-rust/10 border-rust/30 text-rust animate-pulse'
                     }`}
                 >
@@ -445,7 +457,7 @@ export default function TopCommandBar() {
                 </button>
 
                 {userRole && (
-                    <span className="px-2 py-1 rounded text-[9px] font-mono font-bold uppercase bg-carbon/15 border border-carbon/40 text-carbon">
+                    <span className="px-2 py-1 rounded text-micro font-mono font-semibold uppercase bg-carbon/15 border border-carbon/40 text-carbon">
                         {userRole}
                     </span>
                 )}
@@ -458,7 +470,7 @@ export default function TopCommandBar() {
                         title="Account"
                         aria-label="Account menu"
                         aria-expanded={menuOpen}
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-line/15 text-steel hover:text-paper transition-colors"
+                        className="focus-ring flex items-center gap-1 px-2 py-1.5 rounded-md border border-line/15 text-steel hover:text-paper transition-colors"
                     >
                         <KeyRound size={13} strokeWidth={2.5} />
                         <ChevronDown size={11} strokeWidth={2.5} />
@@ -471,7 +483,7 @@ export default function TopCommandBar() {
                                 <TwoFactorSection jwtToken={jwtToken} />
                                 <button
                                     onClick={logout}
-                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-[11px] font-bold text-rust hover:bg-rust/10 uppercase tracking-wide border-t border-line/10 transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-2.5 text-data font-bold text-rust hover:bg-rust/10 uppercase tracking-wide border-t border-line/10 transition-colors"
                                 >
                                     <LogOut size={13} strokeWidth={2.5} />
                                     Sign out

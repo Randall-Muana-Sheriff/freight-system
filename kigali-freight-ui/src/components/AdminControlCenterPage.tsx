@@ -70,19 +70,28 @@ interface StatCardProps {
   icon: IconType;
   label: string;
   value: string | number;
-  accent?: string;
   sub?: string;
+  /* Reserved for a figure that is currently a problem, the same way
+     StatChip uses it in the top bar. Not a category tint. */
+  alert?: boolean;
 }
 
-function StatCard({ icon: Icon, label, value, accent = 'text-route', sub }: StatCardProps) {
+// The per-card accent colour is gone. Six cards carrying four fixed colours
+// by category meant the grid was permanently multicoloured and therefore
+// permanently flat — colour that is always on cannot pick anything out. The
+// figure itself is the emphasis now, in the display face, and the icons sit
+// back at label weight where they belong.
+function StatCard({ icon: Icon, label, value, sub, alert = false }: StatCardProps) {
   return (
-    <div className="bg-panel border border-line/10 rounded-md p-4 flex flex-col gap-2">
+    <div className={`rounded-md p-4 flex flex-col gap-2 border ${
+      alert ? 'bg-rust/10 border-rust/40' : 'bg-panel border-line/10'
+    }`}>
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-steel font-mono">{label}</span>
-        <Icon size={15} strokeWidth={2.5} className={accent} />
+        <span className="data-label text-steel">{label}</span>
+        <Icon size={15} strokeWidth={2.5} className={alert ? 'text-rust' : 'text-steel'} />
       </div>
-      <div className="text-2xl font-bold text-paper tabular-nums">{value}</div>
-      {sub ? <div className="text-[10px] text-steel">{sub}</div> : null}
+      <div className={`ops-figure text-figure ${alert ? 'text-rust' : 'text-paper'}`}>{value}</div>
+      {sub ? <div className="text-micro text-steel">{sub}</div> : null}
     </div>
   );
 }
@@ -123,13 +132,13 @@ function StatisticsSection({ jwtToken }: { jwtToken: string }) {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-base font-bold tracking-tight text-paper font-sans">Statistics</h2>
-          <p className="text-[11px] text-steel mt-0.5">System-wide counts, refreshed on demand.</p>
+          <p className="text-data text-steel mt-0.5">System-wide counts, refreshed on demand.</p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-steel hover:text-paper transition-colors disabled:opacity-50 shrink-0"
+          className="flex items-center gap-1.5 text-micro font-bold uppercase tracking-wide text-steel hover:text-paper transition-colors disabled:opacity-50 shrink-0"
         >
           <RefreshCw size={12} strokeWidth={2.5} className={loading ? 'animate-spin' : ''} />
           Refresh
@@ -137,42 +146,42 @@ function StatisticsSection({ jwtToken }: { jwtToken: string }) {
       </div>
 
       {error ? (
-        <div className="p-3 bg-rust/10 border border-rust/30 text-rust rounded text-xs font-mono mb-4">{error}</div>
+        <div className="p-3 bg-rust/10 border border-rust/30 text-rust rounded text-data font-mono mb-4">{error}</div>
       ) : null}
 
       {!stats && loading ? (
-        <div className="text-steel text-xs font-mono">Loading statistics…</div>
+        <div className="text-steel text-data font-mono">Loading statistics…</div>
       ) : stats ? (
         <div className="space-y-8">
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-steel font-mono mb-3">Accounts &amp; fleet</h3>
+            <h3 className="text-micro uppercase tracking-wider text-steel font-mono mb-3">Accounts &amp; fleet</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard icon={Users} label="Drivers" value={stats.accounts.driver} accent="text-carbon" />
-              <StatCard icon={Users} label="Dispatchers" value={stats.accounts.dispatcher} accent="text-carbon" sub={`${totalAccounts} accounts total`} />
-              <StatCard icon={Truck} label="Vehicles" value={stats.vehicles} accent="text-route" />
+              <StatCard icon={Users} label="Drivers" value={stats.accounts.driver} />
+              <StatCard icon={Users} label="Dispatchers" value={stats.accounts.dispatcher} sub={`${totalAccounts} accounts total`} />
+              <StatCard icon={Truck} label="Vehicles" value={stats.vehicles} />
             </div>
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-steel font-mono mb-3">Delivery performance</h3>
+            <h3 className="text-micro uppercase tracking-wider text-steel font-mono mb-3">Delivery performance</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <StatCard icon={PackageCheck} label="Delivered this week" value={stats.deliveredThisWeek} accent="text-tarp" />
+              <StatCard icon={PackageCheck} label="Delivered this week" value={stats.deliveredThisWeek} />
               <StatCard
                 icon={AlertTriangle}
                 label="Open incidents"
                 value={stats.openIncidents}
-                accent={stats.openIncidents > 0 ? 'text-rust' : 'text-tarp'}
+                alert={stats.openIncidents > 0}
               />
-              <StatCard icon={Clock} label="Avg. delivery time" value={formatHours(stats.avgDeliveryHours)} accent="text-carbon" sub="Creation to confirmed delivery" />
-              <StatCard icon={PackageCheck} label="Total orders" value={totalOrders} accent="text-route" />
+              <StatCard icon={Clock} label="Avg. delivery time" value={formatHours(stats.avgDeliveryHours)} sub="Creation to confirmed delivery" />
+              <StatCard icon={PackageCheck} label="Total orders" value={totalOrders} />
             </div>
           </div>
 
           <div>
-            <h3 className="text-[10px] uppercase tracking-wider text-steel font-mono mb-3">Orders by status</h3>
+            <h3 className="text-micro uppercase tracking-wider text-steel font-mono mb-3">Orders by status</h3>
             <div className="bg-panel border border-line/10 rounded-md p-4 space-y-3">
               {ORDER_STATUS_ORDER.filter((status) => stats.ordersByStatus[status]).length === 0 ? (
-                <div className="text-steel text-xs font-mono text-center py-2">No orders recorded yet.</div>
+                <div className="text-steel text-data font-mono text-center py-2">No orders recorded yet.</div>
               ) : (
                 ORDER_STATUS_ORDER.map((status) => {
                   const count = stats.ordersByStatus[status] || 0;
@@ -181,11 +190,11 @@ function StatisticsSection({ jwtToken }: { jwtToken: string }) {
                   const style = ORDER_STATUS_STYLE[status];
                   return (
                     <div key={status} className="flex items-center gap-3">
-                      <div className="w-24 shrink-0 text-[11px] text-steel font-mono">{style.label}</div>
+                      <div className="w-24 shrink-0 text-data text-steel font-mono">{style.label}</div>
                       <div className="flex-1 h-2 bg-panel-soft rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${style.color}`} style={{ width: `${pct}%` }} />
                       </div>
-                      <div className="w-10 shrink-0 text-right text-xs font-bold text-paper tabular-nums">{count}</div>
+                      <div className="w-10 shrink-0 text-right text-data font-bold text-paper tabular-nums">{count}</div>
                     </div>
                   );
                 })
@@ -231,12 +240,12 @@ function FleetPerformanceSection() {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[10px] uppercase tracking-wider text-steel font-mono">Fleet performance &middot; unloading dwell time</h3>
+        <h3 className="text-micro uppercase tracking-wider text-steel font-mono">Fleet performance &middot; unloading dwell time</h3>
         <button
           type="button"
           onClick={() => void load()}
           disabled={loading}
-          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-steel hover:text-paper transition-colors disabled:opacity-50 shrink-0"
+          className="flex items-center gap-1.5 text-micro font-bold uppercase tracking-wide text-steel hover:text-paper transition-colors disabled:opacity-50 shrink-0"
         >
           <RefreshCw size={12} strokeWidth={2.5} className={loading ? 'animate-spin' : ''} />
           Refresh
@@ -244,18 +253,18 @@ function FleetPerformanceSection() {
       </div>
 
       {error ? (
-        <div className="p-3 bg-rust/10 border border-rust/30 text-rust rounded text-xs font-mono">{error}</div>
+        <div className="p-3 bg-rust/10 border border-rust/30 text-rust rounded text-data font-mono">{error}</div>
       ) : !report && loading ? (
-        <div className="text-steel text-xs font-mono">Loading performance report…</div>
+        <div className="text-steel text-data font-mono">Loading performance report…</div>
       ) : metrics.length === 0 ? (
-        <div className="bg-panel border border-line/10 rounded-md p-4 text-steel text-xs font-mono text-center">
+        <div className="bg-panel border border-line/10 rounded-md p-4 text-steel text-data font-mono text-center">
           No driver has a completed delivery with a recorded arrival yet.
         </div>
       ) : (
         <div className="bg-panel border border-line/10 rounded-md overflow-hidden">
-          <table className="w-full text-left text-[11px]">
+          <table className="w-full text-left text-data">
             <thead>
-              <tr className="border-b border-line/10 text-steel uppercase text-[9px] tracking-wider font-mono">
+              <tr className="border-b border-line/10 text-steel uppercase text-micro tracking-wider font-mono">
                 <th className="px-4 py-2 font-medium">Driver</th>
                 <th className="px-4 py-2 font-medium text-right">Deliveries</th>
                 <th className="px-4 py-2 font-medium text-right">Avg. dwell</th>
@@ -293,12 +302,12 @@ export default function AdminControlCenterPage() {
         <button
           type="button"
           onClick={() => setShowAdminCenter(false)}
-          className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-steel hover:text-paper transition-colors"
+          className="flex items-center gap-2 text-data font-bold uppercase tracking-wide text-steel hover:text-paper transition-colors"
         >
           <ArrowLeft size={14} strokeWidth={2.5} />
           Back to dispatch
         </button>
-        <h1 className="text-sm font-bold uppercase tracking-wide text-paper">Admin Control Center</h1>
+        <h1 className="text-body font-bold uppercase tracking-wide text-paper">Admin Control Center</h1>
         <div className="w-[110px]" aria-hidden="true" />
       </header>
 
@@ -312,7 +321,7 @@ export default function AdminControlCenterPage() {
                 key={item.id}
                 type="button"
                 onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[12px] font-bold text-left transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-data font-bold text-left transition-colors ${
                   isActive ? 'bg-route/12 text-route border border-route/30' : 'text-steel border border-transparent hover:text-paper hover:bg-panel-soft'
                 }`}
               >

@@ -70,13 +70,13 @@ export default function VehicleAssignmentPanel() {
     }
 
     return (
-        <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-[11px]">
+        <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-data">
             <div className="flex justify-between items-center">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper font-sans">
+                <h3 className="flex items-center gap-1.5 text-body font-bold tracking-tight text-paper font-sans">
                     <UserCog size={14} strokeWidth={2.5} className="text-steel" />
                     Driver assignment
                 </h3>
-                {loading && <span className="text-[9px] text-carbon animate-pulse">Syncing...</span>}
+                {loading && <span className="text-micro text-carbon animate-pulse">Syncing...</span>}
             </div>
 
             {displayError && (
@@ -95,7 +95,7 @@ export default function VehicleAssignmentPanel() {
                 <select
                     value={selectedVehicle}
                     onChange={(e) => setSelectedVehicle(e.target.value)}
-                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper"
+                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper"
                 >
                     <option value="">Select vehicle asset</option>
                     {vehicles.map((v) => (
@@ -107,7 +107,7 @@ export default function VehicleAssignmentPanel() {
                 <select
                     value={selectedDriver}
                     onChange={(e) => setSelectedDriver(e.target.value)}
-                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper"
+                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper"
                 >
                     <option value="">Select available driver</option>
                     {drivers.map((d) => (
@@ -119,7 +119,7 @@ export default function VehicleAssignmentPanel() {
                 <button
                     type="submit"
                     disabled={assigning}
-                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-bold py-1.5 rounded text-xs uppercase tracking-wide transition-all disabled:opacity-50"
+                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-bold py-1.5 rounded text-data uppercase tracking-wide transition-all disabled:opacity-50"
                 >
                     {assigning ? 'Assigning...' : 'Assign driver to asset'}
                 </button>

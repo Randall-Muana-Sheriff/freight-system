@@ -151,38 +151,38 @@ export default function AdminControlPanel() {
 
     return (
         <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3">
-            <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper">
+            <h3 className="flex items-center gap-1.5 text-body font-bold tracking-tight text-paper">
                 <Truck size={14} strokeWidth={2.5} className="text-steel" />
                 Fleet asset control
             </h3>
-            <div className="text-[11px] text-carbon font-mono uppercase tracking-wider">Access level: {userRole || 'Guest'}</div>
+            <div className="text-data text-carbon font-mono uppercase tracking-wider">Access level: {userRole || 'Guest'}</div>
 
             {error && (
-                <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-[11px] rounded font-mono">
+                <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-data rounded font-mono">
                     {error}
                 </div>
             )}
 
             {successMsg && (
-                <div className="p-2 bg-tarp/10 border border-tarp/30 text-tarp text-[11px] rounded font-mono">
+                <div className="p-2 bg-tarp/10 border border-tarp/30 text-tarp text-data rounded font-mono">
                     {successMsg}
                 </div>
             )}
 
             <form onSubmit={(e) => void handleRegisterVehicle(e)} className="space-y-2 bg-ink/60 p-2.5 rounded border border-line/10">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-carbon font-bold">Register new fleet asset</div>
+                <div className="text-micro font-mono uppercase tracking-wider text-carbon font-bold">Register new fleet asset</div>
                 <input
                     type="text"
                     placeholder="License plate (e.g. RAD 123 A)"
                     value={plateNumber}
                     onChange={(e) => setPlateNumber(e.target.value)}
-                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 focus:outline-none focus:border-route font-mono transition-colors"
+                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 focus:outline-none focus:border-route font-mono transition-colors"
                 />
                 <div className="flex gap-1.5">
                     <select
                         value={vehicleType}
                         onChange={(e) => setVehicleType(e.target.value)}
-                        className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper font-mono"
+                        className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper font-mono"
                     >
                         {savedVehicleTypes.length === 0 && <option value="">No types defined</option>}
                         {savedVehicleTypes.map((t) => (
@@ -209,13 +209,13 @@ export default function AdminControlPanel() {
                                 placeholder="New type name"
                                 value={newTypeName}
                                 onChange={(e) => setNewTypeName(e.target.value)}
-                                className="flex-1 min-w-0 bg-ink border border-line/15 rounded px-2 py-1 text-[11px] text-paper placeholder-steel/60 focus:outline-none focus:border-route transition-colors"
+                                className="flex-1 min-w-0 bg-ink border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 focus:outline-none focus:border-route transition-colors"
                             />
                             <button
                                 type="button"
                                 onClick={(e) => void handleAddType(e)}
                                 disabled={typeBusy || !newTypeName.trim()}
-                                className="shrink-0 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2.5 text-[10px] uppercase disabled:opacity-50"
+                                className="shrink-0 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2.5 text-micro uppercase disabled:opacity-50"
                             >
                                 Add
                             </button>
@@ -223,7 +223,7 @@ export default function AdminControlPanel() {
                         <div className="max-h-28 overflow-y-auto space-y-1">
                             {savedVehicleTypes.map((t) => (
                                 <div key={t.id} className="flex justify-between items-center bg-ink/60 px-2 py-1 rounded border border-line/10">
-                                    <span className="text-[11px] text-steel">{t.name}</span>
+                                    <span className="text-data text-steel">{t.name}</span>
                                     <button
                                         type="button"
                                         onClick={() => void handleDeleteType(t)}
@@ -245,36 +245,36 @@ export default function AdminControlPanel() {
                         placeholder="Max weight (kg)"
                         value={maxWeight}
                         onChange={(e) => setMaxWeight(e.target.value)}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 font-mono"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 font-mono"
                     />
                     <input
                         type="number"
                         placeholder="Max range (km)"
                         value={maxRangeKm}
                         onChange={(e) => setMaxRangeKm(e.target.value)}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 font-mono"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 font-mono"
                     />
                 </div>
                 <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-mono font-bold py-1.5 rounded text-xs uppercase tracking-wide transition-all disabled:opacity-50"
+                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-mono font-bold py-1.5 rounded text-data uppercase tracking-wide transition-all disabled:opacity-50"
                 >
                     {submitting ? 'Registering asset...' : '+ Add asset to fleet'}
                 </button>
             </form>
 
             <div className="pt-1 space-y-1.5">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-carbon font-bold">Fleet roster ({vehicles.length})</div>
+                <div className="text-micro font-mono uppercase tracking-wider text-carbon font-bold">Fleet roster ({vehicles.length})</div>
                 {vehicles.length === 0 ? (
-                    <div className="text-steel text-center py-2 text-[11px]">No vehicles registered yet.</div>
+                    <div className="text-steel text-center py-2 text-data">No vehicles registered yet.</div>
                 ) : (
                     <div className="max-h-52 overflow-y-auto space-y-1.5">
                         {vehicles.map((v) => (
                             <div key={v.id} className="flex justify-between items-center bg-ink/60 p-2 rounded border border-line/10">
                                 <div className="min-w-0">
-                                    <div className="text-paper font-bold text-[11px] truncate">{v.plateNumber}</div>
-                                    <div className="text-[9px] text-steel font-mono">
+                                    <div className="text-paper font-bold text-data truncate">{v.plateNumber}</div>
+                                    <div className="text-micro text-steel font-mono">
                                         {v.vehicleType}
                                         {v.currentDriverId ? ' · assigned' : ' · unassigned'}
                                         {v.maxWeightKg ? ` · ${v.maxWeightKg}kg` : ''}
@@ -287,7 +287,7 @@ export default function AdminControlPanel() {
                                             onClick={() => void handleUnassignVehicle(v)}
                                             disabled={unassigningId === v.id}
                                             title="Unassign from driver"
-                                            className="flex items-center gap-1 bg-panel border border-line/15 text-carbon rounded px-2 py-1 text-[9px] font-bold uppercase disabled:opacity-50"
+                                            className="flex items-center gap-1 bg-panel border border-line/15 text-carbon rounded px-2 py-1 text-micro font-bold uppercase disabled:opacity-50"
                                         >
                                             <UserMinus size={11} strokeWidth={2.5} />
                                             {unassigningId === v.id ? '...' : 'Unassign'}
@@ -298,7 +298,7 @@ export default function AdminControlPanel() {
                                         onClick={() => void handleDeleteVehicle(v)}
                                         disabled={deletingId === v.id}
                                         title="Delete vehicle"
-                                        className="flex items-center gap-1 bg-panel border border-rust/40 text-rust rounded px-2 py-1 text-[9px] font-bold uppercase disabled:opacity-50"
+                                        className="flex items-center gap-1 bg-panel border border-rust/40 text-rust rounded px-2 py-1 text-micro font-bold uppercase disabled:opacity-50"
                                     >
                                         <Trash2 size={11} strokeWidth={2.5} />
                                         {deletingId === v.id ? '...' : 'Delete'}

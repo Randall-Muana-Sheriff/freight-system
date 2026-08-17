@@ -59,7 +59,7 @@ export default function BatchSuggestions({ drivers, jwtToken, onAssigned }: Batc
             <button
                 type="button"
                 onClick={handleToggle}
-                className="w-full flex items-center justify-between text-[9px] text-steel uppercase tracking-wider font-mono"
+                className="w-full flex items-center justify-between text-micro text-steel uppercase tracking-wider font-mono"
             >
                 <span className="flex items-center gap-1.5">
                     <Boxes size={11} strokeWidth={2.5} />
@@ -69,28 +69,28 @@ export default function BatchSuggestions({ drivers, jwtToken, onAssigned }: Batc
             </button>
             {open && (
                 loading && batches === null ? (
-                    <div className="text-steel text-center py-2 text-[10px]">Clustering nearby pickups...</div>
+                    <div className="text-steel text-center py-2 text-micro">Clustering nearby pickups...</div>
                 ) : batches && batches.length === 0 ? (
-                    <div className="text-steel text-center py-2 text-[10px]">No pending orders cluster into a batch right now.</div>
+                    <div className="text-steel text-center py-2 text-micro">No pending orders cluster into a batch right now.</div>
                 ) : batches ? (
                     <div className="max-h-52 overflow-y-auto space-y-1.5">
                         {batches.map((batch) => (
                             <div key={batch.batch_id} className="bg-ink/60 p-2.5 rounded border border-line/10 space-y-1.5">
                                 <div className="flex justify-between items-start gap-2">
                                     <div className="min-w-0">
-                                        <div className="text-paper font-bold text-[11px] truncate">{batch.origin_cluster}</div>
-                                        <div className="text-[9px] text-steel font-mono">{batch.shipments.length} shipments &middot; {batch.total_weight_kg} kg</div>
+                                        <div className="text-paper font-bold text-data truncate">{batch.origin_cluster}</div>
+                                        <div className="text-micro text-steel font-mono">{batch.shipments.length} shipments &middot; {batch.total_weight_kg} kg</div>
                                     </div>
-                                    <span className="shrink-0 text-[9px] font-mono text-carbon">{batch.batch_id}</span>
+                                    <span className="shrink-0 text-micro font-mono text-carbon">{batch.batch_id}</span>
                                 </div>
-                                <div className="text-[9px] text-steel font-mono truncate">
+                                <div className="text-micro text-steel font-mono truncate">
                                     {batch.shipments.map((s) => s.cargo_description).join(' · ')}
                                 </div>
                                 <div className="flex gap-1.5">
                                     <select
                                         value={selectedDrivers[batch.batch_id] || ''}
                                         onChange={(e) => setSelectedDrivers((sd) => ({ ...sd, [batch.batch_id]: e.target.value }))}
-                                        className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-[10px] text-paper"
+                                        className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-micro text-paper"
                                     >
                                         <option value="">Assign whole batch to...</option>
                                         {drivers.map((d) => (
@@ -101,7 +101,7 @@ export default function BatchSuggestions({ drivers, jwtToken, onAssigned }: Batc
                                         type="button"
                                         onClick={() => void handleAssignBatch(batch)}
                                         disabled={assigningId === batch.batch_id || !selectedDrivers[batch.batch_id]}
-                                        className="shrink-0 flex items-center gap-1 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2 text-[10px] uppercase disabled:opacity-50"
+                                        className="shrink-0 flex items-center gap-1 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2 text-micro uppercase disabled:opacity-50"
                                     >
                                         <Send size={10} strokeWidth={2.5} />
                                         {assigningId === batch.batch_id ? '...' : 'Assign'}

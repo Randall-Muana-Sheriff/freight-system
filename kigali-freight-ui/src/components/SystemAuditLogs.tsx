@@ -59,13 +59,13 @@ export default function SystemAuditLogs() {
     }
 
     return (
-        <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-[11px]">
+        <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-data">
             <div className="flex justify-between items-center">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper font-sans">
+                <h3 className="flex items-center gap-1.5 text-body font-bold tracking-tight text-paper font-sans">
                     <ScrollText size={14} strokeWidth={2.5} className="text-steel" />
                     System audit log
                 </h3>
-                {loading && <span className="text-[9px] text-carbon animate-pulse">Syncing...</span>}
+                {loading && <span className="text-micro text-carbon animate-pulse">Syncing...</span>}
             </div>
 
             {error && (
@@ -79,13 +79,13 @@ export default function SystemAuditLogs() {
                     <div className="text-steel text-center py-2">No audit events recorded yet.</div>
                 )}
                 {logs.map((log, idx) => (
-                    <div key={log.id || idx} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-start text-[10px]">
+                    <div key={log.id || idx} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-start text-micro">
                         <div>
                             <span className="text-carbon font-bold uppercase">[{log.actionType}]</span>{' '}
                             <span className="text-steel">{log.description}</span>
-                            <div className="text-[9px] text-steel/70 mt-0.5">Operator: {log.username ? resolveDriverName(log.username) : 'System'}</div>
+                            <div className="text-micro text-steel/70 mt-0.5">Operator: {log.username ? resolveDriverName(log.username) : 'System'}</div>
                         </div>
-                        <span className="text-[9px] text-steel font-mono whitespace-nowrap ml-2">
+                        <span className="text-micro text-steel font-mono whitespace-nowrap ml-2">
                             {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </span>
                     </div>

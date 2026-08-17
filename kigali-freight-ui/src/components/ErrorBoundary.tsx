@@ -60,8 +60,8 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
                         </div>
                     </div>
                     <div>
-                        <h1 className="text-sm font-bold tracking-tight text-paper">Something went wrong</h1>
-                        <p className="text-[13px] text-steel mt-1.5">
+                        <h1 className="text-body font-bold tracking-tight text-paper">Something went wrong</h1>
+                        <p className="text-data text-steel mt-1.5">
                             The dashboard hit an unexpected error and couldn't continue. Your session and any
                             pending dispatch actions are unaffected — reloading will bring the dashboard back.
                         </p>
@@ -69,12 +69,12 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
                     <button
                         type="button"
                         onClick={this.handleReload}
-                        className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-mono font-bold py-2 rounded text-xs uppercase tracking-wide transition-all"
+                        className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-mono font-bold py-2 rounded text-data uppercase tracking-wide transition-all"
                     >
                         Reload dashboard
                     </button>
                     {this.state.error?.message && (
-                        <div className="text-[10px] font-mono text-steel/70 border-t border-line/10 pt-3 break-words">
+                        <div className="text-micro font-mono text-steel/70 border-t border-line/10 pt-3 break-words">
                             {this.state.error.message}
                         </div>
                     )}

@@ -60,9 +60,9 @@ export default function LocationSearchControl({ jwtToken, pickHandlers }: Locati
           onFocus={() => results.length > 0 && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder="Search an address or place..."
-          className="w-full bg-panel/95 border border-line/20 rounded-md pl-7 pr-8 py-1.5 text-xs text-paper placeholder-steel/60 font-mono focus:outline-none focus:border-route shadow-lg"
+          className="w-full bg-panel/95 border border-line/20 rounded-md pl-7 pr-8 py-1.5 text-data text-paper placeholder-steel/60 font-mono focus:outline-none focus:border-route shadow-lg"
         />
-        {searching && <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] text-steel font-mono">...</div>}
+        {searching && <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-micro text-steel font-mono">...</div>}
         {open && results.length > 0 && (
           <div className="absolute mt-1 w-full bg-panel border border-line/20 rounded-md shadow-lg overflow-hidden max-h-56 overflow-y-auto">
             {results.map((r, i) => (
@@ -70,7 +70,7 @@ export default function LocationSearchControl({ jwtToken, pickHandlers }: Locati
                 key={i}
                 type="button"
                 onMouseDown={(e) => { e.preventDefault(); handleSelect(r); }}
-                className="block w-full text-left px-3 py-1.5 text-[11px] text-steel hover:bg-ink/60 hover:text-paper font-mono border-b border-line/10 last:border-b-0 truncate"
+                className="block w-full text-left px-3 py-1.5 text-data text-steel hover:bg-ink/60 hover:text-paper font-mono border-b border-line/10 last:border-b-0 truncate"
               >
                 {r.label}
               </button>

@@ -39,7 +39,7 @@ function StatChip({ icon, value, label, accentClassName }: { icon: React.ReactNo
             <div className={accentClassName}>{icon}</div>
             <div>
                 <div className="text-3xl font-bold text-paper leading-none font-mono tabular-nums">{value}</div>
-                <div className="text-[10px] text-steel uppercase tracking-widest mt-0.5">{label}</div>
+                <div className="text-micro text-steel uppercase tracking-widest mt-0.5">{label}</div>
             </div>
         </div>
     );
@@ -77,11 +77,11 @@ export default function KioskDashboard({
                 <div className="flex items-center gap-4 pointer-events-auto">
                     <div className="flex items-center gap-2">
                         {isConnected ? <Wifi size={16} className="text-tarp" /> : <WifiOff size={16} className="text-rust" />}
-                        <span className="text-sm font-bold uppercase tracking-widest text-paper">Inzira Fleet Operations</span>
+                        <span className="text-body font-bold uppercase tracking-widest text-paper">Inzira Fleet Operations</span>
                         {deviceLabel && (
                             <>
                                 <span className="text-steel/40">·</span>
-                                <span className="text-sm font-bold uppercase tracking-widest text-route">{deviceLabel}</span>
+                                <span className="text-body font-bold uppercase tracking-widest text-route">{deviceLabel}</span>
                             </>
                         )}
                     </div>
@@ -97,7 +97,7 @@ export default function KioskDashboard({
                             <span className="text-2xl leading-none" aria-hidden="true">{weather.icon}</span>
                             <div>
                                 <div className="text-2xl font-bold text-paper leading-none font-mono tabular-nums">{weather.temperatureC}°C</div>
-                                <div className="text-[10px] text-steel uppercase tracking-widest mt-0.5">{weather.label}</div>
+                                <div className="text-micro text-steel uppercase tracking-widest mt-0.5">{weather.label}</div>
                             </div>
                         </div>
                     )}
@@ -106,7 +106,7 @@ export default function KioskDashboard({
                         <div className="text-2xl font-bold text-paper leading-none font-mono tabular-nums">
                             {now.toLocaleTimeString('en-GB', { timeZone: 'Africa/Kigali', hour: '2-digit', minute: '2-digit' })}
                         </div>
-                        <div className="text-[10px] text-steel uppercase tracking-widest mt-0.5">Kigali</div>
+                        <div className="text-micro text-steel uppercase tracking-widest mt-0.5">Kigali</div>
                     </div>
                 </div>
             </div>
@@ -122,7 +122,7 @@ export default function KioskDashboard({
                                     className="flex items-center gap-2.5 shrink-0 px-4 py-2.5 bg-rust/15 border border-rust/40 rounded-lg"
                                 >
                                     <AlertTriangle size={16} className="text-rust shrink-0" strokeWidth={2.5} />
-                                    <div className="text-sm">
+                                    <div className="text-body">
                                         <span className="font-bold text-paper">{resolveDriverName(incident.driver_name || '')}</span>
                                         <span className="text-steel"> — {title}</span>
                                     </div>

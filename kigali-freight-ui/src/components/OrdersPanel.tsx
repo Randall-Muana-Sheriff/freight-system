@@ -95,15 +95,20 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
 
     return (
         <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3">
-            <div className="flex items-center justify-between gap-2">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper">
-                    <PackagePlus size={14} strokeWidth={2.5} className="text-steel" />
-                    Dispatch queue ({activeOrders.length} pending)
+            {/* flex-wrap and min-w-0 because this row is the widest thing in
+                the rail — title, count and action all on one line — and the
+                rail can be dragged down to 260px. It wraps rather than
+                overflowing there. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+                <h3 className="flex min-w-0 items-center gap-2 display-tight text-body text-paper">
+                    <PackagePlus size={15} strokeWidth={2.5} className="shrink-0 text-steel" />
+                    <span className="truncate">Dispatch queue</span>
+                    <span className="shrink-0 font-mono text-micro text-steel">{activeOrders.length} pending</span>
                 </h3>
                 <button
                     type="button"
                     onClick={() => setShowCreateForm((v) => !v)}
-                    className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors ${
+                    className={`focus-ring shrink-0 flex items-center gap-1 px-2 py-1 rounded text-micro font-semibold uppercase tracking-wide border transition-colors ${
                         showCreateForm ? 'bg-panel border-line/20 text-steel hover:text-paper' : 'bg-route/15 border-route/40 text-route hover:bg-route/25'
                     }`}
                 >
@@ -112,20 +117,20 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             </div>
 
             {error && (
-                <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-[11px] rounded font-mono">
+                <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-data rounded font-mono">
                     {error}
                 </div>
             )}
 
             {showCreateForm && (
             <form onSubmit={(e) => void handleCreate(e)} className="space-y-2 bg-ink/60 p-2.5 rounded border border-line/10">
-                <div className="text-[9px] text-steel uppercase tracking-wider font-mono">New manifest entry</div>
+                <div className="text-micro text-steel uppercase tracking-wider font-mono">New manifest entry</div>
                 <input
                     type="text"
                     placeholder="Cargo description"
                     value={form.cargoDescription}
                     onChange={(e) => setForm((f) => ({ ...f, cargoDescription: e.target.value }))}
-                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 focus:outline-none focus:border-route transition-colors"
+                    className="w-full bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 focus:outline-none focus:border-route transition-colors"
                 />
                 <div className="grid grid-cols-2 gap-1.5">
                     <input
@@ -133,14 +138,14 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                         placeholder="Recipient name"
                         value={form.recipientName}
                         onChange={(e) => setForm((f) => ({ ...f, recipientName: e.target.value }))}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60"
                     />
                     <input
                         type="tel"
                         placeholder="Recipient phone"
                         value={form.recipientPhone}
                         onChange={(e) => setForm((f) => ({ ...f, recipientPhone: e.target.value }))}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 font-mono"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 font-mono"
                     />
                 </div>
                 <div className="grid grid-cols-3 gap-1.5">
@@ -149,12 +154,12 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                         placeholder="Weight (kg)"
                         value={form.weightKg}
                         onChange={(e) => setForm((f) => ({ ...f, weightKg: e.target.value }))}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper placeholder-steel/60 font-mono"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper placeholder-steel/60 font-mono"
                     />
                     <select
                         value={form.hubId}
                         onChange={(e) => setForm((f) => ({ ...f, hubId: e.target.value }))}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper font-mono"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper font-mono"
                     >
                         <option value="">Pickup hub</option>
                         {savedHubs.map((h) => (
@@ -164,7 +169,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                     <select
                         value={form.priority}
                         onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value }))}
-                        className="bg-panel border border-line/15 rounded px-2 py-1 text-xs text-paper font-mono"
+                        className="bg-panel border border-line/15 rounded px-2 py-1 text-data text-paper font-mono"
                     >
                         <option value="high">High</option>
                         <option value="normal">Normal</option>
@@ -174,8 +179,8 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 <button
                     type="button"
                     onClick={() => setPickTargetMode(!pickTargetMode)}
-                    className={`w-full flex items-center justify-center gap-2 py-1.5 rounded text-[10px] font-bold uppercase tracking-wide border transition-colors ${
-                        pickTargetMode ? 'bg-rust border-rust/60 text-paper animate-pulse' : pickedDeliveryCoords ? 'bg-tarp/15 border-tarp/40 text-tarp' : 'bg-panel border-line/15 text-carbon'
+                    className={`w-full flex items-center justify-center gap-2 py-1.5 rounded text-micro font-bold uppercase tracking-wide border transition-colors ${
+                        pickTargetMode ? 'bg-rust border-rust/60 text-ink animate-pulse' : pickedDeliveryCoords ? 'bg-tarp/15 border-tarp/40 text-tarp' : 'bg-panel border-line/15 text-carbon'
                     }`}
                 >
                     <MapPin size={11} strokeWidth={2.5} />
@@ -184,7 +189,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 <button
                     type="submit"
                     disabled={creating}
-                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-mono font-bold py-1.5 rounded text-[11px] uppercase tracking-wide transition-all disabled:opacity-50"
+                    className="w-full bg-route hover:bg-route-deep text-ink hover:text-paper font-mono font-bold py-1.5 rounded text-data uppercase tracking-wide transition-all disabled:opacity-50"
                 >
                     {creating ? 'Logging manifest...' : '+ Create order'}
                 </button>
@@ -193,7 +198,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
 
             <div className="max-h-52 overflow-y-auto space-y-1.5">
                 {activeOrders.length === 0 && (
-                    <div className="text-steel text-center py-2 text-[11px]">No pending orders — dispatch queue is clear.</div>
+                    <div className="text-steel text-center py-2 text-data">No pending orders — dispatch queue is clear.</div>
                 )}
                 {activeOrders.map((order) => (
                     <OrderRow key={order.id} order={order} drivers={drivers} jwtToken={jwtToken} onAssigned={() => void refreshFeeds()} />
@@ -202,7 +207,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
 
             {inFlightOrders.length > 0 && (
                 <div className="pt-2 border-t border-line/10 space-y-1.5">
-                    <div className="text-[9px] text-steel uppercase tracking-wider font-mono">Awaiting pickup ({inFlightOrders.length}) &middot; reassign or unassign</div>
+                    <div className="text-micro text-steel uppercase tracking-wider font-mono">Awaiting pickup ({inFlightOrders.length}) &middot; reassign or unassign</div>
                     <div className="max-h-52 overflow-y-auto space-y-1.5">
                         {inFlightOrders.map((order) => (
                             <InFlightRow key={order.id} order={order} drivers={drivers} jwtToken={jwtToken} onChanged={() => void refreshFeeds()} />

@@ -53,7 +53,7 @@ export default function LiveFleetStatusPanel() {
     return (
         <div className="bg-panel border border-line/10 p-3 rounded-md text-paper space-y-2">
             <div className="flex items-center justify-between">
-                <h3 className="flex items-center gap-1.5 text-[10px] font-bold text-steel uppercase tracking-wider">
+                <h3 className="flex items-center gap-1.5 text-micro font-bold text-steel uppercase tracking-wider">
                     <Gauge size={12} strokeWidth={2.5} />
                     Live ETAs {report ? `(${report.activeFleetCount})` : ''}
                 </h3>
@@ -63,28 +63,28 @@ export default function LiveFleetStatusPanel() {
             </div>
 
             {error && (
-                <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-[10px] rounded font-mono">{error}</div>
+                <div className="p-2 bg-rust/10 border border-rust/30 text-rust text-micro rounded font-mono">{error}</div>
             )}
 
             {!error && fleetReport.length === 0 && !loading && (
-                <div className="text-steel text-center py-2 text-[11px]">No order currently has both a driver assigned and live telemetry.</div>
+                <div className="text-steel text-center py-2 text-data">No order currently has both a driver assigned and live telemetry.</div>
             )}
 
             <div className="max-h-40 overflow-y-auto space-y-1.5">
                 {fleetReport.map((row) => (
                     <div
                         key={row.orderId}
-                        className={`p-2 border rounded flex items-center justify-between text-xs transition-colors ${
+                        className={`p-2 border rounded flex items-center justify-between text-data transition-colors ${
                             row.telemetryStatus === 'STALE_SIGNAL' ? 'border-line/10 bg-panel text-steel opacity-60' : 'border-line/10 bg-ink/60 text-paper'
                         }`}
                     >
                         <div className="flex flex-col truncate max-w-[190px]">
                             <span className="font-medium truncate">#{row.orderId} {row.cargo}</span>
-                            <span className="text-[10px] text-steel font-mono">{resolveDriverName(row.driver)}</span>
+                            <span className="text-micro text-steel font-mono">{resolveDriverName(row.driver)}</span>
                         </div>
                         <div className="shrink-0 text-right">
-                            <div className="text-[11px] font-bold font-mono text-tarp">{row.estimatedMinutesArrival}m</div>
-                            <div className="text-[9px] text-steel font-mono">{row.distanceRemainingKm}km {row.telemetryStatus === 'STALE_SIGNAL' ? '· stale' : ''}</div>
+                            <div className="text-data font-bold font-mono text-tarp">{row.estimatedMinutesArrival}m</div>
+                            <div className="text-micro text-steel font-mono">{row.distanceRemainingKm}km {row.telemetryStatus === 'STALE_SIGNAL' ? '· stale' : ''}</div>
                         </div>
                     </div>
                 ))}

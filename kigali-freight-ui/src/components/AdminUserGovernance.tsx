@@ -116,10 +116,10 @@ export default function AdminUserGovernance() {
     }
 
     return (
-        <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-[11px]">
+        <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-data">
             <div className="flex justify-between items-center">
-                <h3 className="text-sm font-bold tracking-tight text-paper font-sans">User &amp; role governance</h3>
-                {loading && <span className="text-[9px] text-carbon animate-pulse">Syncing...</span>}
+                <h3 className="text-body font-bold tracking-tight text-paper font-sans">User &amp; role governance</h3>
+                {loading && <span className="text-micro text-carbon animate-pulse">Syncing...</span>}
             </div>
 
             {displayError && (
@@ -135,36 +135,36 @@ export default function AdminUserGovernance() {
             )}
 
             <form onSubmit={(e) => void handleCreateUser(e)} className="bg-ink/60 p-3.5 rounded border border-line/10 space-y-2.5">
-                <div className="text-[9px] text-steel uppercase tracking-wider">Create dispatcher / admin account</div>
+                <div className="text-micro text-steel uppercase tracking-wider">Create dispatcher / admin account</div>
                 <div className="grid grid-cols-2 sm:grid-cols-[1fr_1fr_120px_auto] gap-2.5 items-end">
                     <label className="block">
-                        <span className="block text-[8px] text-steel/70 uppercase tracking-wider mb-1">Username</span>
+                        <span className="block text-micro text-steel/70 uppercase tracking-wider mb-1">Username</span>
                         <input
                             type="text"
                             placeholder="e.g. peter.k"
                             required
                             value={newUser.username}
                             onChange={(e) => setNewUser((u) => ({ ...u, username: e.target.value }))}
-                            className="w-full min-w-0 bg-panel border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                            className="w-full min-w-0 bg-panel border border-line/15 rounded px-2 py-1.5 text-data text-paper focus:outline-none focus:border-route transition-colors"
                         />
                     </label>
                     <label className="block">
-                        <span className="block text-[8px] text-steel/70 uppercase tracking-wider mb-1">Password</span>
+                        <span className="block text-micro text-steel/70 uppercase tracking-wider mb-1">Password</span>
                         <input
                             type="password"
                             placeholder="min. 8 characters"
                             required
                             value={newUser.password}
                             onChange={(e) => setNewUser((u) => ({ ...u, password: e.target.value }))}
-                            className="w-full min-w-0 bg-panel border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                            className="w-full min-w-0 bg-panel border border-line/15 rounded px-2 py-1.5 text-data text-paper focus:outline-none focus:border-route transition-colors"
                         />
                     </label>
                     <label className="block">
-                        <span className="block text-[8px] text-steel/70 uppercase tracking-wider mb-1">Role</span>
+                        <span className="block text-micro text-steel/70 uppercase tracking-wider mb-1">Role</span>
                         <select
                             value={newUser.role}
                             onChange={(e) => setNewUser((u) => ({ ...u, role: e.target.value as UserRole }))}
-                            className="w-full bg-panel border border-line/15 rounded px-2 py-1.5 text-[11px] text-carbon font-bold focus:outline-none focus:border-route"
+                            className="w-full bg-panel border border-line/15 rounded px-2 py-1.5 text-data text-carbon font-bold focus:outline-none focus:border-route"
                         >
                             <option value="dispatcher">DISPATCHER</option>
                             <option value="admin">ADMIN</option>
@@ -173,7 +173,7 @@ export default function AdminUserGovernance() {
                     <button
                         type="submit"
                         disabled={creating}
-                        className="bg-route hover:bg-route-deep disabled:opacity-50 rounded px-4 py-1.5 text-[11px] font-bold text-ink hover:text-paper uppercase whitespace-nowrap"
+                        className="bg-route hover:bg-route-deep disabled:opacity-50 rounded px-4 py-1.5 text-data font-bold text-ink hover:text-paper uppercase whitespace-nowrap"
                     >
                         {creating ? '...' : 'Create'}
                     </button>
@@ -190,20 +190,20 @@ export default function AdminUserGovernance() {
                             <div className="text-paper font-bold flex items-center gap-1.5">
                                 {u.username || u.email}
                                 {u.status === 'rejected' && (
-                                    <span className="text-[8px] bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Rejected</span>
+                                    <span className="text-micro bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Rejected</span>
                                 )}
                                 {u.status === 'suspended' && (
-                                    <span className="text-[8px] bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Suspended</span>
+                                    <span className="text-micro bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Suspended</span>
                                 )}
                             </div>
-                            <div className="text-[9px] text-steel">ID: {u.id}</div>
+                            <div className="text-micro text-steel">ID: {u.id}</div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
                             <select
                                 value={u.role}
                                 onChange={(e) => void handleRoleChange(u.id, e.target.value)}
                                 disabled={u.status === 'suspended'}
-                                className="bg-panel border border-line/15 rounded px-2 py-1 text-[10px] text-carbon font-bold focus:outline-none focus:border-route disabled:opacity-40"
+                                className="bg-panel border border-line/15 rounded px-2 py-1 text-micro text-carbon font-bold focus:outline-none focus:border-route disabled:opacity-40"
                             >
                                 <option value="dispatcher">DISPATCHER</option>
                                 <option value="admin">ADMIN</option>
@@ -212,7 +212,7 @@ export default function AdminUserGovernance() {
                                 type="button"
                                 onClick={() => void handleStatusChange(u)}
                                 title={u.status === 'suspended' ? 'Reinstate this account' : 'Suspend this account'}
-                                className={`rounded px-2 py-1 text-[9px] font-bold uppercase border ${
+                                className={`rounded px-2 py-1 text-micro font-bold uppercase border ${
                                     u.status === 'suspended'
                                         ? 'border-tarp/40 text-tarp hover:bg-tarp/10'
                                         : 'border-rust/40 text-rust hover:bg-rust/10'
@@ -231,25 +231,25 @@ export default function AdminUserGovernance() {
                 account control anywhere in the dashboard. */}
             {driverUsers.length > 0 && (
                 <div className="pt-3 mt-3 border-t border-line/10 space-y-1.5">
-                    <div className="text-[9px] text-steel uppercase tracking-wider font-mono">
+                    <div className="text-micro text-steel uppercase tracking-wider font-mono">
                         Drivers ({driverUsers.length}) &middot; suspend or reinstate
                     </div>
                     <div className="max-h-64 overflow-y-auto space-y-1.5">
                         {driverUsers.map((d) => (
                             <div key={d.id} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-center gap-2">
                                 <div className="truncate">
-                                    <div className="text-paper font-bold flex items-center gap-1.5 text-[11px]">
+                                    <div className="text-paper font-bold flex items-center gap-1.5 text-data">
                                         {d.fullName || d.username}
                                         {d.status === 'suspended' && (
-                                            <span className="text-[8px] bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Suspended</span>
+                                            <span className="text-micro bg-rust/15 text-rust rounded px-1 py-0.5 uppercase">Suspended</span>
                                         )}
                                     </div>
-                                    <div className="text-[9px] text-steel font-mono">{d.username}</div>
+                                    <div className="text-micro text-steel font-mono">{d.username}</div>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={() => void handleStatusChange(d)}
-                                    className={`shrink-0 rounded px-2 py-1 text-[9px] font-bold uppercase border ${
+                                    className={`shrink-0 rounded px-2 py-1 text-micro font-bold uppercase border ${
                                         d.status === 'suspended'
                                             ? 'border-tarp/40 text-tarp hover:bg-tarp/10'
                                             : 'border-rust/40 text-rust hover:bg-rust/10'

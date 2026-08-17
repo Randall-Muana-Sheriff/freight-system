@@ -72,13 +72,13 @@ export default function IncidentReportsPanel() {
 
     return (
         <div className="bg-panel border border-line/10 p-3 rounded-md space-y-2">
-            <h3 className="flex items-center gap-1.5 text-[10px] font-bold text-steel uppercase tracking-wider">
+            <h3 className="flex items-center gap-1.5 text-micro font-bold text-steel uppercase tracking-wider">
                 <ClipboardList size={12} strokeWidth={2.5} />
                 Driver incident reports ({visibleReports.length})
             </h3>
             <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
                 {visibleReports.length === 0 ? (
-                    <div className="text-[11px] text-steel italic p-3 text-center bg-ink/40 rounded-lg border border-line/10">
+                    <div className="text-data text-steel italic p-3 text-center bg-ink/40 rounded-lg border border-line/10">
                         No incident reports submitted by drivers.
                     </div>
                 ) : (
@@ -97,44 +97,49 @@ export default function IncidentReportsPanel() {
                                 {isUrgent && <div className="absolute inset-y-0 left-0 w-[3px] bg-rust" />}
 
                                 <div className="flex items-start justify-between gap-3">
-                                    <span className="font-bold text-paper text-[12px] truncate">{resolveDriverName(incident.driver_name || '')}</span>
-                                    <span className="font-mono text-[9px] text-steel shrink-0 pt-0.5">
+                                    <span className="font-bold text-paper text-data truncate">{resolveDriverName(incident.driver_name || '')}</span>
+                                    <span className="font-mono text-micro text-steel shrink-0 pt-0.5">
                                         {incident.created_at ? new Date(incident.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''}
                                     </span>
                                 </div>
 
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="text-paper font-semibold text-[12px] leading-snug">{title}</div>
+                                <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1">
+                                    {/* A floor, not min-w-0: with the latter the title
+                                        shrank to 31px next to the status badges and its
+                                        own words could no longer fit on a line. Given a
+                                        floor it keeps a readable measure and pushes the
+                                        badges onto the row below instead. */}
+                                    <div className="min-w-[8rem] flex-1 text-paper font-semibold text-data leading-snug">{title}</div>
                                     <div className="flex items-center gap-1 shrink-0">
                                         {isUrgent && (
-                                            <span className="flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5 text-rust bg-rust/15">
+                                            <span className="flex items-center gap-0.5 text-micro font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5 text-rust bg-rust/15">
                                                 <AlertTriangle size={8} strokeWidth={3} />
                                                 Urgent
                                             </span>
                                         )}
-                                        <span className={`text-[8px] font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5 whitespace-nowrap ${meta.className}`}>
+                                        <span className={`text-micro font-bold uppercase tracking-wide rounded-full px-1.5 py-0.5 whitespace-nowrap ${meta.className}`}>
                                             {meta.label}
                                         </span>
                                     </div>
                                 </div>
 
                                 {incident.orderCargoDescription && stagePhrase(incident.orderStatus) && (
-                                    <div className="flex items-center gap-1.5 text-[10px] text-carbon bg-carbon/10 rounded-md px-2 py-1">
+                                    <div className="flex items-center gap-1.5 text-micro text-carbon bg-carbon/10 rounded-md px-2 py-1">
                                         <Package size={10} strokeWidth={2.5} className="shrink-0" />
                                         {stagePhrase(incident.orderStatus)}: {incident.orderCargoDescription}
                                     </div>
                                 )}
 
-                                {rest.length > 0 && <p className="text-steel text-[11px] leading-relaxed">{rest.join('\n\n')}</p>}
+                                {rest.length > 0 && <p className="text-steel text-data leading-relaxed">{rest.join('\n\n')}</p>}
 
                                 {incident.aiAnalysis?.suspectedInjury && (
-                                    <div className="flex items-center gap-1.5 text-[10px] text-rust bg-rust/10 rounded-md px-2 py-1.5">
+                                    <div className="flex items-center gap-1.5 text-micro text-rust bg-rust/10 rounded-md px-2 py-1.5">
                                         <Sparkles size={10} strokeWidth={2.5} className="shrink-0" />
                                         AI: possible injury mentioned — verify driver welfare
                                     </div>
                                 )}
 
-                                <div className="flex items-center gap-2 pt-2 mt-1 border-t border-line/10">
+                                <div className="flex flex-wrap items-center gap-2 pt-2 mt-1 border-t border-line/10">
                                     {incident.photo_url && (
                                         <button type="button" onClick={() => setViewingImage(incident.photo_url as string)} className="shrink-0" title="View attached photo">
                                             <img
@@ -144,14 +149,18 @@ export default function IncidentReportsPanel() {
                                             />
                                         </button>
                                     )}
+                                    {/* The wrap belongs on the div below rather than on the
+                                        row above it: that div is what actually holds the
+                                        two buttons, and at the rail's 260px minimum they
+                                        do not fit side by side. */}
                                     {status !== 'RESOLVED' && (
-                                        <div className="flex items-center gap-1.5 ml-auto">
+                                        <div className="flex flex-wrap items-center justify-end gap-1.5 ml-auto">
                                             {status === 'OPEN' && (
                                                 <button
                                                     type="button"
                                                     onClick={() => void handleSetStatus(incident.id, 'ACKNOWLEDGED')}
                                                     disabled={busyId === incident.id}
-                                                    className="flex items-center gap-1 bg-panel border border-line/15 text-carbon rounded-full px-2 py-1 text-[9px] font-bold uppercase disabled:opacity-50"
+                                                    className="flex items-center gap-1 bg-panel border border-line/15 text-carbon rounded-full px-2 py-1 text-micro font-bold uppercase disabled:opacity-50"
                                                 >
                                                     <Eye size={9} strokeWidth={2.5} />
                                                     Acknowledge
@@ -161,7 +170,7 @@ export default function IncidentReportsPanel() {
                                                 type="button"
                                                 onClick={() => void handleSetStatus(incident.id, 'RESOLVED')}
                                                 disabled={busyId === incident.id}
-                                                className="flex items-center gap-1 bg-tarp/15 border border-tarp/40 text-tarp rounded-full px-2 py-1 text-[9px] font-bold uppercase disabled:opacity-50"
+                                                className="flex items-center gap-1 bg-tarp/15 border border-tarp/40 text-tarp rounded-full px-2 py-1 text-micro font-bold uppercase disabled:opacity-50"
                                             >
                                                 <CheckCheck size={9} strokeWidth={2.5} />
                                                 Resolve

@@ -38,7 +38,7 @@ export default function FleetAssetList() {
 
   return (
     <div className="flex-1 min-h-[140px] overflow-y-auto space-y-1.5">
-      <h3 className="flex items-center gap-1.5 text-[10px] font-bold text-steel uppercase tracking-wider">
+      <h3 className="flex items-center gap-1.5 text-micro font-bold text-steel uppercase tracking-wider">
         <Radio size={12} strokeWidth={2.5} />
         Field transmissions ({visibleAssets.length})
       </h3>
@@ -51,7 +51,7 @@ export default function FleetAssetList() {
         return (
           <div
             key={asset.driverName}
-            className={`p-2 border rounded flex items-center justify-between text-xs transition-colors ${hasViolation ?
+            className={`p-2 border rounded flex items-center justify-between text-data transition-colors ${hasViolation ?
               (violationRecord.type === 'SPEED_VIOLATION' ? 'border-hazard/30 bg-hazard/10 text-hazard' : 'border-rust/30 bg-rust/10 text-rust') :
               isStale ? 'border-line/10 bg-panel text-steel opacity-60' : 'border-line/10 bg-panel text-paper'}`}
           >
@@ -60,7 +60,7 @@ export default function FleetAssetList() {
                 {hasViolation ? <AlertTriangle size={12} /> : null}
                 {resolveDriverName(asset.driverName)}
               </span>
-              <span className="text-[10px] text-steel font-mono">
+              <span className="text-micro text-steel font-mono">
                 {isStale ? `Idle · last seen ${formatLastSeen(asset.lastSeen, now)}` : `Live: ${asset.velocityKmh} km/h`}
               </span>
             </div>
@@ -68,13 +68,13 @@ export default function FleetAssetList() {
               <button
                 onClick={() => void handleSnapAndSave(asset.driverName)}
                 disabled={isSaving}
-                className="flex items-center gap-1 text-[9px] bg-carbon/10 border border-carbon/30 hover:bg-carbon/20 text-carbon py-1 px-2 rounded disabled:opacity-50"
+                className="flex items-center gap-1 text-micro bg-carbon/10 border border-carbon/30 hover:bg-carbon/20 text-carbon py-1 px-2 rounded disabled:opacity-50"
               >
                 <Save size={10} strokeWidth={2.5} />
                 {isSaving ? 'Saving...' : 'Snap & save'}
               </button>
               {assetFeedback && (
-                <span className={`text-[9px] font-mono ${assetFeedback.ok ? 'text-tarp' : 'text-rust'}`}>
+                <span className={`text-micro font-mono ${assetFeedback.ok ? 'text-tarp' : 'text-rust'}`}>
                   {assetFeedback.message}
                 </span>
               )}

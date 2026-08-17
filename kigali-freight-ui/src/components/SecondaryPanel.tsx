@@ -60,8 +60,8 @@ export default function SecondaryPanel() {
                             key={tab.id}
                             type="button"
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[10px] font-bold uppercase tracking-wide border-b-2 transition-colors ${
-                                isActive ? 'text-route border-route' : 'text-steel border-transparent hover:text-paper'
+                            className={`focus-ring flex-1 flex items-center justify-center gap-1.5 py-3 text-micro font-semibold uppercase tracking-wide border-b-2 transition-colors ${
+                                isActive ? 'text-paper border-route' : 'text-steel border-transparent hover:text-paper'
                             }`}
                         >
                             <Icon size={13} strokeWidth={2.5} />

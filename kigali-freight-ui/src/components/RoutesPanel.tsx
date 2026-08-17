@@ -25,7 +25,7 @@ function BreadcrumbLoader({ onLoad, loading }: BreadcrumbLoaderProps) {
 
   return (
     <div className="space-y-1.5 bg-ink/60 p-2.5 rounded border border-line/10">
-      <div className="flex items-center gap-1.5 text-[9px] text-steel uppercase tracking-wider font-sans">
+      <div className="flex items-center gap-1.5 text-micro text-steel uppercase tracking-wider font-sans">
         <History size={11} strokeWidth={2.5} />
         Historical breadcrumbs
       </div>
@@ -33,7 +33,7 @@ function BreadcrumbLoader({ onLoad, loading }: BreadcrumbLoaderProps) {
         <select
           value={driverName}
           onChange={(e) => setDriverName(e.target.value)}
-          className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-[10px] text-paper font-sans"
+          className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-micro text-paper font-sans"
         >
           <option value="">Select driver</option>
           {savedDrivers.map((d) => (
@@ -47,13 +47,13 @@ function BreadcrumbLoader({ onLoad, loading }: BreadcrumbLoaderProps) {
           value={hours}
           onChange={(e) => setHours(Number(e.target.value))}
           title="Lookback window, hours"
-          className="w-14 shrink-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-[10px] text-paper font-mono text-center"
+          className="w-14 shrink-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-micro text-paper font-mono text-center"
         />
         <button
           type="button"
           onClick={() => onLoad(driverName, hours)}
           disabled={!driverName || loading}
-          className="shrink-0 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2 text-[10px] uppercase disabled:opacity-50"
+          className="shrink-0 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2 text-micro uppercase disabled:opacity-50"
         >
           {loading ? '...' : 'Load'}
         </button>
@@ -89,18 +89,18 @@ export default function RoutesPanel({
 }: RoutesPanelProps) {
   const { resolveDriverName } = useSocket();
   return (
-    <div className="bg-panel border border-line/10 p-3 rounded-md text-paper space-y-2 font-mono text-[11px]">
+    <div className="bg-panel border border-line/10 p-3 rounded-md text-paper space-y-2 font-mono text-data">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <Route size={12} strokeWidth={2.5} className="text-steel" />
-          <span className="text-paper font-bold font-sans text-xs">Committed routes ({routes.length})</span>
+          <span className="text-paper font-bold font-sans text-data">Committed routes ({routes.length})</span>
         </div>
-        {routesLoading && <span className="text-[9px] text-carbon animate-pulse">Syncing...</span>}
+        {routesLoading && <span className="text-micro text-carbon animate-pulse">Syncing...</span>}
       </div>
 
       <div className="max-h-32 overflow-y-auto space-y-1">
         {routes.length === 0 && (
-          <div className="text-steel text-center py-2 text-[11px] font-sans">No routes committed yet.</div>
+          <div className="text-steel text-center py-2 text-data font-sans">No routes committed yet.</div>
         )}
         {routes.map((rt) => {
           const isSelected = selectedPlaybackRoute?.id === rt.id;
@@ -119,7 +119,7 @@ export default function RoutesPanel({
               <span className={`truncate max-w-[150px] ${isSelected ? 'text-route' : 'text-steel'}`}>
                 Vehicle #{vId} - {dName}
               </span>
-              <span className="text-[10px] text-tarp bg-tarp/15 px-1 py-0.5 rounded border border-tarp/30 shrink-0">
+              <span className="text-micro text-tarp bg-tarp/15 px-1 py-0.5 rounded border border-tarp/30 shrink-0">
                 {dist} km
               </span>
             </button>
@@ -132,15 +132,15 @@ export default function RoutesPanel({
       {selectedPlaybackRoute && (
         <div className="space-y-2 bg-ink/60 p-2.5 rounded border border-line/10">
           {selectedPlaybackRoute.label && (
-            <div className="text-[10px] text-route font-bold font-sans truncate">{selectedPlaybackRoute.label}</div>
+            <div className="text-micro text-route font-bold font-sans truncate">{selectedPlaybackRoute.label}</div>
           )}
-          <div className="flex justify-between text-[10px] text-steel">
+          <div className="flex justify-between text-micro text-steel">
             <span>Progress: {playbackIndex} / {playbackCoords.length > 0 ? playbackCoords.length - 1 : 0} pts</span>
             <span className="text-tarp font-bold">{isPlaying ? 'PLAYING...' : 'PAUSED'}</span>
           </div>
           <button
             onClick={togglePlaybackPlay}
-            className={`w-full flex items-center justify-center gap-2 py-1.5 rounded text-xs font-bold uppercase tracking-wide transition-all ${isPlaying ? 'bg-hazard text-ink' : 'bg-tarp text-ink'}`}
+            className={`w-full flex items-center justify-center gap-2 py-1.5 rounded text-data font-bold uppercase tracking-wide transition-all ${isPlaying ? 'bg-hazard text-ink' : 'bg-tarp text-ink'}`}
           >
             {isPlaying ? <Pause size={13} strokeWidth={2.5} /> : <Play size={13} strokeWidth={2.5} />}
             {isPlaying ? 'Pause playback' : 'Start playback'}

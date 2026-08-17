@@ -4,7 +4,7 @@ import {
     fetchTrips, fetchTrip, createTrip, updateTrip, optimiseTrip, reorderTrip, fetchDrivers,
     type Trip, type TripStop, type TripSummary,
 } from '../utils/api';
-import type { StaffUser } from '../types';
+import { isAssignableDriver, type StaffUser } from '../types';
 import { useSocket } from '../context/SocketContext';
 import { useMapInteraction } from '../context/MapInteractionContext';
 import { useDialog } from './DialogProvider';
@@ -58,7 +58,13 @@ export default function TripsPanel() {
 
     useEffect(() => {
         if (!jwtToken) return;
-        fetchDrivers(jwtToken).then(setDrivers).catch(() => setDrivers([]));
+        // Same filter OrdersPanel applies. Planning a run assigns its
+        // orders, so this picker dispatches cargo just as surely as the
+        // queue's does — offering a driver here who is blocked there only
+        // produced a rejection after the dispatcher had picked the orders.
+        fetchDrivers(jwtToken)
+            .then((all) => setDrivers(all.filter(isAssignableDriver)))
+            .catch(() => setDrivers([]));
     }, [jwtToken]);
 
     // Opening a run here is what draws it on the map, so both go through
@@ -166,18 +172,18 @@ export default function TripsPanel() {
 
     return (
         <div className="bg-panel border border-line/10 p-3 rounded-md space-y-3">
-            <h3 className="flex items-center gap-1.5 text-[10px] font-bold text-steel uppercase tracking-wider">
+            <h3 className="flex items-center gap-1.5 text-micro font-bold text-steel uppercase tracking-wider">
                 <RouteIcon size={12} strokeWidth={2.5} />
                 Multi-stop runs
             </h3>
 
             {/* ── Plan a new run ─────────────────────────────────────── */}
             <div className="space-y-1.5">
-                <div className="text-[9px] font-mono uppercase tracking-wider text-steel">
+                <div className="text-micro font-mono uppercase tracking-wider text-steel">
                     Pick orders {selected.length > 0 ? `· ${selected.length} selected` : ''}
                 </div>
                 {plannable.length === 0 ? (
-                    <p className="text-[10px] text-steel">No pending orders to plan.</p>
+                    <p className="text-micro text-steel">No pending orders to plan.</p>
                 ) : (
                     <div className="max-h-[136px] overflow-y-auto space-y-1">
                         {plannable.map((order) => {
@@ -194,12 +200,12 @@ export default function TripsPanel() {
                                 >
                                     <span className={`w-3 h-3 shrink-0 rounded-sm border ${on ? 'bg-route border-route' : 'border-line/30'}`} />
                                     <span className="min-w-0 flex-1">
-                                        <span className="block text-[11px] text-paper font-bold truncate">{order.cargo_description}</span>
-                                        <span className="block text-[9px] font-mono text-steel truncate">
+                                        <span className="block text-data text-paper font-bold truncate">{order.cargo_description}</span>
+                                        <span className="block text-micro font-mono text-steel truncate">
                                             {order.delivery_address_text || order.origin_hub_name || 'No address yet'}
                                         </span>
                                     </span>
-                                    {order.priority === 'high' && <span className="text-[9px] font-mono font-bold text-rust">HIGH</span>}
+                                    {order.priority === 'high' && <span className="text-micro font-mono font-bold text-rust">HIGH</span>}
                                 </button>
                             );
                         })}
@@ -210,7 +216,7 @@ export default function TripsPanel() {
                     <select
                         value={driver}
                         onChange={(e) => setDriver(e.target.value)}
-                        className="flex-1 min-w-0 bg-ink border border-line/15 rounded px-1.5 py-1 text-[10px] text-paper"
+                        className="flex-1 min-w-0 bg-ink border border-line/15 rounded px-1.5 py-1 text-micro text-paper"
                     >
                         <option value="">Assign later</option>
                         {drivers.map((d) => (
@@ -221,7 +227,7 @@ export default function TripsPanel() {
                         type="button"
                         onClick={() => void plan()}
                         disabled={selected.length === 0 || busy === 'plan'}
-                        className="shrink-0 bg-route hover:bg-route-deep text-ink font-bold rounded px-3 text-[10px] uppercase disabled:opacity-40"
+                        className="shrink-0 bg-route hover:bg-route-deep text-ink font-bold rounded px-3 text-micro uppercase disabled:opacity-40"
                     >
                         {busy === 'plan' ? 'Planning…' : `Plan run`}
                     </button>
@@ -231,7 +237,7 @@ export default function TripsPanel() {
             {/* ── Existing runs ──────────────────────────────────────── */}
             <div className="space-y-1 border-t border-line/10 pt-2">
                 {trips.length === 0 ? (
-                    <p className="text-[10px] text-steel">No runs yet.</p>
+                    <p className="text-micro text-steel">No runs yet.</p>
                 ) : trips.map((t) => (
                     <button
                         key={t.id}
@@ -240,10 +246,10 @@ export default function TripsPanel() {
                         className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-ink/60 border border-line/10 hover:border-line/25 text-left"
                     >
                         <span className="min-w-0">
-                            <span className="block text-[11px] text-paper font-bold truncate">
+                            <span className="block text-data text-paper font-bold truncate">
                                 Run #{t.id} · {t.driver_username ? resolveDriverName(t.driver_username) : 'Unassigned'}
                             </span>
-                            <span className="block text-[9px] font-mono text-steel">
+                            <span className="block text-micro font-mono text-steel">
                                 {t.completed_stop_count}/{t.stop_count} stops · {km(t.planned_distance_m)}
                                 {t.failed_stop_count > 0 && <span className="text-rust"> · {t.failed_stop_count} failed</span>}
                             </span>
@@ -253,12 +259,12 @@ export default function TripsPanel() {
                                 leaving the map blank and the dispatcher
                                 wondering which of the two is broken. */}
                             {t.unplaced_stop_count > 0 && (
-                                <span className="block text-[9px] font-mono text-hazard">
+                                <span className="block text-micro font-mono text-hazard">
                                     {t.unplaced_stop_count} stop{t.unplaced_stop_count === 1 ? '' : 's'} need placing on the map
                                 </span>
                             )}
                         </span>
-                        <span className={`shrink-0 text-[9px] font-mono font-bold uppercase border rounded px-1.5 py-0.5 ${TRIP_STATUS_STYLE[t.status]}`}>
+                        <span className={`shrink-0 text-micro font-mono font-bold uppercase border rounded px-1.5 py-0.5 ${TRIP_STATUS_STYLE[t.status]}`}>
                             {t.status}
                         </span>
                     </button>
@@ -269,7 +275,7 @@ export default function TripsPanel() {
             {openTrip && (
                 <div className="border-t border-line/10 pt-2 space-y-2">
                     <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-paper">
+                        <span className="text-micro font-bold text-paper">
                             Run #{openTrip.id} · {openTrip.stopCount} stops · {km(openTrip.planned_distance_m)}
                         </span>
                         <button type="button" onClick={() => setOpenTrip(null)} className="text-steel hover:text-paper" aria-label="Close run">
@@ -278,7 +284,7 @@ export default function TripsPanel() {
                     </div>
 
                     {openTrip.stops.some((s) => s.lat == null || s.lng == null) && (
-                        <p className="text-[9px] font-mono text-hazard leading-relaxed">
+                        <p className="text-micro font-mono text-hazard leading-relaxed">
                             Some stops have no location, so they are missing from the map and the
                             optimiser cannot order them. Place their orders on the map from the
                             dispatch queue first.
@@ -288,26 +294,26 @@ export default function TripsPanel() {
                     <ol className="space-y-1">
                         {openTrip.stops.map((stop, index) => (
                             <li key={stop.id} className="flex items-start gap-1.5 bg-ink/60 border border-line/10 rounded px-2 py-1.5">
-                                <span className="mt-0.5 w-4 shrink-0 text-[10px] font-mono font-bold text-steel">{stop.sequence}</span>
+                                <span className="mt-0.5 w-4 shrink-0 text-micro font-mono font-bold text-steel">{stop.sequence}</span>
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-1.5">
-                                        <span className={`text-[9px] font-mono font-bold uppercase ${stop.kind === 'PICKUP' ? 'text-tarp' : 'text-carbon'}`}>
+                                        <span className={`text-micro font-mono font-bold uppercase ${stop.kind === 'PICKUP' ? 'text-tarp' : 'text-carbon'}`}>
                                             {stop.kind}
                                         </span>
-                                        <span className={`text-[9px] font-mono uppercase ${STOP_STATUS_STYLE[stop.status]}`}>{stop.status}</span>
+                                        <span className={`text-micro font-mono uppercase ${STOP_STATUS_STYLE[stop.status]}`}>{stop.status}</span>
                                     </span>
                                     {/* Placed-on-the-map stops have coordinates and no street text;
                                         saying "no address" there would send a dispatcher
                                         chasing a problem that does not exist. */}
-                                    <span className="block text-[10px] text-paper truncate">
+                                    <span className="block text-micro text-paper truncate">
                                         {stop.address_text
                                             || (stop.lat != null && stop.lng != null
                                                 ? `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}`
                                                 : 'No location — place it on the map')}
                                     </span>
-                                    <span className="block text-[9px] font-mono text-steel truncate">{stop.cargo_description}</span>
+                                    <span className="block text-micro font-mono text-steel truncate">{stop.cargo_description}</span>
                                     {stop.failure_reason && (
-                                        <span className="block text-[9px] text-rust">{stop.failure_reason}</span>
+                                        <span className="block text-micro text-rust">{stop.failure_reason}</span>
                                     )}
                                 </span>
                                 {/* Only stops still ahead of the driver can move. */}
@@ -332,23 +338,23 @@ export default function TripsPanel() {
                             <button type="button" onClick={() => void runAction('optimise', () => optimiseTrip(openTrip.id, jwtToken))}
                                 disabled={busy === 'optimise'}
                                 title="Re-order the stops still ahead, shortest first, keeping every pickup before its own drop"
-                                className="flex items-center gap-1 bg-ink border border-line/15 text-carbon rounded px-2 py-1 text-[10px] font-bold uppercase disabled:opacity-40">
+                                className="flex items-center gap-1 bg-ink border border-line/15 text-carbon rounded px-2 py-1 text-micro font-bold uppercase disabled:opacity-40">
                                 {busy === 'optimise' ? <Loader2 size={11} className="animate-spin" /> : <Wand2 size={11} />}
                                 Optimise
                             </button>
                             <button type="button" onClick={() => void assign(openTrip)} disabled={busy === 'assign'}
-                                className="bg-ink border border-line/15 text-carbon rounded px-2 py-1 text-[10px] font-bold uppercase disabled:opacity-40">
+                                className="bg-ink border border-line/15 text-carbon rounded px-2 py-1 text-micro font-bold uppercase disabled:opacity-40">
                                 {openTrip.driver_username ? 'Reassign' : 'Assign driver'}
                             </button>
                             {openTrip.status === 'PLANNED' && openTrip.driver_username && (
                                 <button type="button" onClick={() => void runAction('start', () => updateTrip(openTrip.id, { status: 'ACTIVE' }, jwtToken))}
                                     disabled={busy === 'start'}
-                                    className="flex items-center gap-1 bg-route text-ink rounded px-2 py-1 text-[10px] font-bold uppercase disabled:opacity-40">
+                                    className="flex items-center gap-1 bg-route text-ink rounded px-2 py-1 text-micro font-bold uppercase disabled:opacity-40">
                                     <Play size={10} /> Start
                                 </button>
                             )}
                             <button type="button" onClick={() => void cancel(openTrip)} disabled={busy === 'cancel'}
-                                className="bg-ink border border-rust/30 text-rust rounded px-2 py-1 text-[10px] font-bold uppercase disabled:opacity-40">
+                                className="bg-ink border border-rust/30 text-rust rounded px-2 py-1 text-micro font-bold uppercase disabled:opacity-40">
                                 Cancel run
                             </button>
                         </div>

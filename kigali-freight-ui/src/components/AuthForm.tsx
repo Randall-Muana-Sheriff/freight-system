@@ -38,22 +38,22 @@ export default function AuthForm() {
         <div className="p-6 space-y-4">
           <div className="flex flex-col items-center text-center pt-1 pb-1">
             <InziraWordmark />
-            <p className="text-[10px] text-steel uppercase font-mono tracking-wider mt-2">
+            <p className="text-micro text-steel uppercase font-mono tracking-wider mt-2">
               {mfaPending ? 'Two-Factor Verification' : 'Dispatch Control Access'}
             </p>
           </div>
 
           {authError && (
-            <div className="p-2 bg-rust/10 border border-rust/30 rounded text-[11px] text-rust font-mono">
+            <div className="p-2 bg-rust/10 border border-rust/30 rounded text-data text-rust font-mono">
               {authError}
             </div>
           )}
 
           {mfaPending ? (
-            <form onSubmit={handleVerifyMfa} className="space-y-3 text-xs">
+            <form onSubmit={handleVerifyMfa} className="space-y-3 text-data">
               {useRecoveryCode ? (
                 <div>
-                  <label htmlFor="auth-recovery-code" className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Recovery code</label>
+                  <label htmlFor="auth-recovery-code" className="text-micro text-steel uppercase font-mono tracking-wide block mb-1">Recovery code</label>
                   <input
                     id="auth-recovery-code"
                     type="text" value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value)} required autoFocus
@@ -62,7 +62,7 @@ export default function AuthForm() {
                 </div>
               ) : (
                 <div>
-                  <label htmlFor="auth-mfa-code" className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">6-digit code</label>
+                  <label htmlFor="auth-mfa-code" className="text-micro text-steel uppercase font-mono tracking-wide block mb-1">6-digit code</label>
                   <input
                     id="auth-mfa-code"
                     type="text" inputMode="numeric" maxLength={6} value={code}
@@ -74,7 +74,7 @@ export default function AuthForm() {
               <button type="submit" className="w-full py-2.5 bg-route hover:bg-route-deep font-bold uppercase rounded text-ink hover:text-paper tracking-wide transition-all mt-2">
                 Verify
               </button>
-              <div className="flex items-center justify-between text-[10px] font-mono">
+              <div className="flex items-center justify-between text-micro font-mono">
                 <button type="button" onClick={handleBack} className="flex items-center gap-1 text-steel hover:text-paper transition-colors">
                   <ArrowLeft size={11} strokeWidth={2.5} />
                   Back
@@ -89,9 +89,9 @@ export default function AuthForm() {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleSubmit} className="space-y-3 text-data">
               <div>
-                <label htmlFor="auth-username" className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Username</label>
+                <label htmlFor="auth-username" className="text-micro text-steel uppercase font-mono tracking-wide block mb-1">Username</label>
                 <input
                   id="auth-username"
                   type="text" value={username} onChange={(e) => setUsername(e.target.value)} required
@@ -99,7 +99,7 @@ export default function AuthForm() {
                 />
               </div>
               <div>
-                <label htmlFor="auth-password" className="text-[10px] text-steel uppercase font-mono tracking-wide block mb-1">Password</label>
+                <label htmlFor="auth-password" className="text-micro text-steel uppercase font-mono tracking-wide block mb-1">Password</label>
                 <input
                   id="auth-password"
                   type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
@@ -112,7 +112,7 @@ export default function AuthForm() {
             </form>
           )}
 
-          <p className="flex items-center gap-1.5 justify-center pt-3 border-t border-line/10 text-[10px] text-steel font-mono">
+          <p className="flex items-center gap-1.5 justify-center pt-3 border-t border-line/10 text-micro text-steel font-mono">
             <ShieldCheck size={12} strokeWidth={2.5} />
             Accounts are provisioned by an administrator.
           </p>

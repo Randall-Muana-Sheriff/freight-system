@@ -61,11 +61,11 @@ export default function FleetMap() {
           (which top out around z-index 650) so it never gets buried under
           tiles/markers/popups. */}
       <div className="absolute bottom-3 right-3 z-[1000] bg-panel/90 border border-line/15 rounded-md px-2.5 py-2 space-y-1 pointer-events-none">
-        <div className="text-[9px] font-mono uppercase tracking-wider text-carbon font-bold mb-1">Vehicle type</div>
+        <div className="text-micro font-mono uppercase tracking-wider text-carbon font-bold mb-1">Vehicle type</div>
         {VEHICLE_TYPE_LEGEND.map(({ name, glyph }) => (
           <div key={name} className="flex items-center gap-1.5">
             <div className="w-4 h-4 flex items-center justify-center" dangerouslySetInnerHTML={{ __html: glyph }} />
-            <span className="text-[10px] text-steel font-mono">{name}</span>
+            <span className="text-micro text-steel font-mono">{name}</span>
           </div>
         ))}
       </div>
@@ -96,7 +96,7 @@ export default function FleetMap() {
         {savedHubs.map((hub) => (
           <Marker key={`hub-${hub.id}`} position={[hub.lat, hub.lng]} icon={hubIcon}>
             <Popup>
-              <div className="text-xs font-mono text-slate-900">
+              <div className="text-data font-mono text-slate-900">
                 <div className="font-bold">{hub.name}</div>
                 <div className="text-slate-600 font-bold">{hub.code}</div>
               </div>
@@ -161,7 +161,7 @@ export default function FleetMap() {
                 }}
               >
                 <Popup>
-                  <div className="text-xs font-mono text-slate-900">
+                  <div className="text-data font-mono text-slate-900">
                     <div className="font-bold">{resolveDriverName(asset.driverName)}</div>
                     {asset.vehicleType && <div className="text-slate-500">{asset.vehicleType}</div>}
                     {isStale ? (
@@ -169,7 +169,7 @@ export default function FleetMap() {
                     ) : (
                       <div className="text-slate-600 font-bold">Speed: {asset.velocityKmh} km/h</div>
                     )}
-                    <div className="text-[10px] text-slate-400 mt-1">
+                    <div className="text-micro text-slate-400 mt-1">
                       {isSelected ? 'Trail shown — click marker again to hide' : 'Click marker to show movement trail'}
                     </div>
                   </div>
@@ -201,7 +201,7 @@ export default function FleetMap() {
                   icon={stopIcon(stop.sequence, isStopSettled(stop), stop.kind)}
                 >
                   <Popup>
-                    <div className="text-xs font-mono text-slate-900 space-y-1">
+                    <div className="text-data font-mono text-slate-900 space-y-1">
                       <div className="font-bold">
                         {stop.sequence}. {stop.kind === 'PICKUP' ? 'Collect' : 'Deliver'}
                       </div>
@@ -221,7 +221,7 @@ export default function FleetMap() {
         {newHubCoords && (
           <Marker position={newHubCoords} icon={flagIcon}>
             <Popup>
-              <div className="text-xs font-mono text-slate-900 font-bold">New hub location</div>
+              <div className="text-data font-mono text-slate-900 font-bold">New hub location</div>
             </Popup>
           </Marker>
         )}
@@ -230,7 +230,7 @@ export default function FleetMap() {
         {newOrderDeliveryCoords && (
           <Marker position={newOrderDeliveryCoords} icon={flagIcon}>
             <Popup>
-              <div className="text-xs font-mono text-slate-900 font-bold">New order delivery point</div>
+              <div className="text-data font-mono text-slate-900 font-bold">New order delivery point</div>
             </Popup>
           </Marker>
         )}
@@ -239,7 +239,7 @@ export default function FleetMap() {
         {dispatchLocation && (
           <Marker position={dispatchLocation} icon={flagIcon}>
             <Popup>
-              <div className="text-xs font-mono text-slate-900 font-bold">Dispatch target hub</div>
+              <div className="text-data font-mono text-slate-900 font-bold">Dispatch target hub</div>
             </Popup>
           </Marker>
         )}
@@ -251,7 +251,7 @@ export default function FleetMap() {
         {playbackCoords.length > 0 && playbackCoords[playbackIndex] && (
           <Marker position={playbackCoords[playbackIndex]} icon={truckIcon}>
             <Popup>
-              <div className="text-xs font-mono text-slate-900 font-bold">
+              <div className="text-data font-mono text-slate-900 font-bold">
                 Playback position {playbackIndex + 1} / {playbackCoords.length}
               </div>
             </Popup>

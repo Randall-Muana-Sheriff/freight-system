@@ -37,7 +37,7 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
             <button
                 type="button"
                 onClick={() => void handleToggle()}
-                className="flex items-center gap-1 text-[9px] text-steel hover:text-paper uppercase font-mono tracking-wide"
+                className="flex items-center gap-1 text-micro text-steel hover:text-paper uppercase font-mono tracking-wide"
             >
                 <History size={10} strokeWidth={2.5} />
                 {open ? 'Hide history' : 'History'}
@@ -45,7 +45,7 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
             {open && (
                 <div className="mt-1 space-y-1.5 border-l border-line/15 pl-2 overflow-x-hidden">
                     {loading ? (
-                        <div className="text-steel text-[9px] font-mono">Loading...</div>
+                        <div className="text-steel text-micro font-mono">Loading...</div>
                     ) : history && history.length > 0 ? (
                         history.map((h, idx) => (
                             // Three separate lines, not one run-on string — a full
@@ -54,7 +54,7 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
                             // forcing horizontal scroll instead of wrapping. Splitting
                             // by meaning (what changed / who / when) means each piece
                             // wraps independently and never needs to scroll sideways.
-                            <div key={idx} className="text-[9px] font-mono min-w-0">
+                            <div key={idx} className="text-micro font-mono min-w-0">
                                 <div className="text-paper break-words">
                                     {h.previous_status ? `${h.previous_status} → ` : ''}
                                     {h.new_status}
@@ -64,7 +64,7 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
                             </div>
                         ))
                     ) : (
-                        <div className="text-steel text-[9px] font-mono">No status changes logged yet.</div>
+                        <div className="text-steel text-micro font-mono">No status changes logged yet.</div>
                     )}
                 </div>
             )}

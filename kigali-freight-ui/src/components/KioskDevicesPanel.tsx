@@ -101,8 +101,8 @@ export default function KioskDevicesPanel() {
 
     return (
         <div className="space-y-4">
-            <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-[11px]">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-tight text-paper font-sans">
+            <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-data">
+                <h3 className="flex items-center gap-1.5 text-body font-bold tracking-tight text-paper font-sans">
                     <MonitorPlay size={14} strokeWidth={2.5} className="text-steel" />
                     Kiosk displays
                 </h3>
@@ -116,20 +116,20 @@ export default function KioskDevicesPanel() {
 
                 <form onSubmit={(e) => void handleCreate(e)} className="bg-ink/60 p-3.5 rounded border border-line/10 flex items-end gap-2.5 max-w-md">
                     <label className="block flex-1">
-                        <span className="block text-[8px] text-steel/70 uppercase tracking-wider mb-1">Label</span>
+                        <span className="block text-micro text-steel/70 uppercase tracking-wider mb-1">Label</span>
                         <input
                             type="text"
                             placeholder="e.g. Control Room"
                             required
                             value={label}
                             onChange={(e) => setLabel(e.target.value)}
-                            className="w-full min-w-0 bg-panel border border-line/15 rounded px-2 py-1.5 text-[11px] text-paper focus:outline-none focus:border-route transition-colors"
+                            className="w-full min-w-0 bg-panel border border-line/15 rounded px-2 py-1.5 text-data text-paper focus:outline-none focus:border-route transition-colors"
                         />
                     </label>
                     <button
                         type="submit"
                         disabled={creating}
-                        className="bg-route hover:bg-route-deep disabled:opacity-50 rounded px-4 py-1.5 text-[11px] font-bold text-ink hover:text-paper uppercase whitespace-nowrap"
+                        className="bg-route hover:bg-route-deep disabled:opacity-50 rounded px-4 py-1.5 text-data font-bold text-ink hover:text-paper uppercase whitespace-nowrap"
                     >
                         {creating ? '...' : 'Generate link'}
                     </button>
@@ -143,19 +143,19 @@ export default function KioskDevicesPanel() {
                             <button
                                 type="button"
                                 onClick={handleCopy}
-                                className="flex items-center gap-1 text-[10px] text-carbon hover:text-paper transition-colors shrink-0"
+                                className="flex items-center gap-1 text-micro text-carbon hover:text-paper transition-colors shrink-0"
                             >
                                 {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
                                 {copied ? 'Copied' : 'Copy'}
                             </button>
                         </div>
-                        <div className="text-steel text-[10px] font-sans">This link won&apos;t be shown again — open it on the display now, or copy it somewhere safe.</div>
+                        <div className="text-steel text-micro font-sans">This link won&apos;t be shown again — open it on the display now, or copy it somewhere safe.</div>
                     </div>
                 )}
             </div>
 
-            <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-[11px]">
-                <h3 className="text-sm font-bold tracking-tight text-paper font-sans">Active displays</h3>
+            <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3 font-mono text-data">
+                <h3 className="text-body font-bold tracking-tight text-paper font-sans">Active displays</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                     {activeDevices.length === 0 && <div className="text-steel text-center py-2 md:col-span-2">No kiosk displays yet.</div>}
                     {activeDevices.map((d) => {
@@ -164,10 +164,10 @@ export default function KioskDevicesPanel() {
                             <div key={d.id} className="bg-ink/60 p-2.5 rounded border border-line/10 flex justify-between items-center">
                                 <div>
                                     <div className="text-paper font-bold">{d.label}</div>
-                                    <div className="text-[9px] text-steel">Provisioned {new Date(d.createdAt).toLocaleDateString()}</div>
+                                    <div className="text-micro text-steel">Provisioned {new Date(d.createdAt).toLocaleDateString()}</div>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className={`flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wide ${isStale ? 'text-rust' : 'text-tarp'}`}>
+                                    <span className={`flex items-center gap-1.5 text-micro font-bold uppercase tracking-wide ${isStale ? 'text-rust' : 'text-tarp'}`}>
                                         <span className={`w-1.5 h-1.5 rounded-full ${isStale ? 'bg-rust' : 'bg-tarp'}`} />
                                         {d.lastSeenAt ? `Seen ${formatLastSeen(d.lastSeenAt, now)}` : 'Never connected'}
                                     </span>
@@ -175,7 +175,7 @@ export default function KioskDevicesPanel() {
                                         type="button"
                                         onClick={() => void handleRevoke(d.id)}
                                         disabled={revokingId === d.id}
-                                        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-rust hover:text-paper disabled:opacity-50 transition-colors whitespace-nowrap"
+                                        className="flex items-center gap-1 text-micro font-bold uppercase tracking-wide text-rust hover:text-paper disabled:opacity-50 transition-colors whitespace-nowrap"
                                     >
                                         <Trash2 size={11} strokeWidth={2.5} />
                                         {revokingId === d.id ? '...' : 'Revoke'}

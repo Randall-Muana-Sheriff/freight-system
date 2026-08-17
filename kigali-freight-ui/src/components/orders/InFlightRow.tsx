@@ -54,10 +54,10 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
         <div className="bg-ink/60 p-2.5 rounded border border-line/10 space-y-2">
             <div className="flex justify-between items-start gap-2">
                 <div className="min-w-0">
-                    <div className="text-paper font-bold text-[11px] truncate">{order.cargo_description}</div>
-                    <div className="text-[9px] text-steel font-mono">Awaiting pickup &middot; {resolveDriverName(order.assigned_to || '')}</div>
+                    <div className="text-paper font-bold text-data truncate">{order.cargo_description}</div>
+                    <div className="text-micro text-steel font-mono">Awaiting pickup &middot; {resolveDriverName(order.assigned_to || '')}</div>
                 </div>
-                <span className="shrink-0 text-[9px] font-mono font-bold uppercase text-carbon bg-carbon/10 border border-carbon/30 rounded px-1.5 py-0.5">
+                <span className="shrink-0 text-micro font-mono font-bold uppercase text-carbon bg-carbon/10 border border-carbon/30 rounded px-1.5 py-0.5">
                     {order.status}
                 </span>
             </div>
@@ -65,7 +65,7 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
                 <select
                     value={selectedDriver}
                     onChange={(e) => setSelectedDriver(e.target.value)}
-                    className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-[10px] text-paper"
+                    className="flex-1 min-w-0 bg-panel border border-line/15 rounded px-1.5 py-1 text-micro text-paper"
                 >
                     <option value="">Reassign to...</option>
                     {drivers.filter((d) => d.username !== order.assigned_to).map((d) => (
@@ -77,7 +77,7 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
                     onClick={() => void handleReassign()}
                     disabled={busy || !selectedDriver}
                     title="Reassign to selected driver"
-                    className="shrink-0 flex items-center gap-1 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2 text-[10px] uppercase disabled:opacity-50"
+                    className="shrink-0 flex items-center gap-1 bg-route hover:bg-route-deep text-ink hover:text-paper font-bold rounded px-2 text-micro uppercase disabled:opacity-50"
                 >
                     <Repeat size={10} strokeWidth={2.5} />
                 </button>
@@ -86,7 +86,7 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
                     onClick={() => void handleUnassign()}
                     disabled={busy}
                     title="Unassign — send back to dispatch queue"
-                    className="shrink-0 flex items-center gap-1 bg-panel border border-rust/40 text-rust font-bold rounded px-2 text-[10px] uppercase disabled:opacity-50"
+                    className="shrink-0 flex items-center gap-1 bg-panel border border-rust/40 text-rust font-bold rounded px-2 text-micro uppercase disabled:opacity-50"
                 >
                     <Undo2 size={10} strokeWidth={2.5} />
                 </button>

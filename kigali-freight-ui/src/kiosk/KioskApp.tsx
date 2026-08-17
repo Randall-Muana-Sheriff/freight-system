@@ -132,7 +132,7 @@ export default function KioskApp() {
 
     if (!token) {
         return (
-            <div className="h-screen w-screen flex items-center justify-center bg-ink text-steel text-sm font-mono">
+            <div className="h-screen w-screen flex items-center justify-center bg-ink text-steel text-body font-mono">
                 This screen isn&apos;t provisioned. Generate a kiosk link from Admin Control Center → Kiosk displays.
             </div>
         );

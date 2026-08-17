@@ -131,11 +131,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                         aria-describedby={dialog.body ? 'dialog-body' : undefined}
                         className="relative w-full max-w-md rounded-md border border-line/15 bg-panel p-5 shadow-2xl"
                     >
-                        <h2 id="dialog-title" className="font-sans text-sm font-bold tracking-tight text-paper">
+                        <h2 id="dialog-title" className="font-sans text-body font-bold tracking-tight text-paper">
                             {dialog.title}
                         </h2>
                         {dialog.body ? (
-                            <p id="dialog-body" className="mt-2 whitespace-pre-line font-mono text-[11px] leading-relaxed text-steel">
+                            <p id="dialog-body" className="mt-2 whitespace-pre-line font-mono text-data leading-relaxed text-steel">
                                 {dialog.body}
                             </p>
                         ) : null}
@@ -149,7 +149,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                                     if (e.key === 'Enter' && !(dialog.required && !value.trim())) close(value);
                                 }}
                                 placeholder={dialog.placeholder}
-                                className="mt-4 w-full rounded border border-line/20 bg-ink px-2.5 py-2 font-mono text-[11px] text-paper placeholder:text-steel/60 focus:border-route focus:outline-none"
+                                className="mt-4 w-full rounded border border-line/20 bg-ink px-2.5 py-2 font-mono text-data text-paper placeholder:text-steel/60 focus:border-route focus:outline-none"
                             />
                         ) : null}
 
@@ -158,7 +158,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                                 <button
                                     type="button"
                                     onClick={() => close(dialog.kind === 'prompt' ? null : false)}
-                                    className="rounded border border-line/15 px-3 py-1.5 font-mono text-[10px] font-bold uppercase text-steel hover:text-paper"
+                                    className="rounded border border-line/15 px-3 py-1.5 font-mono text-micro font-bold uppercase text-steel hover:text-paper"
                                 >
                                     {dialog.cancelLabel || 'Cancel'}
                                 </button>
@@ -168,8 +168,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                                 type="button"
                                 onClick={() => close(dialog.kind === 'prompt' ? value : true)}
                                 disabled={dialog.kind === 'prompt' && Boolean(dialog.required) && !value.trim()}
-                                className={`rounded px-3 py-1.5 font-mono text-[10px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${
-                                    danger ? 'bg-rust text-paper hover:bg-rust/85' : 'bg-route text-ink hover:bg-route-deep'
+                                className={`rounded px-3 py-1.5 font-mono text-micro font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${
+                                    danger ? 'bg-rust text-ink hover:bg-rust/85' : 'bg-route text-ink hover:bg-route-deep'
                                 }`}
                             >
                                 {dialog.confirmLabel || (dialog.kind === 'alert' ? 'OK' : 'Confirm')}
