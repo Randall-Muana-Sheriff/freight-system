@@ -15,6 +15,8 @@
     "db:migrate": "node bin/migrate.js",
     "seed:demo": "node ops/seed-demo-data.js",
     "seed:demo:clear": "node ops/seed-demo-data.js --clear",
+    "review:driver": "node ops/create-review-driver.js",
+    "review:driver:remove": "node ops/create-review-driver.js --remove",
     "build:info": "node bin/write-build-info.js",
     "db:migrate:down": "node bin/migrate-down.js",
     "backup:db": "node ops/backup-db.js",
