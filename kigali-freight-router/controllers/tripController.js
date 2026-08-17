@@ -225,7 +225,14 @@ export const TripController = {
                         u.full_name AS driver_full_name,
                         COUNT(s.id)::int AS stop_count,
                         COUNT(s.id) FILTER (WHERE s.status IN ('DONE','FAILED','SKIPPED'))::int AS completed_stop_count,
-                        COUNT(s.id) FILTER (WHERE s.status = 'FAILED')::int AS failed_stop_count
+                        COUNT(s.id) FILTER (WHERE s.status = 'FAILED')::int AS failed_stop_count,
+                        -- Stops with no coordinates. A run built from customer
+                        -- orders has none until a dispatcher places them, and
+                        -- such a run cannot be drawn on the map or meaningfully
+                        -- sequenced — nearest-neighbour has nothing to measure.
+                        -- Surfaced so that shows as a job to finish rather than
+                        -- as a map that quietly draws nothing.
+                        COUNT(s.id) FILTER (WHERE s.lat IS NULL OR s.lng IS NULL)::int AS unplaced_stop_count
                    FROM trips t
                    LEFT JOIN users u ON u.username = t.driver_username
                    LEFT JOIN trip_stops s ON s.trip_id = t.id

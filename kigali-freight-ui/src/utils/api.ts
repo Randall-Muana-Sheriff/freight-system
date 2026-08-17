@@ -445,6 +445,8 @@ export interface TripSummary {
     stop_count: number;
     completed_stop_count: number;
     failed_stop_count: number;
+    /** Stops with no coordinates yet — nothing to draw and nothing to sequence. */
+    unplaced_stop_count: number;
 }
 
 export async function fetchTrips(token: string): Promise<TripSummary[]> {

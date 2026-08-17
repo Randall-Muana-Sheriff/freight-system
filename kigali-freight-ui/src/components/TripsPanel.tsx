@@ -247,6 +247,16 @@ export default function TripsPanel() {
                                 {t.completed_stop_count}/{t.stop_count} stops · {km(t.planned_distance_m)}
                                 {t.failed_stop_count > 0 && <span className="text-rust"> · {t.failed_stop_count} failed</span>}
                             </span>
+                            {/* Customer orders arrive without coordinates, so a
+                                run planned from them has nothing to draw and
+                                nothing to sequence. Said here rather than
+                                leaving the map blank and the dispatcher
+                                wondering which of the two is broken. */}
+                            {t.unplaced_stop_count > 0 && (
+                                <span className="block text-[9px] font-mono text-hazard">
+                                    {t.unplaced_stop_count} stop{t.unplaced_stop_count === 1 ? '' : 's'} need placing on the map
+                                </span>
+                            )}
                         </span>
                         <span className={`shrink-0 text-[9px] font-mono font-bold uppercase border rounded px-1.5 py-0.5 ${TRIP_STATUS_STYLE[t.status]}`}>
                             {t.status}
@@ -266,6 +276,14 @@ export default function TripsPanel() {
                             <X size={13} />
                         </button>
                     </div>
+
+                    {openTrip.stops.some((s) => s.lat == null || s.lng == null) && (
+                        <p className="text-[9px] font-mono text-hazard leading-relaxed">
+                            Some stops have no location, so they are missing from the map and the
+                            optimiser cannot order them. Place their orders on the map from the
+                            dispatch queue first.
+                        </p>
+                    )}
 
                     <ol className="space-y-1">
                         {openTrip.stops.map((stop, index) => (
