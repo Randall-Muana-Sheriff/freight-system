@@ -45,6 +45,17 @@ function readStepParam() {
     return Number.isInteger(raw) && raw > 0 && raw < STEPS.length ? raw : 0;
 }
 
+// A question about the customer's need, in their language. Deliberately
+// not "priority": asked how important their delivery is, everybody says
+// very — asked when they need it, people answer honestly, because it is a
+// fact about their week rather than a status they are claiming.
+const NEEDED_BY = [
+    { value: 'today', label: 'Today' },
+    { value: 'tomorrow', label: 'Tomorrow' },
+    { value: 'this_week', label: 'This week' },
+    { value: 'flexible', label: "I'm flexible" },
+];
+
 const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
 export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -261,6 +272,9 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                     ['Deliver to', draft.deliveryAddress],
                                     ['Cargo', draft.cargoType],
                                     ['Weight', weightInput ? `${weightInput} kg` : ''],
+                                    ...(draft.neededBy
+                                        ? [['Needed', NEEDED_BY.find((o) => o.value === draft.neededBy)?.label ?? '']]
+                                        : []),
                                     ['Contact', `${draft.customerName} · ${draft.customerPhone}`],
                                     ...(draft.specialInstructions ? [['Notes', draft.specialInstructions]] : []),
                                 ].map(([term, value]) => (

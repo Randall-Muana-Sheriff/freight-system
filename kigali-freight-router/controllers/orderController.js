@@ -192,7 +192,11 @@ export const OrderController = {
                     customer_phone,
                     pickup_address_text,
                     delivery_address_text,
-                    special_instructions
+                    special_instructions,
+                    -- What the customer said about timing. Informs the
+                    -- dispatcher's priority call; deliberately does not set
+                    -- it (see add_order_needed_by.sql).
+                    needed_by
                 FROM orders
                 WHERE status = 'PENDING'
                 ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;
@@ -1004,6 +1008,47 @@ export const OrderController = {
     // downstream is coordinate-driven: the fleet map, nearest-driver
     // ranking, the ETA and the route-progress bar all stay dark until a
     // human says where this actually is. This is that step.
+    // PATCH /api/orders/:id/priority
+    //
+    // The dispatch queue has always sorted by priority, but nothing could
+    // change it after an order was created — so a customer ringing to say
+    // "this one is urgent" left the dispatcher looking at a lever they
+    // could not pull. This is that lever.
+    updateOrderPriority: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { priority } = req.body || {};
+
+            if (!ALLOWED_ORDER_PRIORITIES.includes(priority)) {
+                return fail(res, {
+                    status: 400,
+                    code: 'ORDERS_PRIORITY_INVALID',
+                    message: `Priority must be one of: ${ALLOWED_ORDER_PRIORITIES.join(', ')}.`,
+                });
+            }
+
+            const result = await pool.query(
+                `UPDATE orders SET priority = $2, updated_at = NOW() WHERE id = $1
+                 RETURNING id, priority, cargo_description`,
+                [id, priority]
+            );
+            if (result.rows.length === 0) {
+                return fail(res, { status: 404, code: 'ORDERS_NOT_FOUND', message: 'That order no longer exists.' });
+            }
+
+            await appendAuditLog({
+                actionType: 'ORDER_PRIORITY_CHANGED',
+                description: `Order #${id} set to ${priority} priority`,
+                username: req.user?.username || 'System',
+            });
+
+            return ok(res, result.rows[0]);
+        } catch (error) {
+            logError(req, 'Database error', error);
+            return fail(res, { status: 500, code: 'ORDERS_PRIORITY_FAILED', message: 'Could not change the priority.' });
+        }
+    },
+
     placeOrder: async (req, res) => {
         try {
             const { id } = req.params;

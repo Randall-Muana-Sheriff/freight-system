@@ -23,6 +23,9 @@ export interface OrderDraft {
     cargoType: string;
     weightKg: number;
     specialInstructions?: string;
+    /** When the customer needs it, in their terms. Informs the
+     *  dispatcher's priority call; it does not set priority itself. */
+    neededBy?: string;
     customerName: string;
     customerPhone: string;
     customerEmail?: string;

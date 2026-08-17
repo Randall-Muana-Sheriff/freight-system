@@ -102,6 +102,9 @@ export interface Order {
     pickup_address_text?: string | null;
     delivery_address_text?: string | null;
     special_instructions?: string | null;
+    // What the customer said about timing. Informs the dispatcher's
+    // priority decision rather than setting it — see the migration.
+    needed_by?: 'today' | 'tomorrow' | 'this_week' | 'flexible' | null;
 }
 
 export interface OrderActivityEvent {

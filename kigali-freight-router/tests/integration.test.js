@@ -823,6 +823,62 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(response.statusCode, 403);
     });
 
+    test('public: a booking records when the customer needs it, without setting priority', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Nyabugogo', deliveryAddress: 'Kicukiro centre',
+            cargoType: 'Perishables', weightKg: 40,
+            customerName: 'Urgency Test', customerPhone: '0788557111',
+            neededBy: 'today',
+        });
+        assert.equal(create.statusCode, 201);
+
+        const queue = await request(app).get('/api/orders/active').set('Authorization', `Bearer ${adminToken}`);
+        const row = queue.body.data.find((o) => o.tracking_token === create.body.data.trackingToken);
+        assert.equal(row.needed_by, 'today');
+        // The whole point: the customer's answer is information for the
+        // dispatcher, not a self-service way into the front of the queue.
+        assert.equal(row.priority, 'normal');
+
+        const bad = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'a', deliveryAddress: 'b', cargoType: 'Documents', weightKg: 1,
+            customerName: 'x', customerPhone: '0788557112', neededBy: 'immediately',
+        });
+        assert.equal(bad.statusCode, 400);
+        assert.equal(bad.body.error.code, 'INVALID_NEEDED_BY');
+    });
+
+    test('dispatch: priority can be changed after an order exists', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Gikondo', deliveryAddress: 'Remera',
+            cargoType: 'General goods', weightKg: 20,
+            customerName: 'Priority Test', customerPhone: '0788557113',
+        });
+        const queue = await request(app).get('/api/orders/active').set('Authorization', `Bearer ${adminToken}`);
+        const row = queue.body.data.find((o) => o.tracking_token === create.body.data.trackingToken);
+        assert.equal(row.priority, 'normal');
+
+        const raised = await request(app).patch(`/api/orders/${row.id}/priority`)
+            .set('Authorization', `Bearer ${adminToken}`).send({ priority: 'high' });
+        assert.equal(raised.statusCode, 200, JSON.stringify(raised.body));
+        assert.equal(raised.body.data.priority, 'high');
+
+        // The queue sorts on it, so a raised order has to actually move.
+        const after = await request(app).get('/api/orders/active').set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(after.body.data[0].priority, 'high');
+
+        const bogus = await request(app).patch(`/api/orders/${row.id}/priority`)
+            .set('Authorization', `Bearer ${adminToken}`).send({ priority: 'urgent' });
+        assert.equal(bogus.statusCode, 400);
+        assert.equal(bogus.body.error.code, 'ORDERS_PRIORITY_INVALID');
+
+        // A driver must not be able to promote their own workload.
+        const asDriver = await request(app).patch(`/api/orders/${row.id}/priority`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ priority: 'low' });
+        assert.equal(asDriver.statusCode, 403);
+    });
+
     test.after(async () => {
         await shutdownServices();
     });

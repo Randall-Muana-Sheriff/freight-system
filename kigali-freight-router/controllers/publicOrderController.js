@@ -26,6 +26,12 @@ function generateTrackingToken() {
     return `INZ-${out}`;
 }
 
+// What the customer is asked, in their own terms. Deliberately a question
+// about their need rather than a priority ranking: people answer "when do
+// you need it" honestly because it is a fact about their situation, and
+// answer "how important is this" with "very" every time.
+export const NEEDED_BY_OPTIONS = ['today', 'tomorrow', 'this_week', 'flexible'];
+
 export const CARGO_TYPES = [
     'General goods', 'Retail stock', 'Construction materials',
     'Perishables', 'Documents', 'Fragile / high-value', 'Other',
@@ -44,7 +50,7 @@ export const PublicOrderController = {
     // GET /api/public/cargo-types — the form's dropdown reads this so the
     // options and the validation below cannot drift apart.
     getCargoTypes(_req, res) {
-        return ok(res, { cargoTypes: CARGO_TYPES });
+        return ok(res, { cargoTypes: CARGO_TYPES, neededByOptions: NEEDED_BY_OPTIONS });
     },
 
     // POST /api/public/orders
@@ -58,6 +64,7 @@ export const PublicOrderController = {
             const customerEmail = cleanText(req.body?.customerEmail, LIMITS.email);
             const instructions = cleanText(req.body?.specialInstructions, LIMITS.instructions);
             const weightKg = Number(req.body?.weightKg);
+            const neededBy = cleanText(req.body?.neededBy, 20);
 
             if (!pickup || !delivery) {
                 return fail(res, { status: 400, code: 'MISSING_LOCATIONS', message: 'Pickup and delivery locations are both required.' });
@@ -67,6 +74,9 @@ export const PublicOrderController = {
             }
             if (!cargoType || !CARGO_TYPES.includes(cargoType)) {
                 return fail(res, { status: 400, code: 'INVALID_CARGO_TYPE', message: 'Choose a cargo type from the list.' });
+            }
+            if (neededBy && !NEEDED_BY_OPTIONS.includes(neededBy)) {
+                return fail(res, { status: 400, code: 'INVALID_NEEDED_BY', message: 'Choose when you need it from the list.' });
             }
             if (!isValidWeightKg(weightKg)) {
                 return fail(res, { status: 400, code: 'INVALID_WEIGHT', message: 'Weight must be a positive number up to 50000 kg.' });
@@ -89,11 +99,12 @@ export const PublicOrderController = {
                         `INSERT INTO orders
                             (cargo_description, weight_kg, status, source, tracking_token,
                              customer_name, customer_phone, customer_email,
-                             pickup_address_text, delivery_address_text, special_instructions)
-                         VALUES ($1, $2, 'PENDING', 'public', $3, $4, $5, $6, $7, $8, $9)
+                             pickup_address_text, delivery_address_text, special_instructions,
+                             needed_by)
+                         VALUES ($1, $2, 'PENDING', 'public', $3, $4, $5, $6, $7, $8, $9, $10)
                          RETURNING tracking_token AS "trackingToken"`,
                         [cargoType, weightKg, generateTrackingToken(), customerName, customerPhone,
-                         customerEmail, pickup, delivery, instructions]
+                         customerEmail, pickup, delivery, instructions, neededBy]
                     );
                     created = result.rows[0];
                 } catch (err) {

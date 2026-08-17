@@ -228,6 +228,12 @@ export async function placeOrderOnMap(
     return apiFetch(`/api/orders/${orderId}/place`, { method: 'PATCH', token, body: coords });
 }
 
+// The dispatch queue sorts by priority, but until now nothing could change
+// it after an order was created.
+export async function setOrderPriority(orderId: number, priority: 'high' | 'normal' | 'low', token: string) {
+    return apiFetch(`/api/orders/${orderId}/priority`, { method: 'PATCH', token, body: { priority } });
+}
+
 export async function fetchNearestDrivers(orderId: number, token: string): Promise<{ recommendedDrivers?: DriverSuggestion[] }> {
     return apiFetch(`/api/orders/${orderId}/nearest-drivers`, { method: 'GET', token }) as Promise<{ recommendedDrivers?: DriverSuggestion[] }>;
 }

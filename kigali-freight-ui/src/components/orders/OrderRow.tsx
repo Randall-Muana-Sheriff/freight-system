@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Send, Navigation, MapPin } from 'lucide-react';
-import { assignOrders, fetchNearestDrivers, placeOrderOnMap } from '../../utils/api';
+import { assignOrders, fetchNearestDrivers, placeOrderOnMap, setOrderPriority } from '../../utils/api';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
 import { describeDriverChecks } from '../../types';
@@ -18,6 +18,15 @@ interface OrderRowProps {
 // existing status badge — this card already shows one badge (status);
 // stacking a second same-style badge right beside it would read as one
 // crowded, hard-to-parse label instead of two distinct signals.
+// The customer's own words, not a rank — shown to the dispatcher as
+// context for the priority they then choose themselves.
+const NEEDED_BY_LABEL: Record<string, string> = {
+    today: 'today',
+    tomorrow: 'tomorrow',
+    this_week: 'this week',
+    flexible: 'no rush',
+};
+
 const PRIORITY_BORDER: Record<'high' | 'normal' | 'low', string> = {
     high: 'border-l-rust',
     normal: 'border-l-carbon',
@@ -32,6 +41,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
         beginPlacement, cancelPlacement,
     } = useMapInteraction();
     const [placing, setPlacing] = useState(false);
+    const [changingPriority, setChangingPriority] = useState(false);
     const [selectedDriver, setSelectedDriver] = useState('');
     const [suggestions, setSuggestions] = useState<DriverSuggestion[] | null>(null);
     const [assigning, setAssigning] = useState(false);
@@ -68,6 +78,18 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isThisOrder, placementPickup, placementDelivery]);
 
+    const handlePriority = async (next: string) => {
+        setChangingPriority(true);
+        try {
+            await setOrderPriority(order.id, next as 'high' | 'normal' | 'low', jwtToken);
+            onAssigned(); // refreshes the queue, which re-sorts on priority
+        } catch (err) {
+            void alert({ title: 'Could not change the priority', body: (err as Error).message || 'Please try again.', tone: 'danger' });
+        } finally {
+            setChangingPriority(false);
+        }
+    };
+
     const handleAssign = async () => {
         if (!selectedDriver) return;
         setAssigning(true);
@@ -97,9 +119,31 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                         )}
                     </div>
                 </div>
-                <span className="shrink-0 text-[9px] font-mono font-bold uppercase text-hazard bg-hazard/10 border border-hazard/30 rounded px-1.5 py-0.5">
-                    {order.status}
-                </span>
+                <div className="shrink-0 flex items-center gap-1.5">
+                    {/* The queue sorts on this, so it belongs where the
+                        sorting is looked at rather than behind a detail
+                        view. A customer's stated timing sits in the block
+                        below; this is the dispatcher's own call. */}
+                    <select
+                        value={priority}
+                        disabled={changingPriority}
+                        onChange={(e) => void handlePriority(e.target.value)}
+                        title="Change priority — the dispatch queue sorts on this"
+                        aria-label={`Priority for ${order.cargo_description}`}
+                        className={`bg-panel border rounded px-1 py-0.5 text-[9px] font-mono font-bold uppercase disabled:opacity-50 ${
+                            priority === 'high' ? 'border-rust/50 text-rust'
+                                : priority === 'low' ? 'border-line/15 text-steel'
+                                : 'border-line/15 text-carbon'
+                        }`}
+                    >
+                        <option value="high">HIGH</option>
+                        <option value="normal">NORMAL</option>
+                        <option value="low">LOW</option>
+                    </select>
+                    <span className="text-[9px] font-mono font-bold uppercase text-hazard bg-hazard/10 border border-hazard/30 rounded px-1.5 py-0.5">
+                        {order.status}
+                    </span>
+                </div>
             </div>
 
             {/* A customer-submitted order carries no coordinates and no hub
@@ -130,6 +174,12 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                                     {order.customer_phone}
                                 </a>
                             ) : null}
+                        </div>
+                    ) : null}
+                    {order.needed_by ? (
+                        <div className="text-[10px] text-paper">
+                            <span className="text-steel">Needed </span>
+                            {NEEDED_BY_LABEL[order.needed_by]}
                         </div>
                     ) : null}
                     {order.special_instructions ? (
