@@ -99,12 +99,27 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        // Ground only, no image. components/BrandEntry.tsx draws the mark
-        // itself as the app opens, and a static copy here would show the
-        // finished mark first and then have it vanish so the animated one
-        // could draw it again. Both screens are this same flat colour, so
-        // the handoff from native splash to JS has nothing to flash.
+        // Ground only. components/BrandEntry.tsx draws the mark itself as
+        // the app opens, and a static copy here would show the finished
+        // mark, hide it, and have the animation draw it again.
+        //
+        // The image cannot simply be dropped to get that. Android 12+
+        // replaced the old splash with the system SplashScreen API, and
+        // this plugin always writes windowSplashScreenAnimatedIcon =
+        // @drawable/splashscreen_logo together with
+        // windowSplashScreenBehavior = icon_preferred — whether or not an
+        // image was configured. Omitting one deletes the drawables while
+        // leaving styles.xml pointing at them, which fails the Android
+        // build on a missing resource; and icon_preferred means the system
+        // would show the launcher icon regardless. A transparent icon is
+        // what actually produces a bare coloured ground.
+        //
+        // Both screens are then this same flat colour, so the handoff from
+        // native splash to JS has nothing to flash.
         backgroundColor: '#050C18',
+        image: './assets/splash-blank.png',
+        imageWidth: 200,
+        resizeMode: 'contain',
       },
     ],
     [
