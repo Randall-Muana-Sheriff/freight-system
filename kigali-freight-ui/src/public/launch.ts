@@ -28,6 +28,32 @@ export const LAUNCH_LABEL = 'November 2026';
 // LAUNCH_DATE passes, after which the real site takes over on its own.
 export const COUNTDOWN_ENABLED = true;
 
+// The countdown is for the public internet, not for us. Holding a
+// developer behind it means either working on the site through /preview
+// or editing this file to work and remembering to revert it — and the
+// second one eventually ships a flipped flag by accident.
+//
+// So the switch above is scoped to hosts a visitor could actually reach.
+// The test is inverted deliberately: a host is exempt only if it is
+// recognisably a machine of ours, and anything unrecognised gets the
+// countdown. Forgetting to exempt a dev box shows us a holding page;
+// forgetting to include some real hostname would open the site early to
+// customers, which is the more expensive mistake.
+function isLocalHost(hostname: string) {
+    return hostname === 'localhost'
+        || hostname === '127.0.0.1'
+        || hostname === '[::1]'
+        || hostname === '0.0.0.0'
+        || hostname.endsWith('.local')
+        // Private LAN ranges — a phone or another laptop opening the dev
+        // server over Wi-Fi is still us testing, not a visitor.
+        || /^10\./.test(hostname)
+        || /^192\.168\./.test(hostname)
+        || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+}
+
 export function isPreLaunch(now: Date = new Date()) {
-    return COUNTDOWN_ENABLED && now.getTime() < LAUNCH_DATE.getTime();
+    if (!COUNTDOWN_ENABLED) return false;
+    if (typeof window !== 'undefined' && isLocalHost(window.location.hostname)) return false;
+    return now.getTime() < LAUNCH_DATE.getTime();
 }
