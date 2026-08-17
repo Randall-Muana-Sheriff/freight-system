@@ -130,6 +130,28 @@ body, html, #root {
   z-index: 1;
 }
 
+/* Leaflet's own stylesheet sets .leaflet-container's background to #ddd,
+   and that grey is what shows through the hairline gaps the browser leaves
+   between raster tiles when a pan or zoom lands on a fractional pixel
+   offset. Against the CARTO dark basemap those gaps read as bright white
+   lines straight across the map. Nothing is wrong with the tiles — it is
+   the backdrop behind them, so the fix is to darken the backdrop rather
+   than fight the rounding.
+
+   The class is doubled deliberately. leaflet.css is imported from
+   mapIcons.ts, so Vite emits it *after* this file, and a plain
+   .leaflet-container rule here loses to Leaflet's on source order despite
+   being ours — verified in the built bundle, where #ddd came second. The
+   extra class raises specificity so the outcome no longer depends on which
+   module happened to import what first.
+
+   Matched to the basemap's own land colour rather than --color-ink, so a
+   seam falls between two near-identical darks instead of between the map
+   and the app's slightly different black. */
+.leaflet-container.leaflet-container {
+  background: #12161a;
+}
+
 @utility text-xxs {
   font-size: 0.68rem;
 }
