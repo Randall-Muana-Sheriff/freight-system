@@ -26,7 +26,10 @@ export const LAUNCH_LABEL = 'November 2026';
 //
 // Flip to false to open the site early; true holds the countdown until
 // LAUNCH_DATE passes, after which the real site takes over on its own.
-export const COUNTDOWN_ENABLED = true;
+// Flipped off: the site is open. LAUNCH_DATE above is left as it was
+// rather than moved or faked — this switch exists precisely so opening
+// early does not mean losing the real date.
+export const COUNTDOWN_ENABLED = false;
 
 // The countdown is for the public internet, not for us. Holding a
 // developer behind it means either working on the site through /preview
