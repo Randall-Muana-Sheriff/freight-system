@@ -5,7 +5,7 @@ import { uploadDriverDocument, toSignedUrl, assertRealFileType } from '../config
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { analyzeDriverDocument } from '../services/documentAnalysisService.js';
-import { REQUIRED_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { REQUIRED_DOCUMENT_TYPES, DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
 
 // Three of the five documents describe the truck, not the person, and now
@@ -96,7 +96,14 @@ export async function drainPendingDocumentAnalyses(timeoutMs = 5000) {
     }
 }
 
-async function analyzeAndStoreDocumentInsights({ documentId, buffer, mimeType, documentLabel, username, uploadedAt }) {
+// `table` is passed in rather than assumed: since vehicle paperwork moved to
+// vehicle_documents, the two tables have independent id sequences, and this
+// wrote every result back to driver_documents regardless. For a vehicle
+// document that matched nothing, so the analysis was discarded and the only
+// trace was the "re-uploaded before this call finished" warning below —
+// which would have been actively misleading, because nobody had re-uploaded
+// anything. Caller resolves the table; the value is never request input.
+async function analyzeAndStoreDocumentInsights({ table, documentId, buffer, mimeType, documentLabel, username, uploadedAt }) {
     try {
         const userResult = await pool.query(`SELECT full_name AS "fullName" FROM users WHERE username = $1`, [username]);
         const driverFullName = userResult.rows[0]?.fullName || username;
@@ -112,7 +119,7 @@ async function analyzeAndStoreDocumentInsights({ documentId, buffer, mimeType, d
         // match (0 rows updated, no error, no logged sign anything was
         // wrong). Comparing text representations sidesteps that entirely.
         const updateResult = await pool.query(
-            `UPDATE driver_documents SET ai_analysis = $1, ai_analyzed_at = NOW()
+            `UPDATE ${table} SET ai_analysis = $1, ai_analyzed_at = NOW()
              WHERE id = $2 AND uploaded_at::text = $3::text`,
             [JSON.stringify(analysis), documentId, uploadedAt]
         );
@@ -137,12 +144,20 @@ export const DriverDocumentController = {
             // simply gets no rows from the second half, so the three vehicle
             // documents show as not submitted — which is accurate, since
             // there is no truck for them to describe yet.
+            //
+            // The driver half is restricted to the types that actually
+            // belong to a person. When vehicle paperwork moved to
+            // vehicle_documents the migration deliberately left the old rows
+            // in driver_documents, on the understanding that the service
+            // layer would stop reading them — this query did not, and since
+            // the two halves are keyed by document type below, the stale
+            // driver-held copy silently shadowed the vehicle's real one.
             const result = await pool.query(
                 `SELECT id, document_type AS "documentType", file_url AS "fileUrl", status,
                         rejection_reason AS "rejectionReason", uploaded_at AS "uploadedAt",
                         reviewed_at AS "reviewedAt", expires_at AS "expiresAt"
                    FROM driver_documents
-                  WHERE username = $1
+                  WHERE username = $1 AND document_type = ANY($2::text[])
                   UNION ALL
                  SELECT vd.id, vd.document_type, vd.file_url, vd.status,
                         vd.rejection_reason, vd.uploaded_at,
@@ -151,7 +166,7 @@ export const DriverDocumentController = {
                    JOIN fleet_vehicles fv ON fv.id = vd.vehicle_id
                    JOIN users u ON u.id = fv.current_driver_id
                   WHERE u.username = $1 AND fv.status = 'ACTIVE';`,
-                [username]
+                [username, DRIVER_DOCUMENT_TYPES]
             );
             const byType = Object.fromEntries(result.rows.map((row) => [row.documentType, row]));
 
@@ -314,6 +329,7 @@ export const DriverDocumentController = {
             const realType = assertRealFileType(req.file.buffer, ['image/jpeg', 'image/png', 'application/pdf']);
             trackPendingAnalysis(
                 analyzeAndStoreDocumentInsights({
+                    table: target.table,
                     documentId: doc.id,
                     buffer: req.file.buffer,
                     mimeType: realType,
@@ -359,6 +375,15 @@ export const DriverDocumentController = {
             // halves in place instead would not work either: it sorts each
             // branch separately and the reviewer gets driver documents
             // interleaved by nothing in particular.
+            //
+            // The driver half is restricted to person-held types for the
+            // same reason getMyDocuments is, but the consequence here was
+            // worse than a duplicate row: the queue listed every vehicle
+            // document twice, once as the superseded driver_documents copy
+            // the migration left behind, and approving that copy cleared
+            // nothing. Verification reads vehicle_documents for those types,
+            // so a reviewer could work the queue to empty and the driver
+            // would still be blocked from dispatch with no visible reason.
             const result = await pool.query(
                 `SELECT * FROM (
                     SELECT id, username, 'driver' AS "holderKind", NULL::text AS "plateNumber",
@@ -367,6 +392,7 @@ export const DriverDocumentController = {
                            reviewed_by AS "reviewedBy", reviewed_at AS "reviewedAt", expires_at AS "expiresAt",
                            ai_analysis AS "aiAnalysis", ai_analyzed_at AS "aiAnalyzedAt"
                       FROM driver_documents
+                     WHERE document_type = ANY($1::text[])
                      UNION ALL
                     SELECT vd.id, COALESCE(u.username, vd.uploaded_by), 'vehicle', fv.plate_number,
                            vd.document_type, vd.file_url, vd.status,
@@ -377,7 +403,8 @@ export const DriverDocumentController = {
                       JOIN fleet_vehicles fv ON fv.id = vd.vehicle_id
                       LEFT JOIN users u ON u.id = fv.current_driver_id
                  ) documents
-                 ORDER BY (status = 'pending') DESC, "uploadedAt" DESC;`
+                 ORDER BY (status = 'pending') DESC, "uploadedAt" DESC;`,
+                [DRIVER_DOCUMENT_TYPES]
             );
             const rows = await Promise.all(result.rows.map(async (row) => ({
                 ...row,

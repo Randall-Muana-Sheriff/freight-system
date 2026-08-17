@@ -23,11 +23,13 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import pool from '../config/db.js';
 // Imported rather than listed again here. A driver only counts as verified
-// when *every* required document is approved, so a seeder holding its own
-// copy of that list silently produces drivers the dispatcher cannot assign
-// the moment the two fall out of step — which is exactly what happened when
-// this file hardcoded four of the five.
-import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+// when every required document is approved, and the two lists are kept apart
+// because they live in different tables — the person's papers against the
+// driver, the truck's against the vehicle. A seeder holding its own copy of
+// either list silently produces drivers the dispatcher cannot assign the
+// moment the two fall out of step, which is exactly what happened when this
+// file hardcoded four of the five.
+import { DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
 // Demo drivers all share this PIN so the app can be opened as any of them
 // during a walkthrough. Fine for a laptop, which is the only place this
@@ -172,7 +174,10 @@ async function clearDemoData(client) {
     // is invented. Only the account row itself is spared below.
     const allDemoDrivers = DRIVERS.map((d) => d.username);
     const usernames = DRIVERS.filter((d) => !d.existing).map((d) => d.username);
-    await client.query('TRUNCATE orders, trips, trip_stops, order_status_logs, delivery_confirmations, geofence_alerts, contact_messages, driver_safety_checklists, fleet_vehicles, system_audit_logs RESTART IDENTITY CASCADE');
+    // vehicle_documents is listed rather than left to CASCADE from
+    // fleet_vehicles, so the fact that clearing the demo fleet also clears
+    // its paperwork is visible here instead of implied by a foreign key.
+    await client.query('TRUNCATE orders, trips, trip_stops, order_status_logs, delivery_confirmations, geofence_alerts, contact_messages, driver_safety_checklists, fleet_vehicles, vehicle_documents, system_audit_logs RESTART IDENTITY CASCADE');
     await client.query('DELETE FROM driver_documents WHERE username = ANY($1::text[])', [allDemoDrivers]);
     await client.query('DELETE FROM users WHERE username = ANY($1::text[]) AND username <> ALL($2::text[])', [usernames, PROTECTED_USERS]);
     console.log('🧹 Demo data cleared.');
@@ -214,20 +219,36 @@ async function seed() {
             driver.id = user.id;
 
             const capacity = { 'Heavy Hauler': 12000, 'Medium Truck': 5000, 'Light Van': 1200 }[driver.type];
-            await client.query(
+            const vehicle = await client.query(
                 `INSERT INTO fleet_vehicles (plate_number, vehicle_type, current_driver_id, status, max_weight_kg, max_range_km, created_at)
-                 VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6)`,
+                 VALUES ($1, $2, $3, 'ACTIVE', $4, $5, $6) RETURNING id`,
                 [driver.plate, driver.type, driver.id, capacity, between(200, 600), workingMoment(between(40, 120), 10)]
             );
+            const vehicleId = vehicle.rows[0].id;
 
             // A driver who has been working for weeks has their paperwork in.
-            for (const doc of REQUIRED_DOCUMENT_TYPES) {
+            //
+            // Two documents describe the person and three describe the truck,
+            // and they live in different tables — putting all five against the
+            // driver, as this once did, leaves three rows the verification
+            // service does not read and a duplicate of every vehicle document
+            // in the admin's review queue.
+            for (const doc of DRIVER_DOCUMENT_TYPES) {
                 await client.query(
                     `INSERT INTO driver_documents (username, document_type, file_url, status, uploaded_at, reviewed_by, reviewed_at)
                      VALUES ($1, $2, $3, 'approved', $4, 'peter', $5)
                      ON CONFLICT (username, document_type) DO NOTHING`,
                     [driver.username, doc, `demo/${driver.username}/${doc}.jpg`,
                      workingMoment(between(25, 60), 11), workingMoment(between(20, 24), 14)]
+                );
+            }
+            for (const doc of VEHICLE_DOCUMENT_TYPES) {
+                await client.query(
+                    `INSERT INTO vehicle_documents (vehicle_id, document_type, file_url, status, uploaded_at, uploaded_by, reviewed_by, reviewed_at)
+                     VALUES ($1, $2, $3, 'approved', $4, $5, 'peter', $6)
+                     ON CONFLICT (vehicle_id, document_type) DO NOTHING`,
+                    [vehicleId, doc, `demo/${driver.plate.replace(/\s+/g, '')}/${doc}.jpg`,
+                     workingMoment(between(25, 60), 11), driver.username, workingMoment(between(20, 24), 14)]
                 );
             }
         }
