@@ -8,6 +8,7 @@ import { createHub, updateHub, deleteHub } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import { useAsyncAction, useKeyedAsyncAction } from '../hooks/useAsyncAction';
 import type { Hub, LatLng } from '../types';
+import { useDialog } from './DialogProvider';
 
 interface HubsPanelProps {
     hubTargetMode: boolean;
@@ -19,6 +20,7 @@ interface HubsPanelProps {
 const EMPTY_FORM = { name: '', code: '' };
 
 export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoords, clearNewHubCoords }: HubsPanelProps) {
+    const { confirm } = useDialog();
     const { jwtToken, savedHubs, refreshFeeds } = useSocket();
     const [form, setForm] = useState(EMPTY_FORM);
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -71,7 +73,12 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
     };
 
     const handleDelete = async (hub: Hub) => {
-        if (!confirm(`Delete hub "${hub.name}"? This can't be undone.`)) return;
+        if (!(await confirm({
+            title: `Delete hub ${hub.name}?`,
+            body: "This can't be undone.",
+            confirmLabel: 'Delete',
+            tone: 'danger',
+        }))) return;
         await runDelete(hub.id, async () => {
             await deleteHub(hub.id, jwtToken);
             void refreshFeeds();

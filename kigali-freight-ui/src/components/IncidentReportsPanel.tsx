@@ -6,6 +6,7 @@ import { ClipboardList, Eye, CheckCheck, AlertTriangle, Sparkles, Package } from
 import { useSocket } from '../context/SocketContext';
 import { updateIncidentStatus } from '../utils/api';
 import { isUrgentIncident } from '../utils/incidentSeverity';
+import { useDialog } from './DialogProvider';
 
 const RESOLVED_VISIBLE_MS = 30 * 60 * 1000;
 
@@ -37,6 +38,7 @@ function stagePhrase(status?: string | null) {
 }
 
 export default function IncidentReportsPanel() {
+    const { alert } = useDialog();
     const { incidentReports, jwtToken, resolveDriverName, setViewingImage } = useSocket();
     const [busyId, setBusyId] = useState<number | null>(null);
 
@@ -62,7 +64,7 @@ export default function IncidentReportsPanel() {
         try {
             await updateIncidentStatus(id, status, jwtToken);
         } catch (err) {
-            alert((err as Error).message || 'Failed to update incident status.');
+            void alert({ title: 'Could not update the incident', body: (err as Error).message || 'Failed to update incident status.', tone: 'danger' });
         } finally {
             setBusyId(null);
         }

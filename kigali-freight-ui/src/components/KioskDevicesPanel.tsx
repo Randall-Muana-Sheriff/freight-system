@@ -9,6 +9,7 @@ import { createKioskDevice, listKioskDevices, revokeKioskDevice, type CreateKios
 import { useSocket } from '../context/SocketContext';
 import { formatLastSeen, useNow } from '../utils/telemetryFreshness';
 import type { KioskDevice } from '../types';
+import { useDialog } from './DialogProvider';
 
 // The kiosk frontend heartbeats every 3 minutes (see KioskApp.tsx) — this
 // is deliberately looser than that (enough room for one or two missed
@@ -18,6 +19,7 @@ import type { KioskDevice } from '../types';
 const KIOSK_STALE_AFTER_MS = 10 * 60 * 1000;
 
 export default function KioskDevicesPanel() {
+    const { confirm } = useDialog();
     const { jwtToken, userRole } = useSocket();
     const now = useNow(30 * 1000);
     const [devices, setDevices] = useState<KioskDevice[]>([]);
@@ -74,7 +76,12 @@ export default function KioskDevicesPanel() {
     };
 
     const handleRevoke = async (id: number) => {
-        if (!window.confirm('Revoke this display? It will lose access on its next data refresh.')) return;
+        if (!(await confirm({
+            title: 'Revoke this display?',
+            body: 'It will lose access on its next data refresh.',
+            confirmLabel: 'Revoke',
+            tone: 'danger',
+        }))) return;
         setRevokingId(id);
         try {
             await revokeKioskDevice(id, jwtToken);

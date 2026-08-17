@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { FileCheck, Check, X, Eye, RotateCcw, Sparkles, ShieldCheck } from 'lucide-react';
 import { fetchDriverDocuments, updateDriverDocumentStatus } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
+import { useDialog } from './DialogProvider';
 
 type DocumentType = 'national_id' | 'drivers_license' | 'vehicle_registration' | 'insurance_certificate' | 'roadworthiness_certificate';
 type DocumentStatus = 'approved' | 'rejected' | 'pending' | 'not_submitted';
@@ -81,6 +82,7 @@ function groupByDriver(rows: DriverDocument[]): Record<string, Partial<Record<Do
 }
 
 export default function DriverDocumentReview() {
+    const { confirm } = useDialog();
     const { jwtToken, userRole, setViewingImage, resolveDriverName } = useSocket();
     const [rows, setRows] = useState<DriverDocument[]>([]);
     const [loading, setLoading] = useState(false);
@@ -130,9 +132,12 @@ export default function DriverDocumentReview() {
     // confirm() step exists specifically so that's a deliberate choice,
     // not a misclick.
     const handleRevoke = async (id: number, driverLabel: string, docLabel: string) => {
-        const confirmed = window.confirm(
-            `${docLabel} for ${driverLabel} is already approved. Revoking it will mark them unverified again until they resubmit and it's re-approved. Continue?`
-        );
+        const confirmed = await confirm({
+            title: 'Revoke this approval?',
+            body: `${docLabel} for ${driverLabel} is already approved. Revoking it will mark them unverified again until they resubmit and it's re-approved. Continue?`,
+            confirmLabel: 'Revoke',
+            tone: 'danger',
+        });
         if (!confirmed) return;
 
         const rejectionReason = window.prompt('Reason for revoking this approval (shown to the driver):');
@@ -156,7 +161,12 @@ export default function DriverDocumentReview() {
     // screen into a window.prompt(). Still one explicit confirm, since
     // rejecting is still a real decision the AI doesn't get to make alone.
     const handleRejectWithAiReason = async (id: number, reason: string) => {
-        if (!window.confirm(`Reject this document using the AI's finding as the reason?\n\n"${reason}"`)) return;
+        if (!(await confirm({
+            title: "Reject using the AI's finding as the reason?",
+            body: reason,
+            confirmLabel: 'Reject',
+            tone: 'danger',
+        }))) return;
         setError(null);
         setDecidingId(id);
         try {

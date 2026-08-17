@@ -4,6 +4,7 @@ import { reassignOrder } from '../../utils/api';
 import { useSocket } from '../../context/SocketContext';
 import OrderHistoryToggle from './OrderHistoryToggle';
 import type { Order, StaffUser } from '../../types';
+import { useDialog } from '../DialogProvider';
 
 interface InFlightRowProps {
     order: Order;
@@ -13,6 +14,7 @@ interface InFlightRowProps {
 }
 
 export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InFlightRowProps) {
+    const { confirm, alert } = useDialog();
     const { resolveDriverName } = useSocket();
     const [selectedDriver, setSelectedDriver] = useState('');
     const [busy, setBusy] = useState(false);
@@ -24,20 +26,25 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
             await reassignOrder(order.id, selectedDriver, jwtToken);
             onChanged();
         } catch (err) {
-            alert((err as Error).message || 'Failed to reassign order.');
+            void alert({ title: 'Could not reassign the order', body: (err as Error).message || 'Failed to reassign order.', tone: 'danger' });
         } finally {
             setBusy(false);
         }
     };
 
     const handleUnassign = async () => {
-        if (!confirm(`Unassign order #${order.id} from ${resolveDriverName(order.assigned_to || '')} and send it back to the dispatch queue?`)) return;
+        if (!(await confirm({
+            title: `Unassign order #${order.id}?`,
+            body: `It will be taken from ${resolveDriverName(order.assigned_to || '')} and returned to the dispatch queue.`,
+            confirmLabel: 'Unassign',
+            tone: 'danger',
+        }))) return;
         setBusy(true);
         try {
             await reassignOrder(order.id, null, jwtToken);
             onChanged();
         } catch (err) {
-            alert((err as Error).message || 'Failed to unassign order.');
+            void alert({ title: 'Could not unassign the order', body: (err as Error).message || 'Failed to unassign order.', tone: 'danger' });
         } finally {
             setBusy(false);
         }

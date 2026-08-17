@@ -4,8 +4,10 @@ import { Truck, Trash2, UserMinus, Tag, X } from 'lucide-react';
 import { apiFetch, createVehicleType, deleteVehicleType } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import type { Vehicle, VehicleType } from '../types';
+import { useDialog } from './DialogProvider';
 
 export default function AdminControlPanel() {
+    const { confirm } = useDialog();
     const { jwtToken, userRole, savedVehicleTypes, refreshFeeds } = useSocket();
     const [plateNumber, setPlateNumber] = useState('');
     const [vehicleType, setVehicleType] = useState('');
@@ -79,7 +81,12 @@ export default function AdminControlPanel() {
     };
 
     const handleDeleteVehicle = async (vehicle: Vehicle) => {
-        if (!confirm(`Delete "${vehicle.plateNumber}" from the fleet roster? This can't be undone.`)) return;
+        if (!(await confirm({
+            title: `Delete ${vehicle.plateNumber} from the fleet roster?`,
+            body: "This can't be undone.",
+            confirmLabel: 'Delete',
+            tone: 'danger',
+        }))) return;
         setDeletingId(vehicle.id);
         setError(null);
         setSuccessMsg(null);

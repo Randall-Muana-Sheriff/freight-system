@@ -4,6 +4,7 @@ import { Route, MapPin, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { apiFetch, createDeliveryStop, deleteDeliveryStop, optimizeMultiStopRoute, commitOptimizedRoute, fetchDrivers } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import type { StaffUser, OptimizedRouteGroup, OptimizedRouteNode, LatLng } from '../types';
+import { useDialog } from './DialogProvider';
 
 interface DeliveryStop {
     id: number;
@@ -31,6 +32,7 @@ interface RouteOptimizerPanelProps {
 }
 
 export default function RouteOptimizerPanel({ onRouteOptimized, stopTargetMode, setStopTargetMode, newStopCoords }: RouteOptimizerPanelProps) {
+    const { alert } = useDialog();
     const { jwtToken } = useSocket();
     const [stops, setStops] = useState<DeliveryStop[]>([]);
     const [drivers, setDrivers] = useState<StaffUser[]>([]);
@@ -169,7 +171,7 @@ export default function RouteOptimizerPanel({ onRouteOptimized, stopTargetMode, 
                 aggregateDistanceKm: result.summary.aggregateDistanceKm,
                 totalDemand,
             }, jwtToken);
-            alert('Plan saved for reference. This does not dispatch anything — assign real work from the dispatch queue.');
+            void alert({ title: 'Plan saved for reference', body: 'This does not dispatch anything — assign real work from the dispatch queue.' });
         } catch (err) {
             setError((err as Error).message);
         } finally {

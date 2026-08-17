@@ -5,6 +5,7 @@ import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
 import { describeDriverChecks } from '../../types';
 import type { Order, StaffUser, DriverSuggestion } from '../../types';
+import { useDialog } from '../DialogProvider';
 
 interface OrderRowProps {
     order: Order;
@@ -24,6 +25,7 @@ const PRIORITY_BORDER: Record<'high' | 'normal' | 'low', string> = {
 };
 
 export default function OrderRow({ order, drivers, jwtToken, onAssigned }: OrderRowProps) {
+    const { alert } = useDialog();
     const { resolveDriverName } = useSocket();
     const {
         placingOrderId, placementStep, placementPickup, placementDelivery,
@@ -61,7 +63,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
             deliveryLat: placementDelivery[0], deliveryLng: placementDelivery[1],
         }, jwtToken)
             .then(() => { cancelPlacement(); onAssigned(); })
-            .catch((err) => alert((err as Error).message || 'Could not save those locations.'))
+            .catch((err) => void alert({ title: 'Could not save those locations', body: (err as Error).message || 'Please try again.', tone: 'danger' }))
             .finally(() => setPlacing(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isThisOrder, placementPickup, placementDelivery]);
@@ -73,7 +75,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
             await assignOrders([order.id], selectedDriver, jwtToken);
             onAssigned();
         } catch (err) {
-            alert((err as Error).message || 'Failed to assign order.');
+            void alert({ title: 'Could not assign the order', body: (err as Error).message || 'Failed to assign order.', tone: 'danger' });
         } finally {
             setAssigning(false);
         }

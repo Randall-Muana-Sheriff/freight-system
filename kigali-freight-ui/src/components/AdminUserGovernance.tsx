@@ -6,10 +6,12 @@ import { apiFetch, setUserStatus } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import type { StaffUser, UserRole } from '../types';
+import { useDialog } from './DialogProvider';
 
 const EMPTY_NEW_USER = { username: '', password: '', role: 'dispatcher' as UserRole };
 
 export default function AdminUserGovernance() {
+    const { confirm } = useDialog();
     const { jwtToken, userRole } = useSocket();
     const [users, setUsers] = useState<StaffUser[]>([]);
     // Drivers are governed elsewhere (approval + document verification),
@@ -39,9 +41,12 @@ export default function AdminUserGovernance() {
     const handleStatusChange = async (user: StaffUser) => {
         const next = user.status === 'suspended' ? 'approved' : 'suspended';
         const who = user.fullName || user.username;
-        if (next === 'suspended' && !window.confirm(
-            `Suspend ${who}?\n\nThey will be signed out immediately and cannot log in or be assigned work. Their history is kept, and you can reinstate them at any time.`
-        )) return;
+        if (next === 'suspended' && !(await confirm({
+            title: `Suspend ${who}?`,
+            body: 'They will be signed out immediately and cannot log in or be assigned work.\n\nTheir history is kept, and you can reinstate them at any time.',
+            confirmLabel: 'Suspend',
+            tone: 'danger',
+        }))) return;
 
         setError(null);
         try {

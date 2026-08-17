@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Send, Boxes, RefreshCw } from 'lucide-react';
 import { assignOrders, fetchBatchedOrders } from '../../utils/api';
 import type { OrderBatch, StaffUser } from '../../types';
+import { useDialog } from '../DialogProvider';
 
 interface BatchSuggestionsProps {
     drivers: StaffUser[];
@@ -14,6 +15,7 @@ interface BatchSuggestionsProps {
 // can send the whole cluster to one driver in a single tap instead of
 // assigning each shipment one by one.
 export default function BatchSuggestions({ drivers, jwtToken, onAssigned }: BatchSuggestionsProps) {
+    const { alert } = useDialog();
     const [open, setOpen] = useState(false);
     const [batches, setBatches] = useState<OrderBatch[] | null>(null);
     const [loading, setLoading] = useState(false);
@@ -46,7 +48,7 @@ export default function BatchSuggestions({ drivers, jwtToken, onAssigned }: Batc
             onAssigned();
             void load();
         } catch (err) {
-            alert((err as Error).message || 'Failed to assign batch.');
+            void alert({ title: 'Could not assign the batch', body: (err as Error).message || 'Failed to assign batch.', tone: 'danger' });
         } finally {
             setAssigningId(null);
         }

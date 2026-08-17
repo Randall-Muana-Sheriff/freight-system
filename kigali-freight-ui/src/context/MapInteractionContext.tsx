@@ -14,6 +14,7 @@ import { useSocket } from './SocketContext';
 import { useRoutes } from '../utils/useRoutes';
 import { fetchDriverBreadcrumbs } from '../utils/api';
 import type { SavedRoute, PlaybackRoute, OptimizedRouteGroup, LatLng } from '../types';
+import { useDialog } from '../components/DialogProvider';
 
 interface MapInteractionContextValue {
     drawModeActive: boolean;
@@ -68,6 +69,9 @@ interface MapInteractionContextValue {
 const MapInteractionContext = createContext<MapInteractionContextValue | null>(null);
 
 export function MapInteractionProvider({ children }: { children: ReactNode }) {
+    // Renamed on import: this file already has a local `alert` in scope
+    // from the global, and shadowing it silently would be a trap.
+    const { alert: showAlert } = useDialog();
     const { jwtToken, calculateRoadMatrixETA, socket, resolveDriverName } = useSocket();
     const { routes: savedRoutes, loading: routesLoading, refreshRoutes } = useRoutes(jwtToken);
 
@@ -213,7 +217,7 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
             setPlaybackIndex(0);
         } catch (err) {
             console.error('Failed to load driver breadcrumbs:', err);
-            alert((err as Error).message || 'Failed to load breadcrumbs for this driver.');
+            void showAlert({ title: 'Could not load breadcrumbs', body: (err as Error).message || 'Failed to load breadcrumbs for this driver.', tone: 'danger' });
         } finally {
             setBreadcrumbsLoading(false);
         }

@@ -4,6 +4,7 @@ import { SocketProvider, useSocket } from './context/SocketContext';
 import AuthForm from './components/AuthForm';
 import ImageLightbox from './components/ImageLightbox';
 import ErrorBoundary from './components/ErrorBoundary';
+import { DialogProvider } from './components/DialogProvider';
 import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { setNoIndex } from './utils/seo';
 import { resolveSurface } from './utils/surface';
@@ -105,7 +106,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SocketProvider>
-        <AppShell />
+        {/* Inside SocketProvider but outside AppShell, so the dashboard,
+            the admin centre and MapInteractionContext can all reach it. */}
+        <DialogProvider>
+          <AppShell />
+        </DialogProvider>
       </SocketProvider>
     </ErrorBoundary>
   );
