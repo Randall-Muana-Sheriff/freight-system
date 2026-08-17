@@ -93,9 +93,15 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                     </div>
                 </div>
 
-                <p className="data-label pt-6 text-pub-onink-soft/50">
-                    © {new Date().getFullYear()} Inzira
-                </p>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-6">
+                    <p className="data-label text-pub-onink-soft/50">
+                        © {new Date().getFullYear()} Inzira
+                    </p>
+                    {/* Both app stores require a reachable privacy policy for
+                        the driver app, and a link buried nowhere is the usual
+                        reason that check fails. */}
+                    <button className={link} onClick={() => onNavigate('/privacy')}>Privacy</button>
+                </div>
             </div>
         </footer>
     );

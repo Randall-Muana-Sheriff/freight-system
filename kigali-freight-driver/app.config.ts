@@ -50,15 +50,47 @@ const config: ExpoConfig = {
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: false,
-    // The dev-client variant gets the new "Inzira" branding on its
-    // identifier since it's never been built/registered anywhere yet —
-    // the production identifier stays com.muana.kigalifreightdriver for
-    // now, deliberately deferred as its own future cutover (see the
-    // Inzira rebrand plan): changing it forces every currently-installed
-    // copy of the real app to be reinstalled and needs a new Firebase
-    // app registration, which isn't worth doing as a side effect of
-    // fixing the dev build.
-    bundleIdentifier: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.kigalifreightdriver',
+    // Renamed to the Inzira identifier before the first iOS build rather
+    // than after.
+    //
+    // The old comment here deferred this because changing an identifier
+    // forces every installed copy to reinstall and needs a fresh Firebase
+    // registration. That is true — of Android, where the app is already
+    // distributed. iOS has never been built once (the EAS history is
+    // Android-only) and has no GoogleService-Info.plist, so there is no
+    // installed base and no registration to migrate: here the rename costs
+    // nothing. The two namespaces are independent, so Android keeps its
+    // package untouched below.
+    //
+    // Doing it now is not tidiness. A bundle identifier is immutable once
+    // an app has shipped to the App Store, so this is the last moment it
+    // can be changed at all, and shipping the pre-rebrand name would fix
+    // "kigalifreight" into the product forever.
+    bundleIdentifier: IS_DEV_CLIENT ? 'com.muana.inzirafreightdriver.dev' : 'com.muana.inzirafreightdriver',
+    infoPlist: {
+      // Without this, iOS stops delivering to the background location task
+      // the moment the screen locks — and startLocationUpdatesAsync (see
+      // lib/locationTracking.ts) is how a dispatcher sees where anyone is.
+      // The expo-location plugin's isAndroidBackgroundLocationEnabled and
+      // isAndroidForegroundServiceEnabled are Android-only flags and do
+      // nothing for this; the Android side is handled separately by
+      // plugins/withNativeLocationService.js. So on iOS this key is the
+      // whole feature: without it every iPhone driver silently freezes on
+      // the map the second they pocket their phone.
+      UIBackgroundModes: ['location'],
+      // The expo-location plugin fills the two modern keys from its own
+      // options but leaves this legacy one as the generic "Allow
+      // $(PRODUCT_NAME) to access your location". Background location is
+      // the most heavily reviewed permission on the platform and a vague
+      // purpose string is what draws the rejection, so all three say the
+      // same specific thing.
+      NSLocationAlwaysUsageDescription:
+        'Inzira Driver reports your position to dispatch while a shift is active, including in the background, so the office and the customer can see where a delivery has reached. Tracking stops when you end your shift.',
+      // Declared so App Store Connect stops asking on every single upload.
+      // The app uses only HTTPS, which is exempt from the export
+      // regulations this question is about.
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     // com.muana.kigalifreightdriver was already taken (Play Store/Firebase

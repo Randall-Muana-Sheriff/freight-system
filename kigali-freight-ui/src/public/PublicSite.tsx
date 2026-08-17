@@ -3,6 +3,7 @@ import { PublicHeader, PublicFooter } from './Chrome';
 import { Landing } from './Landing';
 import { OrderFlow } from './OrderFlow';
 import { TrackPage } from './TrackPage';
+import PrivacyPolicy from './PrivacyPolicy';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SiteTour } from './SiteTour';
 import { setCanonical, setDescription } from '../utils/seo';
@@ -27,6 +28,7 @@ function readRoute(): Route {
 const TITLES: Record<string, string> = {
     '/order': 'Place an order',
     '/track': 'Track shipment',
+    '/privacy': 'Privacy policy',
 };
 
 // Each route needs its own, or all three compete in search results with
@@ -34,6 +36,7 @@ const TITLES: Record<string, string> = {
 const DESCRIPTIONS: Record<string, string> = {
     '/order': 'Book freight across Kigali in under a minute. Pickup, destination and cargo type — no account needed, and a tracking code by text as soon as it is placed.',
     '/track': 'Enter the code from your confirmation text to see where your Inzira consignment is, which stage it has reached, and who is driving it.',
+    '/privacy': 'What the Inzira website and the Inzira Driver app collect, why, who it is shared with, and how to ask for your own data.',
 };
 const DEFAULT_DESCRIPTION = 'Same-day and bulk freight across Kigali. Book in under a minute with no account, then follow your cargo from pickup to signature with a tracking code.';
 
@@ -116,6 +119,8 @@ export default function PublicSite() {
                     <OrderFlow onNavigate={navigate} />
                 ) : route.path === '/track' ? (
                     <TrackPage initialCode={route.code} onNavigate={navigate} />
+                ) : route.path === '/privacy' ? (
+                    <PrivacyPolicy />
                 ) : (
                     <Landing onNavigate={navigate} />
                 )}
