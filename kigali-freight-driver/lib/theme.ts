@@ -5,6 +5,27 @@
 // only — neither should leak into general UI the way `primary` does.
 export const theme = {
   colors: {
+    // Depth is carried by surface tint, not shadow. On a #050C18 ground a
+    // drop shadow has nothing darker to fall on: raise it far enough to
+    // see and it stops being a shadow and becomes a grey haze. A hairline
+    // border plus a lighter fill also survives direct sunlight through a
+    // windscreen, which a soft gradient does not.
+    //
+    // Which step to use is decided by what the surface IS, not by which
+    // screen it is on — the three had drifted to the point where surface2
+    // did every job and surface1 did none, so nothing read as nearer than
+    // anything else:
+    //
+    //   surface1  a well or groove — something content sits down inside
+    //             (a progress track, a photo frame)
+    //   surface2  the default card, and raised controls standing on the
+    //             ground (form fields, sheets, modals, tiles)
+    //   surface3  the one card per screen carrying its primary action,
+    //             plus the toast, which genuinely floats above everything
+    //
+    // Anything nested inside another surface uses panelSoft instead: it is
+    // translucent, so it lightens whatever it happens to sit on rather
+    // than needing a step of its own per parent.
     bg: '#050C18',
     surface1: '#0A1628',
     surface2: '#0F1E35',

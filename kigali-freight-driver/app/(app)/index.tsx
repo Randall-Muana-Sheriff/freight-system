@@ -316,7 +316,9 @@ const styles = StyleSheet.create({
   noticeTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   noticeDetail: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
   shiftCard: {
-    backgroundColor: theme.colors.surface2,
+    // surface3: the primary card of the Home tab — starting and ending a
+    // shift is the action the whole screen exists for.
+    backgroundColor: theme.colors.surface3,
     borderRadius: theme.radius.xl,
     borderWidth: 1.5,
     borderColor: theme.colors.border,

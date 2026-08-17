@@ -604,7 +604,10 @@ const styles = StyleSheet.create({
   },
   photoAttachText: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body, flex: 1 },
   photoPreviewWrap: { marginBottom: 16, borderRadius: theme.radius.md, overflow: 'hidden' },
-  photoPreview: { width: '100%', height: 180, backgroundColor: theme.colors.surface2 },
+  // surface1: a well the photo sits inside, and the colour showing
+  // through while it loads. Recessed rather than raised, so an attached
+  // photo reads as mounted in the form rather than floating on it.
+  photoPreview: { width: '100%', height: 180, backgroundColor: theme.colors.surface1 },
   photoRemoveButton: {
     position: 'absolute',
     top: 8,

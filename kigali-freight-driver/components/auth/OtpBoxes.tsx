@@ -116,7 +116,10 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 3,
     borderRadius: 2,
-    backgroundColor: theme.colors.surface2,
+    // surface1: a groove the jade fill runs along. On surface2 it sat at
+    // the same depth as the code boxes above it, so the unfilled part read
+    // as a bar rather than as the space still to fill.
+    backgroundColor: theme.colors.surface1,
     marginTop: 22,
     overflow: 'hidden',
   },

@@ -106,7 +106,9 @@ export function SafetyChecklistCard() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: theme.colors.surface2,
+    // surface3: the only card on the Safety tab, and the one thing there
+    // a driver is meant to complete before setting off.
+    backgroundColor: theme.colors.surface3,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,

@@ -87,7 +87,10 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     paddingVertical: 13,
   },
-  cancelButton: { backgroundColor: theme.colors.surface3, borderWidth: 1, borderColor: theme.colors.border },
+  // panelSoft, matching ActionSheet's cancel: this sits on a card, and
+  // surface3 now means a screen's primary surface — which the way out of
+  // a modal is not.
+  cancelButton: { backgroundColor: theme.colors.panelSoft, borderWidth: 1, borderColor: theme.colors.border },
   cancelText: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
   callButton: { backgroundColor: theme.colors.primary },
   callText: { color: theme.colors.ink, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
