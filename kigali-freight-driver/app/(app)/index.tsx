@@ -9,9 +9,18 @@ import { fetchDriverAssignments, fetchMyCompletedDeliveries, fetchMyDocuments, f
 import { getTrackingDiagnostics, startBackgroundLocationTracking, stopBackgroundLocationTracking } from '../../lib/locationTracking';
 import { isJobInProgress, toDriverAssignmentCard, type DriverAssignmentCard } from '../../lib/assignments';
 
-function getGreeting() {
+// Takes the shift state because one of these greetings is a claim about it,
+// not a time of day. "Still on shift" was returned for any hour before 5am
+// whether or not the driver was working, so a driver opening the app at 1am
+// was greeted as though mid-shift while the chip beside it said Off shift
+// and the button below offered to start one — three elements on the same
+// screen, two of them right. A greeting that contradicts the state is worse
+// than a plain one, and this is the first thing anyone sees.
+// null means the shift state has not loaded yet, and is treated as off: an
+// unresolved state should not be asserted as a fact either.
+function getGreeting(onShift: boolean | null) {
   const hour = new Date().getHours();
-  if (hour < 5) return 'Still on shift';
+  if (hour < 5) return onShift === true ? 'Still on shift' : 'Good night';
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   if (hour < 21) return 'Good evening';
@@ -187,7 +196,7 @@ export default function DashboardScreen() {
     <ScreenShell refreshing={refreshing} onRefresh={onRefresh}>
       <View style={styles.headerRow}>
         <View style={styles.headerTextWrap}>
-          <Text style={styles.greeting}>{getGreeting()}</Text>
+          <Text style={styles.greeting}>{getGreeting(onShift)}</Text>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>{fullName || username || 'Driver'}</Text>
           </View>
