@@ -100,6 +100,53 @@ invites a rejection.
 - **Privacy Policy URL:** https://inzira.systems/privacy
 - **Marketing URL** (optional): https://inzira.systems
 
+## Version
+
+```
+1.1.0
+```
+
+Must match the built binary, which reports 1.1.0 (build 3).
+
+## Copyright
+
+```
+2026 Jennifer Maxwell
+```
+
+Apple asks for whoever holds the exclusive rights, and the account is an
+Individual one in that name — so this matches the seller shown on the
+listing. Change it to the company name at the same time as converting the
+account to an Organization, not before, so the two never disagree.
+
+## Sign-In Information
+
+Tick **Sign-in required**, then fill the two boxes. They are labelled
+username and password because most apps use those; ours does not, so the
+demo phone number and PIN go in and the Notes field explains the code step
+in between.
+
+- **User name:** `+250780000000`
+- **Password:** `4819`
+
+## Contact Information
+
+Who Apple calls if review has a question. Use a phone that will actually be
+answered — an unanswered review query stalls the submission rather than
+failing it, which is worse because nothing tells you it is waiting.
+
+- **Email:** sherifimran2000@gmail.com
+- **Phone:** +250 732 324 860
+
+## Version Release
+
+Choose **Manually release this version**.
+
+Approval and publication become two separate decisions, so a build that
+passes review at 3am does not go public before anyone has looked at it on a
+real phone. Automatic release is the right choice later, once a release has
+been through this once.
+
 ---
 
 ## Review notes
@@ -145,8 +192,12 @@ location permission when prompted.
 
 ## Still needed before submitting
 
-Screenshots. Apple requires at least one 6.7" iPhone screenshot (1290×2796).
-These have to come from a real device or an iOS simulator. Good candidates,
+Screenshots. App Store Connect is asking for the **6.5" display** slot —
+1284 × 2778 portrait (or 1242 × 2688, an older 6.5" size it still accepts).
+Apple reuses these for every other size, so this one set is enough. Only the
+first three appear on the install sheet, so lead with the strongest.
+
+They have to come from a real device or an iOS simulator. Good candidates,
 in order of how well they show what the app is for:
 
 1. Home screen mid-shift — the shift card with jobs counted
