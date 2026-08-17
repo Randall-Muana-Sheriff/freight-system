@@ -100,6 +100,7 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                     {/* Both app stores require a reachable privacy policy for
                         the driver app, and a link buried nowhere is the usual
                         reason that check fails. */}
+                    <button className={link} onClick={() => onNavigate('/support')}>Support</button>
                     <button className={link} onClick={() => onNavigate('/privacy')}>Privacy</button>
                 </div>
             </div>

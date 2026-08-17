@@ -140,26 +140,34 @@ export default function PrivacyPolicy() {
             </Section>
 
             <Section id="contact" title="Contact">
-                {/* Deliberately the on-site form and a postal address rather
-                    than an email address. inzira.systems publishes no MX
-                    record, so every mailbox on the domain — including the
-                    privacy@ this page used to advertise — silently bounces.
-                    A policy whose only contact route is dead is worse than
-                    one with no route at all, because it looks answerable.
-                    Swap in a real address here once mail is set up. */}
+                {/* A working mailbox on a domain that accepts mail.
+                    inzira.systems publishes no MX record, so an address there
+                    would bounce silently — and a policy whose only contact
+                    route is dead is worse than one with none, because it
+                    looks answerable. Move this to a company address once the
+                    domain accepts mail. */}
                 <p>
                     Questions about this policy, or a request to see, correct
-                    or delete your own data, can be sent through the{' '}
-                    <a href="/#contact"
+                    or delete your own data, can be sent to{' '}
+                    <a href="mailto:sherifimran2000@gmail.com"
                         className="focus-ring font-medium text-pub-laterite underline underline-offset-4">
-                        contact form on our website
+                        sherifimran2000@gmail.com
+                    </a>{' '}
+                    or{' '}
+                    <a href="tel:+250732324860"
+                        className="focus-ring font-mono font-medium text-pub-laterite underline underline-offset-4">
+                        +250 732 324 860
                     </a>
-                    , which reaches our office directly.
+                    .
                 </p>
                 <p>
                     By post: Inzira, Gikondo Industrial Zone, Kigali, Rwanda.
                     Drivers can also raise anything about their own data
-                    directly with dispatch.
+                    directly with dispatch. Our{' '}
+                    <a href="/support" className="focus-ring font-medium text-pub-laterite underline underline-offset-4">
+                        support page
+                    </a>{' '}
+                    covers everything else.
                 </p>
             </Section>
         </div>
