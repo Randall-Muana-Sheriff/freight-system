@@ -38,6 +38,7 @@ export function AssignmentCard({
   eta,
   status,
   priority,
+  note,
   onPress,
 }: {
   title: string;
@@ -46,6 +47,7 @@ export function AssignmentCard({
   eta: string;
   status: string;
   priority: 'high' | 'normal' | 'low';
+  note?: string | null;
   onPress?: () => void;
 }) {
   const palette = getStatusPalette(status);
@@ -59,7 +61,10 @@ export function AssignmentCard({
       // Priority and status are conveyed visually by pill colour, so they
       // have to be spoken too or a screen-reader user cannot tell a HIGH
       // job from a normal one.
-      accessibilityLabel={`${title}. ${priority} priority, ${status}. Going to ${destination}.`}
+      accessibilityLabel={
+        `${title}. ${priority} priority, ${status}. Going to ${destination}.`
+        + (note ? ` Note from the customer: ${note}` : '')
+      }
       accessibilityHint="Opens the trip details"
       style={styles.row}
     >
@@ -81,6 +86,18 @@ export function AssignmentCard({
           <Text style={styles.metaDot}>·</Text>
           <Text style={styles.metaMono}>{eta}</Text>
         </View>
+        {/* The note itself, one line of it, rather than a "has a note"
+            marker. Most are short enough to read whole, and one that is
+            not still shows its opening words — which is usually enough to
+            tell a driver whether it needs opening before they set off.
+            Amber and the same alert glyph as the trip screen's "From the
+            customer" block, so the two read as the same thing seen twice. */}
+        {note ? (
+          <View style={styles.noteRow}>
+            <Ionicons name="alert-circle-outline" size={12} color={theme.colors.warning} />
+            <Text style={styles.noteText} numberOfLines={1}>{note}</Text>
+          </View>
+        ) : null}
       </View>
       <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} style={{ marginTop: 8 }} />
     </TouchableOpacity>
@@ -108,4 +125,6 @@ const styles = StyleSheet.create({
   metaText: { color: theme.colors.text, ...theme.type.label, flexShrink: 1, fontFamily: theme.fonts.body },
   metaDot: { color: theme.colors.muted, ...theme.type.label },
   metaMono: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
+  noteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
+  noteText: { color: theme.colors.warning, ...theme.type.micro, flexShrink: 1, fontFamily: theme.fonts.body },
 });

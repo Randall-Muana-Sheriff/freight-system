@@ -1,4 +1,4 @@
-import { DriverAssignment } from './api';
+import type { DriverAssignment } from './api';
 
 export type DriverAssignmentCard = {
   id: number;
@@ -8,6 +8,8 @@ export type DriverAssignmentCard = {
   eta: string;
   status: string;
   priority: 'high' | 'normal' | 'low';
+  /** The customer's own note, if they left one. */
+  note: string | null;
 };
 
 // A job is "in progress" once a driver has physically picked it up — before
@@ -65,5 +67,10 @@ export function toDriverAssignmentCard(order: DriverAssignment): DriverAssignmen
     eta: 'Dispatch-managed',
     status: prettyStatus(order.status),
     priority: order.priority || 'normal',
+    // Carried onto the list card, not just the trip screen. A note that
+    // changes what a driver does before they set off — a gate code, "the
+    // yard closes at four" — is worth nothing if it is only found on
+    // arrival, which is when a job usually gets opened.
+    note: order.special_instructions?.trim() || null,
   };
 }
