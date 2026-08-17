@@ -233,6 +233,44 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                         onChange={(e) => setWeightInput(e.target.value)} />
                                 </label>
                             </div>
+                            {/* Buttons rather than a select: four short
+                                answers are quicker to tap than to open,
+                                and on a form this size the options being
+                                visible is what makes the question feel
+                                answerable rather than like more work. */}
+                            <fieldset className="block">
+                                <legend className="data-label text-pub-onpaper-soft">When do you need it — optional</legend>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {NEEDED_BY.map((option) => {
+                                        const chosen = draft.neededBy === option.value;
+                                        return (
+                                            <button
+                                                key={option.value}
+                                                type="button"
+                                                aria-pressed={chosen}
+                                                // Tapping the chosen one again clears it, so
+                                                // an optional question stays optional once
+                                                // it has been answered by accident.
+                                                onClick={() => setDraft({ ...draft, neededBy: chosen ? undefined : option.value })}
+                                                className={`focus-ring border px-4 py-2 text-sm font-medium transition-colors ${
+                                                    chosen
+                                                        ? 'border-pub-laterite bg-pub-laterite text-pub-onink'
+                                                        : 'border-pub-onpaper/25 text-pub-onpaper-soft hover:border-pub-onpaper/50 hover:text-pub-onpaper'
+                                                }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {/* Said plainly, because "Today" on a form is
+                                    easily read as a promise. A dispatcher
+                                    decides what is actually possible. */}
+                                <p className="mt-3 text-sm leading-relaxed text-pub-onpaper-soft">
+                                    This tells the dispatcher how to plan your run. They&apos;ll
+                                    confirm what&apos;s possible when they call.
+                                </p>
+                            </fieldset>
                             <label className="block">
                                 <span className="data-label text-pub-onpaper-soft">Anything the driver should know — optional</span>
                                 <textarea rows={2} className={`${field} resize-none`} value={draft.specialInstructions}
