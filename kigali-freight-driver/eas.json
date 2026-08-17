@@ -38,11 +38,12 @@
         // from memory. Named here so a submission cannot silently go out
         // under a different team than the one the credentials belong to.
         //
-        // ascAppId is deliberately absent: it is the numeric ID of the App
-        // Store Connect record, which does not exist yet. `eas submit`
-        // offers to create the record on the first run and prints the ID
-        // it assigned — paste it here afterwards so later submissions
-        // target the same listing instead of asking again.
+        // The App Store Connect record created on the first submission.
+        // Pinned so every later release goes to this listing instead of
+        // re-running the "ensure the app exists" lookup — which costs an
+        // Apple login each time and, worse, could create a second record
+        // if the bundle identifier were ever mistyped.
+        "ascAppId": "6802449407",
         "appleId": "maxwelljenny96@icloud.com",
         "appleTeamId": "8WDZ75627S"
       }
