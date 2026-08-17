@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,6 +13,7 @@ import { AuthProvider } from '../lib/auth';
 import { theme } from '../lib/theme';
 import { initCrashReporting } from '../lib/crashReporting';
 import ErrorBoundary from '../components/ErrorBoundary';
+import BrandEntry from '../components/BrandEntry';
 
 // Held visible until the design system's real fonts (Outfit/DM Sans/DM
 // Mono) are loaded — without this, the very first frame would flash in the
@@ -24,7 +25,16 @@ SplashScreen.preventAutoHideAsync();
 // EXPO_PUBLIC_SENTRY_DSN is set (see lib/crashReporting.ts).
 initCrashReporting();
 
+// The brand entry belongs to a cold start, not to this component's
+// lifecycle: a remount from expo-router — or a fast refresh mid-shift —
+// must land straight on the app rather than replaying the animation over
+// a screen the driver was already using. Module scope outlives the
+// component and is reset only by the process itself, which is exactly the
+// span "once per launch" means.
+let entryPlayed = false;
+
 export default function RootLayout() {
+  const [entryDone, setEntryDone] = useState(entryPlayed);
   const [fontsLoaded] = useFonts({
     Outfit_900Black,
     DMSans_400Regular,
@@ -61,6 +71,18 @@ export default function RootLayout() {
           <AuthProvider>
             <StatusBar style="light" />
             <Stack screenOptions={{ headerShown: false }} />
+            {/* Laid over the app rather than shown before it, so the
+                first screen is mounted, laid out and settled behind the
+                entry — the reveal lands on a finished screen instead of
+                on a spinner. */}
+            {entryDone ? null : (
+              <BrandEntry
+                onDone={() => {
+                  entryPlayed = true;
+                  setEntryDone(true);
+                }}
+              />
+            )}
           </AuthProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

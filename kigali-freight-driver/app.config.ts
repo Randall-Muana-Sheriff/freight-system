@@ -99,10 +99,12 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
+        // Ground only, no image. components/BrandEntry.tsx draws the mark
+        // itself as the app opens, and a static copy here would show the
+        // finished mark first and then have it vanish so the animated one
+        // could draw it again. Both screens are this same flat colour, so
+        // the handoff from native splash to JS has nothing to flash.
         backgroundColor: '#050C18',
-        image: './assets/icon.png',
-        imageWidth: 200,
-        resizeMode: 'contain',
       },
     ],
     [
