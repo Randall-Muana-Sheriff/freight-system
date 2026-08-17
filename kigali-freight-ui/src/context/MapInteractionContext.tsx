@@ -12,7 +12,7 @@
 import { createContext, useContext, useState, useRef, useEffect, type ReactNode } from 'react';
 import { useSocket } from './SocketContext';
 import { useRoutes } from '../utils/useRoutes';
-import { fetchDriverBreadcrumbs } from '../utils/api';
+import { fetchDriverBreadcrumbs, type Trip } from '../utils/api';
 import type { SavedRoute, PlaybackRoute, LatLng } from '../types';
 import { useDialog } from '../components/DialogProvider';
 
@@ -56,6 +56,12 @@ interface MapInteractionContextValue {
     loadBreadcrumbsForPlayback: (driverName: string, hours: number) => Promise<void>;
     breadcrumbsLoading: boolean;
     trailLimit: number;
+    // The run currently opened in the dispatcher's runs panel, drawn on
+    // the map. One at a time on purpose: several overlaid sequences of
+    // numbered pins is unreadable, and a dispatcher looks at a map to
+    // answer a question about one run.
+    focusedTrip: Trip | null;
+    setFocusedTrip: (trip: Trip | null) => void;
     savedRoutes: SavedRoute[];
     routesLoading: boolean;
 }
@@ -71,6 +77,7 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
 
     // Geofence drawing
     const [drawModeActive, setDrawModeActive] = useState(false);
+    const [focusedTrip, setFocusedTrip] = useState<Trip | null>(null);
     const [drawnPoints, setDrawnPoints] = useState<LatLng[]>([]);
 
     // Dispatch targeting
@@ -261,6 +268,7 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
         playbackCoords, playbackIndex, isPlaying, selectedPlaybackRoute,
         loadRouteForPlayback, togglePlaybackPlay, loadBreadcrumbsForPlayback, breadcrumbsLoading,
         trailLimit,
+        focusedTrip, setFocusedTrip,
         savedRoutes, routesLoading,
     };
 

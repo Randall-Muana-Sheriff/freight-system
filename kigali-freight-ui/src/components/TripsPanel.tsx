@@ -6,6 +6,7 @@ import {
 } from '../utils/api';
 import type { StaffUser } from '../types';
 import { useSocket } from '../context/SocketContext';
+import { useMapInteraction } from '../context/MapInteractionContext';
 import { useDialog } from './DialogProvider';
 
 // Planning a multi-stop run.
@@ -46,10 +47,11 @@ function km(metres: number | null) {
 // threads a dozen props through and this needs none of them.
 export default function TripsPanel() {
     const { jwtToken, activeOrders, resolveDriverName, refreshFeeds } = useSocket();
+    const { setFocusedTrip } = useMapInteraction();
     const [drivers, setDrivers] = useState<StaffUser[]>([]);
     const { alert, confirm, prompt } = useDialog();
     const [trips, setTrips] = useState<TripSummary[]>([]);
-    const [openTrip, setOpenTrip] = useState<Trip | null>(null);
+    const [openTrip, setOpenTripState] = useState<Trip | null>(null);
     const [selected, setSelected] = useState<number[]>([]);
     const [driver, setDriver] = useState('');
     const [busy, setBusy] = useState<string | null>(null);
@@ -58,6 +60,18 @@ export default function TripsPanel() {
         if (!jwtToken) return;
         fetchDrivers(jwtToken).then(setDrivers).catch(() => setDrivers([]));
     }, [jwtToken]);
+
+    // Opening a run here is what draws it on the map, so both go through
+    // one setter — otherwise the panel and the map drift apart the first
+    // time a code path forgets one of them.
+    const setOpenTrip = useCallback((trip: Trip | null) => {
+        setOpenTripState(trip);
+        setFocusedTrip(trip);
+    }, [setFocusedTrip]);
+
+    // A run left drawn on the map after the panel unmounts is a line
+    // nobody can dismiss.
+    useEffect(() => () => setFocusedTrip(null), [setFocusedTrip]);
 
     const load = useCallback(async () => {
         try {

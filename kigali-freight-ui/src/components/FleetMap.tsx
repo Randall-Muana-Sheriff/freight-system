@@ -9,7 +9,8 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { useSocket } from '../context/SocketContext';
 import { useMapInteraction } from '../context/MapInteractionContext';
-import { truckIcon, flagIcon, hubIcon, getVehicleIcon, VEHICLE_TYPE_LEGEND } from '../utils/mapIcons';
+import { truckIcon, flagIcon, hubIcon, stopIcon, getVehicleIcon, VEHICLE_TYPE_LEGEND } from '../utils/mapIcons';
+import { placedStops, tripPolyline, isStopSettled } from '../utils/tripMapLayer';
 import { classifyFreshness, formatLastSeen, useNow } from '../utils/telemetryFreshness';
 import MapSizeFix from './map/MapSizeFix';
 import MapClickHandler from './map/MapClickHandler';
@@ -28,6 +29,7 @@ export default function FleetMap() {
     orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
     hubTargetMode, setHubTargetMode, newHubCoords, setNewHubCoords,
     placementStep, handlePlacementPick,
+    focusedTrip,
   } = useMapInteraction();
   const now = useNow();
   // Trails are opt-in per vehicle rather than always-on for the whole
@@ -176,6 +178,44 @@ export default function FleetMap() {
             );
           })}
         </MarkerClusterGroup>
+
+        {/* The run currently open in the dispatcher's panel. Drawn as a
+            dashed line through the stops in sequence, because it is a plan
+            over straight lines between points, not a road route — a solid
+            line would imply the driver follows exactly that path. Stops
+            with no coordinates are skipped rather than guessed at, and the
+            popup says so, so a dispatcher can see which ones still need
+            placing on the map. */}
+        {focusedTrip && (() => {
+          const placed = placedStops(focusedTrip);
+          const positions = tripPolyline(focusedTrip);
+          return (
+            <>
+              {positions.length > 1 && (
+                <Polyline positions={positions} pathOptions={{ color: '#5B8C6E', weight: 2.5, opacity: 0.85, dashArray: '7,5' }} />
+              )}
+              {placed.map((stop) => (
+                <Marker
+                  key={`trip-stop-${stop.id}`}
+                  position={[stop.lat, stop.lng]}
+                  icon={stopIcon(stop.sequence, isStopSettled(stop), stop.kind)}
+                >
+                  <Popup>
+                    <div className="text-xs font-mono text-slate-900 space-y-1">
+                      <div className="font-bold">
+                        {stop.sequence}. {stop.kind === 'PICKUP' ? 'Collect' : 'Deliver'}
+                      </div>
+                      <div className="text-slate-600">{stop.cargo_description}</div>
+                      <div className="text-slate-500">{stop.address_text || 'Placed on the map'}</div>
+                      <div className="font-bold text-route-deep">{stop.status}</div>
+                      {stop.failure_reason && <div className="text-rust">{stop.failure_reason}</div>}
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </>
+          );
+        })()}
 
         {/* Picked location for a hub being created/edited */}
         {newHubCoords && (

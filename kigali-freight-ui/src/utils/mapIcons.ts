@@ -147,3 +147,35 @@ export const VEHICLE_TYPE_LEGEND = Object.entries(VEHICLE_TYPE_GLYPHS).map(([nam
   name,
   glyph: glyph.replace(/#0B0F0C/g, '#F4EFE4'),
 }));
+
+// A run's stops are numbered, because the sequence is the whole point —
+// an unnumbered pin tells a dispatcher a stop is there, not when the
+// driver reaches it. Round rather than the square badge used for vehicles
+// and hubs, so a plan reads as distinct from a thing that physically
+// exists.
+//
+// Not memoised like getVehicleIcon: a run has tens of stops with a
+// different number on each, so there is nothing to reuse between them, and
+// only one run is ever drawn at a time.
+export function stopIcon(sequence: number, done: boolean, kind: 'PICKUP' | 'DROP'): L.DivIcon {
+  // Done stops recede rather than disappear — a dispatcher tracing where a
+  // driver has got to needs the completed half of the run visible.
+  const background = done ? 'rgba(138,145,136,0.55)' : kind === 'PICKUP' ? '#5B84A6' : '#5B8C6E';
+  return L.divIcon({
+    className: 'freight-map-marker',
+    html: `
+      <div style="
+        width: 24px; height: 24px;
+        background: ${background};
+        border: 2px solid #0B0F0C;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        font: 700 11px/1 ui-monospace, monospace;
+        color: #F4EFE4;
+      ">${sequence}</div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
