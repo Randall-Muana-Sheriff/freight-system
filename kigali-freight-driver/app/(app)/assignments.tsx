@@ -4,11 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { ScreenShell } from '../../components/ScreenShell';
 import { AssignmentCard } from '../../components/AssignmentCard';
+import { RunCard } from '../../components/RunCard';
 import { EmptyState } from '../../components/EmptyState';
 import { SectionHeader } from '../../components/SectionHeader';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
-import { fetchDriverAssignments, isNetworkFailure } from '../../lib/api';
+import { fetchDriverAssignments, fetchMyTrip, isNetworkFailure, type Trip } from '../../lib/api';
 import { isJobInProgress, toDriverAssignmentCard, type DriverAssignmentCard } from '../../lib/assignments';
 
 function jobsSubtitle(count: number) {
@@ -22,13 +23,22 @@ export default function AssignmentsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [assignments, setAssignments] = useState<DriverAssignmentCard[]>([]);
+  const [trip, setTrip] = useState<Trip | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;
     try {
-      const rows = await fetchDriverAssignments(token);
+      // Both in parallel: a driver on a run still has ordinary jobs, and
+      // waiting on one to show the other doubles the wait on a bad signal.
+      const [rows, run] = await Promise.all([
+        fetchDriverAssignments(token),
+        // A run is an addition to this screen, not a precondition for it —
+        // if only this call fails the job list must still render.
+        fetchMyTrip(token).catch(() => null),
+      ]);
       setAssignments(rows.map(toDriverAssignmentCard));
+      setTrip(run);
       setError(null);
     } catch (err) {
       setAssignments([]);
@@ -92,6 +102,15 @@ export default function AssignmentsScreen() {
     <ScreenShell refreshing={refreshing} onRefresh={onRefresh}>
       <SectionHeader eyebrow="Dispatch board" title="Jobs" subtitle={jobsSubtitle(assignments.length)} />
 
+      {/* Above everything, and outside the loading/error/empty branches
+          below: a driver on a run needs the next stop first, and the run
+          having loaded does not depend on the job list having loaded.
+          Completed runs are not shown — the work is finished, and leaving
+          a green run card on screen reads as something still to do. */}
+      {trip && trip.status !== 'COMPLETED' && trip.stopCount > 0 ? (
+        <RunCard trip={trip} token={token ?? ''} onChanged={setTrip} />
+      ) : null}
+
       {loading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator color={theme.colors.primary} />
@@ -108,11 +127,13 @@ export default function AssignmentsScreen() {
           </TouchableOpacity>
         </View>
       ) : assignments.length === 0 ? (
-        <EmptyState
-          icon="checkmark-done-circle-outline"
-          title="Nothing on your plate"
-          body="Pull down to refresh, or wait for dispatch to send your next job."
-        />
+        trip && trip.status !== 'COMPLETED' ? null : (
+          <EmptyState
+            icon="checkmark-done-circle-outline"
+            title="Nothing on your plate"
+            body="Pull down to refresh, or wait for dispatch to send your next job."
+          />
+        )
       ) : (
         <>
           {inProgress.length > 0 ? (

@@ -528,3 +528,65 @@ export async function uploadDriverDocument(
     clearTimeout(timeoutId!);
   }
 }
+
+// ── Multi-stop runs ──────────────────────────────────────────────────
+// A run is the whole sequence a driver works through: one vehicle, stops
+// in order, several orders. Completing a stop is what moves its order — see
+// the router's tripController. The driver app never sets order status
+// directly while on a run.
+
+export type TripStopStatus = 'PENDING' | 'ARRIVED' | 'DONE' | 'FAILED' | 'SKIPPED';
+
+export type TripStop = {
+  id: number;
+  order_id: number;
+  kind: 'PICKUP' | 'DROP';
+  sequence: number;
+  lat: number | null;
+  lng: number | null;
+  address_text: string | null;
+  status: TripStopStatus;
+  failure_reason: string | null;
+  cargo_description: string | null;
+  weight_kg: number | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  recipient_name: string | null;
+  recipient_phone: string | null;
+  special_instructions: string | null;
+  priority: 'high' | 'normal' | 'low';
+};
+
+export type Trip = {
+  id: number;
+  status: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  planned_distance_m: number | null;
+  started_at: string | null;
+  stops: TripStop[];
+  stopCount: number;
+  completedStopCount: number;
+  currentStop: TripStop | null;
+};
+
+// Resolves to null when the driver has no run — an ordinary state, not an
+// error, so it must not be surfaced as one.
+export async function fetchMyTrip(token: string): Promise<Trip | null> {
+  try {
+    return (await apiFetch('/api/trips/mine', { token })) as Trip | null;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('status 404')) return null;
+    throw error;
+  }
+}
+
+export async function updateTripStop(
+  stopId: number,
+  input: { status: Exclude<TripStopStatus, 'PENDING'>; failureReason?: string },
+  token: string
+): Promise<Trip> {
+  return (await apiFetch(`/api/trips/stops/${stopId}`, {
+    method: 'PATCH',
+    token,
+    body: input,
+  })) as Trip;
+}

@@ -9,6 +9,7 @@ import { useSocket } from '../context/SocketContext';
 import { useMapInteraction } from '../context/MapInteractionContext';
 import DispatchPanel from './DispatchPanel';
 import RouteOptimizerPanel from './RouteOptimizerPanel';
+import TripsPanel from './TripsPanel';
 import RoutesPanel from './RoutesPanel';
 import GeofenceDrawer from './GeofenceDrawer';
 import AdminControlPanel from './AdminControlPanel';
@@ -81,6 +82,7 @@ export default function SecondaryPanel() {
                             setDrawModeActive={setDrawModeActive}
                             dispatchRankings={dispatchRankings}
                         />
+                        <TripsPanel />
                         <RouteOptimizerPanel
                             onRouteOptimized={setOptimizedRoutes}
                             stopTargetMode={stopTargetMode}

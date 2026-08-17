@@ -424,3 +424,89 @@ export async function confirmMfa(code: string, token: string): Promise<{ recover
 export async function disableMfa(password: string, token: string) {
     return apiFetch('/api/auth/mfa/disable', { method: 'POST', token, body: { password } });
 }
+
+// ── Multi-stop runs ──────────────────────────────────────────────────
+// A run is one driver, one ordered sequence of stops drawn from real
+// orders. See the router's tripController for why stops drive order
+// status rather than the other way round.
+
+export interface TripStop {
+    id: number;
+    order_id: number;
+    kind: 'PICKUP' | 'DROP';
+    sequence: number;
+    lat: number | null;
+    lng: number | null;
+    address_text: string | null;
+    status: 'PENDING' | 'ARRIVED' | 'DONE' | 'FAILED' | 'SKIPPED';
+    failure_reason: string | null;
+    cargo_description: string | null;
+    weight_kg: number | null;
+    order_status: string;
+    customer_name: string | null;
+    customer_phone: string | null;
+    recipient_name: string | null;
+    recipient_phone: string | null;
+    special_instructions: string | null;
+    tracking_token: string | null;
+    priority: 'high' | 'normal' | 'low';
+}
+
+export interface Trip {
+    id: number;
+    driver_username: string | null;
+    driver_full_name: string | null;
+    vehicle_id: number | null;
+    status: 'PLANNED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+    planned_distance_m: number | null;
+    created_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+    stops: TripStop[];
+    stopCount: number;
+    completedStopCount: number;
+    currentStop: TripStop | null;
+}
+
+export interface TripSummary {
+    id: number;
+    driver_username: string | null;
+    driver_full_name: string | null;
+    status: Trip['status'];
+    planned_distance_m: number | null;
+    created_at: string;
+    stop_count: number;
+    completed_stop_count: number;
+    failed_stop_count: number;
+}
+
+export async function fetchTrips(token: string): Promise<TripSummary[]> {
+    return apiFetch('/api/trips', { method: 'GET', token }) as Promise<TripSummary[]>;
+}
+
+export async function fetchTrip(tripId: number, token: string): Promise<Trip> {
+    return apiFetch(`/api/trips/${tripId}`, { method: 'GET', token }) as Promise<Trip>;
+}
+
+export async function createTrip(
+    input: { orderIds: number[]; driverUsername?: string | null; vehicleId?: number | null },
+    token: string
+): Promise<Trip> {
+    return apiFetch('/api/trips', { method: 'POST', token, body: input }) as Promise<Trip>;
+}
+
+export async function updateTrip(
+    tripId: number,
+    input: { driverUsername?: string | null; vehicleId?: number | null; status?: 'PLANNED' | 'ACTIVE' | 'CANCELLED' },
+    token: string
+): Promise<Trip> {
+    return apiFetch(`/api/trips/${tripId}`, { method: 'PATCH', token, body: input }) as Promise<Trip>;
+}
+
+export async function optimiseTrip(tripId: number, token: string): Promise<Trip> {
+    return apiFetch(`/api/trips/${tripId}/optimise`, { method: 'POST', token }) as Promise<Trip>;
+}
+
+export async function reorderTrip(tripId: number, stopIds: number[], token: string): Promise<Trip> {
+    return apiFetch(`/api/trips/${tripId}/sequence`, { method: 'PATCH', token, body: { stopIds } }) as Promise<Trip>;
+}
