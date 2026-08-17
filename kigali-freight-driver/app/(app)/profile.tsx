@@ -12,6 +12,7 @@ import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { fetchMyProfile, fetchMyVehicle, fetchMyCompletedDeliveries, fetchMyDocuments, type MyProfile, type MyVehicle, type CompletedDelivery } from '../../lib/api';
 import { getTrackingDiagnostics, sendTestLocationPing } from '../../lib/locationTracking';
+import { useBiometricSupport } from '../../lib/biometrics';
 
 type Diagnostics = Awaited<ReturnType<typeof getTrackingDiagnostics>>;
 type Tone = 'good' | 'bad' | 'neutral';
@@ -144,6 +145,7 @@ export default function ProfileScreen() {
   const [sendingPing, setSendingPing] = useState(false);
   const [pingToast, setPingToast] = useState<Toast | null>(null);
   const [togglingBiometric, setTogglingBiometric] = useState(false);
+  const biometrics = useBiometricSupport();
 
   // undefined = still loading; null = confirmed there isn't one yet.
   const [vehicle, setVehicle] = useState<MyVehicle | null | undefined>(undefined);
@@ -415,20 +417,36 @@ export default function ProfileScreen() {
           <InfoRow label="Sign-in method" value="4-digit PIN" />
         </View>
 
-        <View style={styles.biometricRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.biometricTitle}>Biometric login</Text>
-            <Text style={styles.biometricDetail}>Unlock the app with your fingerprint or face instead of your PIN.</Text>
+        {/* Hidden outright on a phone with no sensor or nothing enrolled,
+            rather than shown greyed out: a disabled switch invites a
+            driver to work out what is wrong with their phone, and the
+            answer here is nothing. It reappears on its own if they enrol
+            a fingerprint later — see useBiometricSupport.
+
+            'checking' renders nothing too. It resolves in a few
+            milliseconds, and a row that appears a beat after the screen
+            does is worse than one that was simply always there. */}
+        {biometrics.status === 'available' ? (
+          <View style={styles.biometricRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.biometricTitle}>{biometrics.label}</Text>
+              <Text style={styles.biometricDetail}>
+                Unlock the app with {biometrics.labelLower} instead of your PIN.
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onToggleBiometric}
+              disabled={togglingBiometric}
+              style={[styles.toggle, biometricEnabled && styles.toggleOn]}
+              activeOpacity={0.85}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: biometricEnabled }}
+              accessibilityLabel={`${biometrics.label} unlock`}
+            >
+              <View style={[styles.toggleKnob, biometricEnabled && styles.toggleKnobOn]} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={onToggleBiometric}
-            disabled={togglingBiometric}
-            style={[styles.toggle, biometricEnabled && styles.toggleOn]}
-            activeOpacity={0.85}
-          >
-            <View style={[styles.toggleKnob, biometricEnabled && styles.toggleKnobOn]} />
-          </TouchableOpacity>
-        </View>
+        ) : null}
 
         <Text style={styles.microcopy}>Forgot your PIN? Contact your dispatcher to have it reset.</Text>
       </Card>

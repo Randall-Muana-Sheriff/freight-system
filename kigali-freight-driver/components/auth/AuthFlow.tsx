@@ -10,6 +10,7 @@ import { ConfirmCallModal } from './ConfirmCallModal';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { getRememberedPhone } from '../../lib/tokenStore';
+import { readBiometricSupport, useBiometricSupport } from '../../lib/biometrics';
 import { requestDriverOtp, verifyDriverOtp, verifyDriverInvite, fetchDispatchContact, type DriverInviteResult } from '../../lib/api';
 import type { Toast } from '../ToastOverlay';
 
@@ -75,6 +76,7 @@ function StartOverFooter({ children, onStartOver }: { children?: ReactNode; onSt
 // A returning driver takes the short path instead: phone -> otp -> pin-login
 export function AuthFlow() {
   const { completePinSetup, loginWithPin, enableBiometric, biometricEnabled } = useAuth();
+  const biometrics = useBiometricSupport();
 
   const [step, setStep] = useState<Step>('phone');
   const [deviceSeenBefore, setDeviceSeenBefore] = useState(false);
@@ -208,7 +210,14 @@ export function AuthFlow() {
       // Biometric was already turned on before a dispatcher-triggered PIN
       // reset sent this driver back through pin-set/pin-confirm — no need
       // to offer to enable it again, it's already active.
-      if (biometricEnabled) {
+      //
+      // Read fresh here rather than trusting the hook's last value: this
+      // runs once, at the end of setup, and the answer decides whether a
+      // whole screen appears. Previously the offer was shown on every
+      // device, so a phone with no sensor got a screen inviting it to
+      // enable something that would silently skip itself when tapped.
+      const support = biometricEnabled ? null : await readBiometricSupport();
+      if (biometricEnabled || support?.status !== 'available') {
         enterApp();
       } else {
         setStep('biometric');
@@ -431,7 +440,12 @@ export function AuthFlow() {
 
     case 'biometric':
       return (
-        <AuthScreen eyebrow="Optional" title="Enable biometric login." subtitle="Faster than typing your PIN every time you start a shift." showLogo={false}>
+        <AuthScreen
+          eyebrow="Optional"
+          title={`Turn on ${biometrics.label}.`}
+          subtitle="Faster than typing your PIN every time you start a shift."
+          showLogo={false}
+        >
           <BiometricPrompt onEnable={onEnableBiometric} onSkip={enterApp} />
         </AuthScreen>
       );

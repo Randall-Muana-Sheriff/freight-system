@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../lib/theme';
+import { useBiometricSupport } from '../../lib/biometrics';
 
 // A one-time offer, shown only right after a driver finishes setting up
 // their PIN (never on a returning-driver login) — accepting just flips a
@@ -9,30 +10,12 @@ import { theme } from '../../lib/theme';
 // cold-start session restore. Nothing here talks to the backend.
 export function BiometricPrompt({ onEnable, onSkip }: { onEnable: () => void; onSkip: () => void }) {
   const [status, setStatus] = useState<'idle' | 'scanning' | 'success'>('idle');
-  // Defaults to the fingerprint glyph (the more common case, and a
-  // reasonable fallback while this check is still in flight), but an
-  // iPhone with Face ID has no fingerprint sensor at all — showing that
-  // icon there would be flat-out wrong, not just generic.
-  const [icon, setIcon] = useState<'finger-print-outline' | 'scan-outline'>('finger-print-outline');
-
-  useEffect(() => {
-    let cancelled = false;
-    // Dynamic import, not a top-level one — see lib/auth.tsx's
-    // confirmBiometric for why: a dev-client build made before this
-    // native module was added would otherwise crash the whole app just
-    // from this file being imported, not merely from calling it.
-    import('expo-local-authentication')
-      .then((LocalAuthentication) => LocalAuthentication.supportedAuthenticationTypesAsync())
-      .then((types) => {
-        if (cancelled) return;
-        const isFaceOnly = types.includes(2) && !types.includes(1); // FACIAL_RECOGNITION without FINGERPRINT
-        setIcon(isFaceOnly ? 'scan-outline' : 'finger-print-outline');
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Icon and wording both come from lib/biometrics, so this button, the
+  // title above it and the toggle in Profile cannot end up calling the
+  // same feature three different things. An iPhone with Face ID has no
+  // fingerprint sensor at all, so the glyph is not merely generic there —
+  // it is wrong.
+  const { icon, label } = useBiometricSupport();
 
   const onPress = async () => {
     setStatus('scanning');
@@ -48,6 +31,7 @@ export function BiometricPrompt({ onEnable, onSkip }: { onEnable: () => void; on
       }
 
       const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Confirm it's you" });
+
       if (result.success) {
         setStatus('success');
         setTimeout(onEnable, 450);
@@ -61,7 +45,14 @@ export function BiometricPrompt({ onEnable, onSkip }: { onEnable: () => void; on
 
   return (
     <View style={styles.wrap}>
-      <TouchableOpacity style={styles.circle} activeOpacity={0.85} onPress={onPress} disabled={status !== 'idle'}>
+      <TouchableOpacity
+        style={styles.circle}
+        activeOpacity={0.85}
+        onPress={onPress}
+        disabled={status !== 'idle'}
+        accessibilityRole="button"
+        accessibilityLabel={`Turn on ${label}`}
+      >
         {status === 'scanning' ? (
           <ActivityIndicator color={theme.colors.primary} />
         ) : (
