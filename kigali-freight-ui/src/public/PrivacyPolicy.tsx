@@ -139,7 +139,12 @@ export default function PrivacyPolicy() {
                 </p>
             </Section>
 
-            <Section id="contact" title="Contact">
+            {/* Deliberately not id="contact": the landing page uses that for its
+                standing-routes enquiry, and the header and footer scroll to it
+                from every page. Two elements sharing the id meant a visitor on
+                this page clicking "Talk to us" landed in a paragraph about
+                erasing their personal data. */}
+            <Section id="privacy-contact" title="Contact">
                 {/* A working mailbox on a domain that accepts mail.
                     inzira.systems publishes no MX record, so an address there
                     would bounce silently — and a policy whose only contact

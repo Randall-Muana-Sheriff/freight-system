@@ -13,8 +13,40 @@ const SECTIONS = [
     { id: 'contact', label: 'Talk to us' },
 ];
 
-function scrollToSection(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+// Every link in the header and the "Standing routes" line in the footer
+// points at a section of the landing page — but both chrome pieces render
+// on every page, and those sections exist only on the landing one. This
+// used to be a bare getElementById(...)?.scrollIntoView(), and the
+// optional chaining swallowed the miss: on /order, /track, /privacy and
+// /support the entire primary navigation did nothing at all, silently.
+//
+// So a section link now means "take me to that part of the site", not
+// "scroll if it happens to be here": if the section is absent we go home
+// first and scroll once it exists.
+function goToSection(id: string, onNavigate: (to: string) => void) {
+    const here = document.getElementById(id);
+    if (here) {
+        here.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+
+    onNavigate('/');
+
+    // The landing page is in this same chunk, so it mounts within a frame
+    // or two — but React commits after the handler returns, so a single
+    // requestAnimationFrame can still fire before the section exists.
+    // Retrying for a short window is more honest than guessing one delay,
+    // and gives up rather than looping if the target never appears.
+    let framesLeft = 30;
+    const scrollWhenReady = () => {
+        const target = document.getElementById(id);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (framesLeft-- > 0) {
+            requestAnimationFrame(scrollWhenReady);
+        }
+    };
+    requestAnimationFrame(scrollWhenReady);
 }
 
 export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => void }) {
@@ -32,7 +64,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
 
                 <nav className="hidden items-center gap-8 md:flex">
                     {SECTIONS.map((section) => (
-                        <button key={section.id} onClick={() => scrollToSection(section.id)}
+                        <button key={section.id} onClick={() => goToSection(section.id, onNavigate)}
                             className="focus-ring text-sm text-pub-onink-soft transition-colors hover:text-pub-onink">
                             {section.label}
                         </button>
@@ -70,7 +102,7 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                         <p className="data-label mb-1 text-pub-onink-soft/60">Get moving</p>
                         <button className={link} onClick={() => onNavigate('/order')}>Book a delivery</button>
                         <button className={link} onClick={() => onNavigate('/track')}>Track a shipment</button>
-                        <button className={link} onClick={() => scrollToSection('contact')}>Standing routes</button>
+                        <button className={link} onClick={() => goToSection('contact', onNavigate)}>Standing routes</button>
                     </div>
 
                     <div className="flex flex-col items-start gap-2.5">
