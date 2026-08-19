@@ -26,14 +26,17 @@ export const LAUNCH_LABEL = 'November 2026';
 //
 // Flip to false to open the site early; true holds the countdown until
 // LAUNCH_DATE passes, after which the real site takes over on its own.
-// Flipped back on: the root serves the countdown again until LAUNCH_DATE.
+// Currently off: the root serves the real site. LAUNCH_DATE above is left
+// exactly as it is rather than moved or deleted — this switch exists so
+// that opening early costs nothing to reverse.
 //
 // This has a partner that must agree with it — PRE_LAUNCH in the UI
 // container's environment, which decides whether the sitemap advertises
-// /order and /track. The two disagreeing is the failure worth avoiding:
-// a sitemap offering a bookable service while the front page says the
-// company is not open yet points Google at a contradiction.
-export const COUNTDOWN_ENABLED = true;
+// /order and /track. The two disagreeing is the failure worth avoiding in
+// either direction: a sitemap listing only the root while the site is open
+// hides the bookable pages from search, and one listing /order while the
+// front page says the company is not open yet is a contradiction.
+export const COUNTDOWN_ENABLED = false;
 
 // The countdown is for the public internet, not for us. Holding a
 // developer behind it means either working on the site through /preview
@@ -46,7 +49,12 @@ export const COUNTDOWN_ENABLED = true;
 // countdown. Forgetting to exempt a dev box shows us a holding page;
 // forgetting to include some real hostname would open the site early to
 // customers, which is the more expensive mistake.
-function isLocalHost(hostname: string) {
+// Exported so the host classification can be tested on its own. Asserting
+// it through isPreLaunch instead meant every test of "which host is this?"
+// also depended on COUNTDOWN_ENABLED, so half the suite broke each time
+// that switch was flipped — which is exactly when you least want the tests
+// shouting about something unrelated.
+export function isLocalHost(hostname: string) {
     return hostname === 'localhost'
         || hostname === '127.0.0.1'
         || hostname === '[::1]'
@@ -54,9 +62,17 @@ function isLocalHost(hostname: string) {
         || hostname.endsWith('.local')
         // Private LAN ranges — a phone or another laptop opening the dev
         // server over Wi-Fi is still us testing, not a visitor.
-        || /^10\./.test(hostname)
-        || /^192\.168\./.test(hostname)
-        || /^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+        //
+        // Anchored at both ends. These were prefix-only, which made
+        // "192.168.1.44.evil.com" read as one of our machines: an IP
+        // address has no suffix, so anything trailing it is a domain name
+        // wearing one as a costume. Nothing could exploit that here — Caddy
+        // only answers on the configured domains — but this function's whole
+        // stated rule is that a host is exempt only if it is recognisably
+        // ours, and a prefix match is looser than that promise.
+        || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)
+        || /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)
+        || /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(hostname);
 }
 
 export function isPreLaunch(now: Date = new Date()) {
