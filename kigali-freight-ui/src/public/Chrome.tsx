@@ -5,13 +5,17 @@ import { InziraMark } from './InziraMark';
 import { restartTour } from './SiteTour';
 import { staffUrl } from '../utils/surface';
 import { getStaffDomain } from '../utils/runtimeConfig';
+import { LANGUAGES, useLanguage, type Language } from './i18n';
 
+// The id is structural (it must match a section on the landing page); the
+// label is editorial. Keeping the label as a dictionary key rather than a
+// string means the two cannot drift apart in one language and not the other.
 const SECTIONS = [
-    { id: 'services', label: 'What we move' },
-    { id: 'how', label: 'How it works' },
-    { id: 'about', label: 'The system' },
-    { id: 'contact', label: 'Talk to us' },
-];
+    { id: 'services', key: 'whatWeMove' },
+    { id: 'how', key: 'howItWorks' },
+    { id: 'about', key: 'theSystem' },
+    { id: 'contact', key: 'talkToUs' },
+] as const;
 
 // Every link in the header and the "Standing routes" line in the footer
 // points at a section of the landing page — but both chrome pieces render
@@ -49,11 +53,34 @@ function goToSection(id: string, onNavigate: (to: string) => void) {
     requestAnimationFrame(scrollWhenReady);
 }
 
+// Two languages, so a dropdown would be a menu with one alternative in it.
+// A pair of buttons shows both at once and takes one tap either way.
+function LanguageToggle() {
+    const { lang, setLang, t } = useLanguage();
+    return (
+        <div className="flex items-center gap-1" role="group" aria-label={t.language.label}>
+            {(Object.keys(LANGUAGES) as Language[]).map((code) => (
+                <button key={code} onClick={() => setLang(code)}
+                    // aria-pressed rather than a visual-only highlight: a
+                    // screen reader user needs to know which is active too.
+                    aria-pressed={lang === code}
+                    lang={code}
+                    className={`focus-ring px-1.5 py-1 text-xs uppercase tracking-wider transition-colors ${
+                        lang === code ? 'text-pub-onink' : 'text-pub-onink-soft/60 hover:text-pub-onink-soft'
+                    }`}>
+                    {code}
+                </button>
+            ))}
+        </div>
+    );
+}
+
 export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
     return (
         <header className="bg-pub-ink">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-5">
-                <button onClick={() => onNavigate('/')} aria-label="Inzira home"
+                <button onClick={() => onNavigate('/')} aria-label={t.nav.home}
                     className="focus-ring flex items-baseline gap-3">
                     <InziraMark className="h-6 w-6 translate-y-1" />
                     <span className="display-tight text-xl text-pub-onink">Inzira</span>
@@ -66,21 +93,25 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                     {SECTIONS.map((section) => (
                         <button key={section.id} onClick={() => goToSection(section.id, onNavigate)}
                             className="focus-ring text-sm text-pub-onink-soft transition-colors hover:text-pub-onink">
-                            {section.label}
+                            {t.nav[section.key]}
                         </button>
                     ))}
                 </nav>
 
-                <button onClick={() => onNavigate('/order')}
-                    className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
-                    Book a delivery
-                </button>
+                <div className="flex items-center gap-3">
+                    <LanguageToggle />
+                    <button onClick={() => onNavigate('/order')}
+                        className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                        {t.actions.book}
+                    </button>
+                </div>
             </div>
         </header>
     );
 }
 
 export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
     const link = 'focus-ring text-left text-sm text-pub-onink-soft transition-colors hover:text-pub-onink';
 
     return (
@@ -92,24 +123,21 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                             <InziraMark className="h-6 w-6 translate-y-1" />
                             <span className="display-tight text-xl text-pub-onink">Inzira</span>
                         </div>
-                        <p className="mt-4 max-w-xs text-sm leading-relaxed text-pub-onink-soft">
-                            Freight across Kigali, with the position of every consignment
-                            visible to the person who sent it.
-                        </p>
+                        <p className="mt-4 max-w-xs text-sm leading-relaxed text-pub-onink-soft">{t.footer.tagline}</p>
                     </div>
 
                     <div className="flex flex-col items-start gap-2.5">
-                        <p className="data-label mb-1 text-pub-onink-soft/60">Get moving</p>
-                        <button className={link} onClick={() => onNavigate('/order')}>Book a delivery</button>
-                        <button className={link} onClick={() => onNavigate('/track')}>Track a shipment</button>
-                        <button className={link} onClick={() => goToSection('contact', onNavigate)}>Standing routes</button>
+                        <p className="data-label mb-1 text-pub-onink-soft/60">{t.footer.getMoving}</p>
+                        <button className={link} onClick={() => onNavigate('/order')}>{t.actions.book}</button>
+                        <button className={link} onClick={() => onNavigate('/track')}>{t.actions.track}</button>
+                        <button className={link} onClick={() => goToSection('contact', onNavigate)}>{t.actions.standingRoutes}</button>
                     </div>
 
                     <div className="flex flex-col items-start gap-2.5">
-                        <p className="data-label mb-1 text-pub-onink-soft/60">Company</p>
+                        <p className="data-label mb-1 text-pub-onink-soft/60">{t.footer.company}</p>
                         <span className="text-sm text-pub-onink-soft">Gikondo Industrial Zone</span>
                         <span className="text-sm text-pub-onink-soft">Kigali, Rwanda</span>
-                        <button className={link} onClick={restartTour}>Show me around</button>
+                        <button className={link} onClick={restartTour}>{t.actions.showMeAround}</button>
                         {/* A real anchor to the board's canonical host, not a
                             path nav. The session is per-origin, so sending
                             staff to this site's own /dispatch would give them
@@ -120,7 +148,7 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                             information, and the people who need it are
                             looking for it rather than reading the footer. */}
                         <a className={`${link} mt-3`} href={staffUrl(getStaffDomain())}>
-                            Staff sign in
+                            {t.actions.staffSignIn}
                         </a>
                     </div>
                 </div>
@@ -132,8 +160,8 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                     {/* Both app stores require a reachable privacy policy for
                         the driver app, and a link buried nowhere is the usual
                         reason that check fails. */}
-                    <button className={link} onClick={() => onNavigate('/support')}>Support</button>
-                    <button className={link} onClick={() => onNavigate('/privacy')}>Privacy</button>
+                    <button className={link} onClick={() => onNavigate('/support')}>{t.actions.support}</button>
+                    <button className={link} onClick={() => onNavigate('/privacy')}>{t.actions.privacy}</button>
                 </div>
             </div>
         </footer>

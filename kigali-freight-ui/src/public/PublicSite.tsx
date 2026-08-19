@@ -10,6 +10,7 @@ import { SiteTour } from './SiteTour';
 import { setCanonical, setDescription } from '../utils/seo';
 import { ComingSoon } from './ComingSoon';
 import { isPreLaunch, LAUNCH_LABEL } from './launch';
+import { LanguageProvider, useLanguage } from './i18n';
 
 // Still no router dependency — App.tsx already branches on pathname for
 // /kiosk and adding one library to serve three static paths would be more
@@ -47,6 +48,20 @@ const DEFAULT_DESCRIPTION = 'Same-day and bulk freight across Kigali. Book in un
 // a bookable service while the page tells visitors it is not open yet is
 // the kind of mismatch that loses trust before anyone clicks twice.
 const PRE_LAUNCH_DESCRIPTION = `Inzira is a freight service for Kigali where you can see exactly where your cargo is, the whole way. Opening ${LAUNCH_LABEL} — leave your number and we will tell you when.`;
+
+// Its own component because PublicSite renders the provider and so cannot
+// read from it in the same body — and this link, of all of them, has to be
+// in the reader's language: it exists for people navigating by keyboard and
+// screen reader, who are least served by guessing.
+function SkipLink() {
+    const { t } = useLanguage();
+    return (
+        <a href="#main"
+            className="focus-ring sr-only focus:not-sr-only focus:fixed focus:left-5 focus:top-5 focus:z-50 focus:bg-pub-laterite focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-pub-onink">
+            {t.actions.skipToContent}
+        </a>
+    );
+}
 
 export default function PublicSite() {
     const [route, setRoute] = useState<Route>(readRoute);
@@ -96,21 +111,21 @@ export default function PublicSite() {
     // it, since there is nowhere else to go yet.
     if (holding) {
         return (
-            <div className="font-body antialiased">
-                <ComingSoon />
-            </div>
+            <LanguageProvider>
+                <div className="font-body antialiased">
+                    <ComingSoon />
+                </div>
+            </LanguageProvider>
         );
     }
 
     return (
+        <LanguageProvider>
         <div className="min-h-screen bg-pub-paper font-body text-pub-onpaper antialiased">
             {/* Four section links and a call to action sit between the top of
                 the page and the content itself. This is the one tab that gets
                 past them, and it stays invisible until it is focused. */}
-            <a href="#main"
-                className="focus-ring sr-only focus:not-sr-only focus:fixed focus:left-5 focus:top-5 focus:z-50 focus:bg-pub-laterite focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-pub-onink">
-                Skip to content
-            </a>
+            <SkipLink />
             <PublicHeader onNavigate={navigate} />
             {/* tabIndex lets the skip link actually move focus here rather
                 than only scrolling, which is the half of it screen readers
@@ -137,5 +152,6 @@ export default function PublicSite() {
                 not be interrupted by a tour of the page they left. */}
             {route.path === '/' || route.path === '/preview' ? <SiteTour onBook={() => navigate('/order')} /> : null}
         </div>
+        </LanguageProvider>
     );
 }
