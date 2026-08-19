@@ -183,6 +183,23 @@ async function attemptStartLocationUpdates(retriesLeft = 2): Promise<void> {
       // stationary, no matter how long the wait, which the dispatcher
       // dashboard's "stale after 2min" check then misreads as offline.
       distanceInterval: 0,
+      // iOS defaults this to true and then stops sending updates whenever
+      // it decides the device is stationary. That defeats distanceInterval:
+      // 0 above by another route — the comment there explains we never want
+      // a parked driver to disappear, and this is the setting that actually
+      // makes it so on iPhone.
+      //
+      // Found on a real device, not in review: seven hours of production
+      // telemetry from a phone in Pennsylvania showed a median gap of one
+      // second interrupted by seventeen silences over ten minutes, the
+      // longest a full hour, recurring every twenty to forty minutes. That
+      // is not a driver toggling their shift; it is iOS pausing a
+      // stationary phone. To a dispatcher it reads as a driver who has
+      // vanished mid-shift.
+      pausesUpdatesAutomatically: false,
+      // Tells iOS this is vehicle movement, so its own heuristics about
+      // when a fix matters are tuned for a truck rather than a pedestrian.
+      activityType: Location.ActivityType.AutomotiveNavigation,
       showsBackgroundLocationIndicator: true, // iOS: the blue status bar pill while tracking in background
       foregroundService: {
         notificationTitle: 'Inzira Driver',
