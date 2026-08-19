@@ -257,3 +257,54 @@ body, html, #root {
   background: transparent !important;
   border: none !important;
 }
+/* ── Loading motion ──────────────────────────────────────────────────
+   The brand mark in motion — see components/RouteLoader.tsx for why the
+   waiting state is a route being travelled rather than a spinner.
+
+   Kept as CSS keyframes rather than JS so the animation runs on the
+   compositor. This is on screen while a JavaScript chunk is downloading
+   and parsing, which is exactly when the main thread has nothing to
+   spare, and a JS-driven loader stutters at the one moment anyone sees
+   it. */
+
+/* pathLength=100 on the element, so the dash maths is in percent and
+   survives any future change to the curve. */
+@keyframes inzira-route-draw {
+  0%        { stroke-dashoffset: 100; }
+  55%, 100% { stroke-dashoffset: 0; }
+}
+
+@keyframes inzira-route-arrive {
+  0%, 45%   { transform: scale(0); opacity: 0; }
+  70%       { transform: scale(1.12); opacity: 1; }
+  80%, 100% { transform: scale(1); opacity: 1; }
+}
+
+.inzira-route-draw {
+  stroke-dasharray: 100;
+  animation: inzira-route-draw 1.9s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+}
+
+.inzira-route-arrive {
+  animation: inzira-route-arrive 1.9s cubic-bezier(0.34, 1.4, 0.64, 1) infinite;
+}
+
+/* Motion is the whole point of this component, so reduced-motion does not
+   get a slower version — it gets the finished frame. The route is drawn,
+   the destination is marked, nothing moves, and the meaning survives.
+   The travelling cargo is hidden outright: SMIL ignores this media query,
+   so the only way to stop it is to not show it. */
+@media (prefers-reduced-motion: reduce) {
+  .inzira-route-draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .inzira-route-arrive {
+    animation: none;
+    transform: scale(1);
+    opacity: 1;
+  }
+  .inzira-route-cargo {
+    display: none;
+  }
+}

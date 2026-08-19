@@ -8,6 +8,7 @@ import { DialogProvider } from './components/DialogProvider';
 import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { setNoIndex } from './utils/seo';
 import { resolveSurface, shouldRedirectToStaffHost, staffUrl } from './utils/surface';
+import { RouteLoader } from './components/RouteLoader';
 import { getStaffDomain } from './utils/runtimeConfig';
 
 // Only one of these two ever renders at a time (gated by showAdminCenter),
@@ -27,12 +28,12 @@ const KioskApp = lazy(() => import('./kiosk/KioskApp'));
 // centre.
 const PublicSite = lazy(() => import('./public/PublicSite'));
 
-function ScreenLoading() {
-  return (
-    <div className="h-screen w-screen flex items-center justify-center bg-ink text-steel text-xs font-mono">
-      Loading...
-    </div>
-  );
+// The wait between asking for a screen and getting it. Public and staff
+// surfaces get different palettes because they are different products;
+// resolveSurface has already run by the time this renders, so the caller
+// passes what it knows rather than this guessing again.
+function ScreenLoading({ tone = 'board' }: { tone?: 'board' | 'public' }) {
+  return <RouteLoader tone={tone} />;
 }
 
 function AppShell() {
@@ -122,7 +123,7 @@ export default function App() {
   if (surface === 'public') {
     return (
       <ErrorBoundary>
-        <Suspense fallback={<ScreenLoading />}>
+        <Suspense fallback={<ScreenLoading tone="public" />}>
           <PublicSite />
         </Suspense>
       </ErrorBoundary>

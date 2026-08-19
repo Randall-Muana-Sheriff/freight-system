@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { trackShipment, type TrackedShipment } from './publicApi';
+import { RouteLoader } from '../components/RouteLoader';
 
 // Tracking is the road, not the paperwork, so it runs on the dark ground —
 // and it is the one page where signal amber earns its keep, marking the
@@ -71,6 +72,15 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                         {loading ? 'Looking…' : 'Track →'}
                     </button>
                 </form>
+
+                {/* The wait after asking "where is it?". Previously the
+                    results area stayed empty and only the button changed to
+                    "Looking…", so on a slow connection the page looked like
+                    it had ignored the question. The route motion answers in
+                    the same terms the page just asked in. */}
+                {loading && !shipment && !error ? (
+                    <RouteLoader tone="public-ink" fullScreen={false} label="Finding your consignment" />
+                ) : null}
 
                 {error ? (
                     <div role="alert" className="mt-10 border-l-2 border-pub-laterite pl-5">
