@@ -26,10 +26,14 @@ export const LAUNCH_LABEL = 'November 2026';
 //
 // Flip to false to open the site early; true holds the countdown until
 // LAUNCH_DATE passes, after which the real site takes over on its own.
-// Flipped off: the site is open. LAUNCH_DATE above is left as it was
-// rather than moved or faked — this switch exists precisely so opening
-// early does not mean losing the real date.
-export const COUNTDOWN_ENABLED = false;
+// Flipped back on: the root serves the countdown again until LAUNCH_DATE.
+//
+// This has a partner that must agree with it — PRE_LAUNCH in the UI
+// container's environment, which decides whether the sitemap advertises
+// /order and /track. The two disagreeing is the failure worth avoiding:
+// a sitemap offering a bookable service while the front page says the
+// company is not open yet points Google at a contradiction.
+export const COUNTDOWN_ENABLED = true;
 
 // The countdown is for the public internet, not for us. Holding a
 // developer behind it means either working on the site through /preview
