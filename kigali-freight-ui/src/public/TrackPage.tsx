@@ -152,6 +152,41 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                 })}
                             </ol>
                         )}
+
+                        {/* The milestone above has always promised "Signed
+                            for, with photo proof". The photo existed the
+                            whole time — the driver takes one at every
+                            handover — but only dispatch could see it, so the
+                            page was making a promise it never kept. */}
+                        {shipment.proofOfDelivery ? (
+                            <div className="mt-12 border-t border-pub-onink/15 pt-8">
+                                <p className="data-label text-pub-onink-soft">Proof of delivery</p>
+                                {shipment.proofOfDelivery.photoUrl ? (
+                                    <a href={shipment.proofOfDelivery.photoUrl}
+                                        target="_blank" rel="noopener noreferrer"
+                                        className="focus-ring mt-4 block overflow-hidden rounded-sm border border-pub-onink/15">
+                                        <img
+                                            src={shipment.proofOfDelivery.photoUrl}
+                                            alt={`Photograph taken at handover of ${shipment.cargo}`}
+                                            loading="lazy"
+                                            className="max-h-[26rem] w-full bg-pub-ink2 object-contain"
+                                        />
+                                    </a>
+                                ) : null}
+                                <p className="mt-4 text-[15px] leading-relaxed text-pub-onink-soft">
+                                    Photographed at handover
+                                    {shipment.proofOfDelivery.confirmedAt
+                                        ? ` on ${formatTime(shipment.proofOfDelivery.confirmedAt)}`
+                                        : ''}
+                                    {shipment.driverFirstName ? ` by ${shipment.driverFirstName}` : ''}.
+                                </p>
+                                {shipment.proofOfDelivery.notes ? (
+                                    <p className="mt-3 border-l-2 border-pub-onink/25 pl-4 text-[15px] leading-relaxed text-pub-onink">
+                                        “{shipment.proofOfDelivery.notes}”
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
                     </div>
                 ) : null}
             </div>

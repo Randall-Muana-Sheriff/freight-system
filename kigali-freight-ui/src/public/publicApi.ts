@@ -15,6 +15,14 @@ export interface TrackedShipment {
     placedAt: string;
     updatedAt: string;
     timeline: { status: string; at: string }[];
+    /** Only present once the consignment is DELIVERED — the server
+     *  withholds it entirely before that. photoUrl is a short-lived signed
+     *  link, so it is not worth storing anywhere. */
+    proofOfDelivery: {
+        photoUrl: string | null;
+        notes: string | null;
+        confirmedAt: string;
+    } | null;
 }
 
 export interface OrderDraft {

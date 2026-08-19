@@ -9,6 +9,7 @@ import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../servi
 import { ok, fail } from '../utils/httpResponse.js';
 import { normalizePhone } from '../utils/phone.js';
 import { isValidWeightKg } from '../utils/validators.js';
+import { toSignedUrl } from '../config/r2Client.js';
 
 // Ambiguity-free alphabet: no O/0, I/1, S/5. These codes get read aloud
 // down a phone line to a dispatcher and typed off an SMS by someone in a
@@ -162,6 +163,46 @@ export const PublicOrderController = {
                 return fail(res, { status: 404, code: 'NOT_FOUND', message: 'No shipment found with that code. Check the code from your confirmation SMS.' });
             }
 
+            // Proof of delivery, once there is a delivery to prove.
+            //
+            // The driver photographs every handover and it has always been
+            // stored — but only dispatch could see it, which left the one
+            // person who actually cares whether their goods arrived unable
+            // to look at the evidence that they did.
+            //
+            // Gated on DELIVERED rather than on a row existing: a photo
+            // surfacing mid-journey would be a state the customer cannot
+            // interpret, and the order's own status is the thing that
+            // decides whether this consignment is finished.
+            //
+            // distance_from_target_m and location_flagged are deliberately
+            // not selected. They are how dispatch audits whether a driver
+            // was really at the address — an internal judgement about staff,
+            // not information about the customer's parcel. Telling someone
+            // their delivery was "flagged" would alarm them about something
+            // they can neither verify nor act on.
+            let proofOfDelivery = null;
+            if (order.status === 'DELIVERED') {
+                const pod = await pool.query(
+                    `SELECT photo_url, notes, confirmed_at
+                       FROM delivery_confirmations
+                      WHERE order_id = $1
+                      ORDER BY confirmed_at DESC LIMIT 1`,
+                    [order.id]
+                );
+                if (pod.rows[0]) {
+                    // photo_url is a storage key, not a public address — the
+                    // bucket is private, so it is signed per response and
+                    // expires. Nothing durable is handed out.
+                    const photoUrl = await toSignedUrl(pod.rows[0].photo_url);
+                    proofOfDelivery = {
+                        photoUrl,
+                        notes: pod.rows[0].notes || null,
+                        confirmedAt: pod.rows[0].confirmed_at,
+                    };
+                }
+            }
+
             const history = await pool.query(
                 // order_status_logs, not order_status_history — changed_by
                 // is intentionally not selected: it is a staff username.
@@ -185,6 +226,7 @@ export const PublicOrderController = {
                 placedAt: order.createdAt,
                 updatedAt: order.updatedAt,
                 timeline: history.rows,
+                proofOfDelivery,
             });
         } catch (error) {
             console.error(`❌ public trackOrder failed [${req.requestId || 'no-request-id'}]:`, error.stack || error.message);
