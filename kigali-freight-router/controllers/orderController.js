@@ -9,6 +9,7 @@ import { uploadDeliveryPhoto, toSignedUrl } from '../config/r2Client.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
 import { appendAuditLog } from '../services/auditLogService.js';
 import { logError } from '../utils/logger.js';
+import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
@@ -739,6 +740,15 @@ export const OrderController = {
             await client.query(logQuery, [id, previousStatus, normalizedStatus, userEmail]);
 
             await client.query('COMMIT');
+
+            // After the commit, never before: an SMS round trip inside an
+            // open transaction would hold this order's row lock for the
+            // length of a third party's network call.
+            notifyCustomerOfStatus({
+                orderId: updatedOrder.id,
+                previousStatus,
+                newStatus: normalizedStatus,
+            });
 
             io.emit('order:status-updated', {
                 orderId: updatedOrder.id,

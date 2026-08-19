@@ -20,6 +20,7 @@ import { sendPushToUser } from '../services/pushNotificationService.js';
 import { logError } from '../utils/logger.js';
 import { sequenceStops, plannedDistanceMetres } from '../utils/routeSequencing.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
+import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
 
 const STOP_KINDS = ['PICKUP', 'DROP'];
 const OPEN_STOP_STATUSES = ['PENDING', 'ARRIVED'];
@@ -594,11 +595,24 @@ export const TripController = {
                 );
             }
 
+            // Filled in below if completing this stop moves its order, and
+            // sent after the commit — see the note there.
+            let customerNotice = null;
+
             // The one place field work changes an order's state.
             if (status === 'DONE') {
                 const orderStatus = STOP_COMPLETION_ORDER_STATUS[stop.kind];
                 const previous = await client.query(`SELECT status FROM orders WHERE id = $1 FOR UPDATE`, [stop.order_id]);
                 if (previous.rows[0] && previous.rows[0].status !== orderStatus) {
+                    // Held until after the commit below. Completing a stop
+                    // is the other place an order's status moves, and a
+                    // customer on a multi-stop run deserves the same text
+                    // as one on a single job.
+                    customerNotice = {
+                        orderId: stop.order_id,
+                        previousStatus: previous.rows[0].status,
+                        newStatus: orderStatus,
+                    };
                     await client.query(`UPDATE orders SET status = $2, updated_at = NOW() WHERE id = $1`, [stop.order_id, orderStatus]);
                     await client.query(
                         `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by) VALUES ($1, $2, $3, $4)`,
@@ -629,6 +643,13 @@ export const TripController = {
 
             const full = await loadTrip(client, stop.trip_id);
             await client.query('COMMIT');
+
+            // After the commit, for the same reason as the order endpoint:
+            // an SMS round trip inside an open transaction holds this
+            // order's row lock for the length of someone else's network
+            // call. No-ops unless completing this stop actually moved the
+            // order's status.
+            if (customerNotice) notifyCustomerOfStatus(customerNotice);
 
             if (['FAILED', 'SKIPPED'].includes(status)) {
                 await appendAuditLog({
