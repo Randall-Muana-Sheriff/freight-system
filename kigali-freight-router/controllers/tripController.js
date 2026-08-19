@@ -292,10 +292,26 @@ export const TripController = {
                    FROM trips t
                    LEFT JOIN users u ON u.username = t.driver_username
                    LEFT JOIN trip_stops s ON s.trip_id = t.id
-                  WHERE t.status <> 'CANCELLED'
+                  -- Live work in full, finished work only while it is still
+                  -- today's news.
+                  --
+                  -- Every run in flight must be here — a bound that could hide
+                  -- an ACTIVE run would hide the very thing this panel exists
+                  -- for — so the window applies to COMPLETED alone. The old
+                  -- rule was a flat LIMIT 100 across all statuses, which was
+                  -- safe but meant a dispatcher opening the board a year in
+                  -- reads ninety-odd finished runs from previous weeks to find
+                  -- the three that are moving.
+                  --
+                  -- Nothing is lost: a finished run stays reachable by id, and
+                  -- an order carries its own history in order_status_logs
+                  -- regardless of which run it travelled on.
+                  WHERE t.status IN ('ACTIVE', 'PLANNED')
+                     OR (t.status = 'COMPLETED'
+                         AND COALESCE(t.completed_at, t.updated_at, t.created_at) > NOW() - INTERVAL '24 hours')
                   GROUP BY t.id, u.full_name
                   ORDER BY CASE t.status WHEN 'ACTIVE' THEN 0 WHEN 'PLANNED' THEN 1 ELSE 2 END, t.created_at DESC
-                  LIMIT 100`
+                  LIMIT 200`
             );
             return ok(res, result.rows);
         } catch (error) {
