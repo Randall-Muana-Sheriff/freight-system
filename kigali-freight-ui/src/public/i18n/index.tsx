@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { en, type Strings } from './en';
+import { en, type Strings, type PartialStrings } from './en';
 import { rw } from './rw';
+import { fr } from './fr';
 
 // Language for the customer site.
 //
@@ -13,10 +14,57 @@ import { rw } from './rw';
 // one vocabulary and translating an internal tool halfway is how two people
 // end up describing the same screen differently on a phone call.
 
-export const LANGUAGES = { en: 'English', rw: 'Ikinyarwanda' } as const;
+// Rwanda's official languages, in the order a Kigali visitor is most
+// likely to want them. Each label is written in its own language: someone
+// looking for Kinyarwanda is scanning for "Ikinyarwanda", not for the
+// English word for it.
+export const LANGUAGES = { en: 'English', rw: 'Ikinyarwanda', fr: 'Français' } as const;
 export type Language = keyof typeof LANGUAGES;
 
-const DICTIONARIES: Record<Language, Strings> = { en, rw };
+const TRANSLATIONS: Record<Language, PartialStrings> = { en, rw, fr };
+
+// Fills the gaps in an unfinished translation from English.
+//
+// Kinyarwanda is deliberately incomplete — its interface is translated
+// and its prose is waiting on a writer — so a visitor reading it must get
+// a real English sentence where a Kinyarwanda one does not exist yet,
+// never a blank. Arrays are taken whole rather than merged element by
+// element: a list half in one language reads as a fault.
+function withFallback(base: Strings, overrides: PartialStrings): Strings {
+    const merged: Record<string, unknown> = { ...base };
+    for (const [key, value] of Object.entries(overrides ?? {})) {
+        if (value === undefined) continue;
+        const fallback = (base as Record<string, unknown>)[key];
+        merged[key] =
+            value && typeof value === 'object' && !Array.isArray(value)
+                ? withFallback(fallback as Strings, value as PartialStrings)
+                : value;
+    }
+    return merged as Strings;
+}
+
+const DICTIONARIES: Record<Language, Strings> = {
+    en,
+    rw: withFallback(en, rw),
+    fr: withFallback(en, fr),
+};
+
+// How much of a language is actually written, for handing to whoever is
+// doing the writing — and so an unfinished translation is a number
+// somebody can see rather than something discovered on a live page.
+export function coverage(lang: Language): { translated: number; total: number } {
+    const count = (value: unknown): number =>
+        typeof value === 'object' && value !== null && !Array.isArray(value)
+            ? Object.values(value).reduce<number>((n, v) => n + count(v), 0)
+            : 1;
+    const written = (base: unknown, over: unknown): number => {
+        if (over === undefined) return 0;
+        if (typeof base !== 'object' || base === null || Array.isArray(base)) return 1;
+        return Object.entries(base).reduce<number>(
+            (n, [k, v]) => n + written(v, (over as Record<string, unknown>)?.[k]), 0);
+    };
+    return { translated: written(en, TRANSLATIONS[lang]), total: count(en) };
+}
 const STORAGE_KEY = 'inzira_lang';
 
 export function isLanguage(value: unknown): value is Language {

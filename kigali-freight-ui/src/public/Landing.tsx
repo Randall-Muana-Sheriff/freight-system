@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { sendContactMessage } from './publicApi';
 import { HeroRoute } from './HeroRoute';
 import { HeroTerrain } from './HeroTerrain';
-import { HERO, SERVICES, JOURNEY, ABOUT, CONTACT } from './content';
+import { useLanguage } from './i18n';
 
 // Copy lives in content.ts. This file is layout only, so the writing can
 // be read and edited as writing.
@@ -22,6 +22,7 @@ function SectionHead({ eyebrow, headline, onPaper = true, className = '' }: {
 }
 
 function ContactForm() {
+    const { t } = useLanguage();
     const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
     const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
     const [error, setError] = useState<string | null>(null);
@@ -42,8 +43,8 @@ function ContactForm() {
     if (state === 'sent') {
         return (
             <div className="border-l-2 border-pub-laterite bg-pub-paper2 px-8 py-10">
-                <p className="display-tight text-2xl text-pub-onpaper">Message received.</p>
-                <p className="mt-2 text-sm text-pub-onpaper-soft">We answer on the number you gave us, usually the same day.</p>
+                <p className="display-tight text-2xl text-pub-onpaper">{t.form.messageReceived}</p>
+                <p className="mt-2 text-sm text-pub-onpaper-soft">{t.form.weAnswer}</p>
             </div>
         );
     }
@@ -53,22 +54,22 @@ function ContactForm() {
     return (
         <form onSubmit={submit} className="grid gap-6 sm:grid-cols-2">
             <label className="block">
-                <span className="data-label text-pub-onpaper-soft">Name</span>
+                <span className="data-label text-pub-onpaper-soft">{t.form.name}</span>
                 <input required className={field} value={form.name} placeholder="Jean Mutabazi"
                     onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label className="block">
-                <span className="data-label text-pub-onpaper-soft">Phone</span>
+                <span className="data-label text-pub-onpaper-soft">{t.form.phone}</span>
                 <input required className={field} value={form.phone} placeholder="0788 000 000"
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </label>
             <label className="block sm:col-span-2">
-                <span className="data-label text-pub-onpaper-soft">Email — optional</span>
+                <span className="data-label text-pub-onpaper-soft">{t.form.emailOptional}</span>
                 <input type="email" className={field} value={form.email} placeholder="you@company.rw"
                     onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </label>
             <label className="block sm:col-span-2">
-                <span className="data-label text-pub-onpaper-soft">What do you need moved?</span>
+                <span className="data-label text-pub-onpaper-soft">{t.form.whatMoved}</span>
                 <textarea required rows={3} className={`${field} resize-none`} value={form.message}
                     placeholder="Two pallets a week from Gikondo to Musanze…"
                     onChange={(e) => setForm({ ...form, message: e.target.value })} />
@@ -87,6 +88,7 @@ function ContactForm() {
 }
 
 export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
     const [code, setCode] = useState('');
 
     return (
@@ -98,12 +100,12 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                     canvas turns off so the buttons underneath still work. */}
                 <div className="relative z-10 mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
                     <div>
-                        <p className="data-label mb-7 text-pub-laterite-soft">{HERO.eyebrow}</p>
+                        <p className="data-label mb-7 text-pub-laterite-soft">{t.hero.eyebrow}</p>
                         <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink"
                             style={{ textWrap: 'balance' } as React.CSSProperties}>
-                            {HERO.headline[0]}<br />{HERO.headline[1]}
+                            {t.hero.headlineTop}<br />{t.hero.headlineBottom}
                         </h1>
-                        <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">{HERO.body}</p>
+                        <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
 
                         <div className="mt-9 flex flex-wrap items-center gap-3">
                             <button data-tour="book" onClick={() => onNavigate('/order')}
@@ -113,10 +115,10 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             <form data-tour="track"
                                 onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
                                 className="flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
-                                <label htmlFor="hero-track" className="sr-only">Tracking code</label>
+                                <label htmlFor="hero-track" className="sr-only">{t.track.codeLabel}</label>
                                 <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"
                                     className="w-40 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none" />
-                                <button type="submit" className="focus-ring px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">Track →</button>
+                                <button type="submit" className="focus-ring px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">{t.actions.trackSubmit} →</button>
                             </form>
                         </div>
                     </div>
@@ -128,9 +130,9 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
             {/* ── THE PAPERWORK ────────────────────────────────────────── */}
             <section id="services" className="bg-pub-paper px-5 py-20 sm:py-28">
                 <div className="mx-auto max-w-6xl">
-                    <SectionHead eyebrow={SERVICES.eyebrow} headline={SERVICES.headline} className="mb-14 max-w-2xl" />
+                    <SectionHead eyebrow={t.services.eyebrow} headline={t.services.headline} className="mb-14 max-w-2xl" />
                     <div className="grid gap-x-14 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-                        {SERVICES.items.map((service) => (
+                        {t.services.items.map((service) => (
                             <article key={service.name} className="border-t border-pub-onpaper/15 pt-5">
                                 <p className="data-label mb-3 text-pub-laterite">{service.spec}</p>
                                 <h3 className="display-tight text-xl text-pub-onpaper">{service.name}</h3>
@@ -145,10 +147,10 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 section drawn as a route with ordinals. */}
             <section id="how" className="bg-pub-paper2 px-5 py-20 sm:py-28">
                 <div className="mx-auto max-w-3xl">
-                    <SectionHead eyebrow={JOURNEY.eyebrow} headline={JOURNEY.headline} className="mb-14" />
+                    <SectionHead eyebrow={t.journey.eyebrow} headline={t.journey.headline} className="mb-14" />
                     <ol className="relative">
                         <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-3 w-px bg-pub-onpaper/20" />
-                        {JOURNEY.stops.map((stop, index) => (
+                        {t.journey.stops.map((stop, index) => (
                             <li key={stop.name} className="relative flex gap-7 pb-11 last:pb-0">
                                 <span aria-hidden="true"
                                     className={`relative z-10 mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 ${
@@ -171,12 +173,12 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
             <section id="about" className="bg-pub-ink px-5 py-20 sm:py-28">
                 <div className="mx-auto max-w-6xl">
                     <div className="mb-14 max-w-2xl">
-                        <SectionHead eyebrow={ABOUT.eyebrow} headline={ABOUT.headline} onPaper={false} />
-                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{ABOUT.intro}</p>
+                        <SectionHead eyebrow={t.about.eyebrow} headline={t.about.headline} onPaper={false} />
+                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{t.about.intro}</p>
                     </div>
 
                     <div className="grid gap-x-14 gap-y-10 md:grid-cols-3">
-                        {ABOUT.views.map((view) => (
+                        {t.about.views.map((view) => (
                             <article key={view.title} className="border-t border-pub-onink/15 pt-5">
                                 <h3 className="display-tight text-lg text-pub-onink">{view.title}</h3>
                                 <p className="mt-2.5 text-[15px] leading-relaxed text-pub-onink-soft">{view.body}</p>
@@ -185,7 +187,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                     </div>
 
                     <p className="mt-12 max-w-2xl border-l-2 border-pub-laterite pl-5 text-[15px] leading-relaxed text-pub-onink-soft">
-                        {ABOUT.closing}
+                        {t.about.closing}
                     </p>
                 </div>
             </section>
@@ -193,9 +195,9 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
             <section id="contact" className="bg-pub-paper px-5 py-20 sm:py-28">
                 <div className="mx-auto grid max-w-5xl gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
                     <div>
-                        <SectionHead eyebrow={CONTACT.eyebrow} headline={CONTACT.headline} />
-                        <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-pub-onpaper-soft">{CONTACT.body}</p>
-                        <p className="data-label mt-8 text-pub-onpaper-soft">{CONTACT.address}</p>
+                        <SectionHead eyebrow={t.contact.eyebrow} headline={t.contact.headline} />
+                        <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-pub-onpaper-soft">{t.contact.body}</p>
+                        <p className="data-label mt-8 text-pub-onpaper-soft">{t.contact.address}</p>
                     </div>
                     <ContactForm />
                 </div>

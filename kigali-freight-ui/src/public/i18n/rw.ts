@@ -1,4 +1,4 @@
-import type { Strings } from './en';
+import type { PartialStrings } from './en';
 
 // ─────────────────────────────────────────────────────────────────────
 //  KINYARWANDA — DRAFT, NEEDS A NATIVE SPEAKER'S REVIEW BEFORE LAUNCH.
@@ -24,9 +24,17 @@ import type { Strings } from './en';
 //      one.
 //    · "Amazina" rather than "Izina" for the name field, matching how
 //      Rwandan forms usually ask for it.
+//
+//  STILL TO WRITE: the landing-page prose — hero, services, journey,
+//  about, contact. Those keys are absent from this file on purpose and
+//  fall back to English until someone writes them. They are not
+//  translation work: rendering "Most freight goes quiet the moment it
+//  leaves your gate" needs writing in Kinyarwanda, not translating from
+//  English, and a literal rendering would read as flat as it sounds.
+//  Copy the shape from en.ts, keep the keys, replace the words.
 // ─────────────────────────────────────────────────────────────────────
 
-export const rw: Strings = {
+export const rw: PartialStrings = {
     nav: {
         whatWeMove: 'Ibyo dutwara',
         howItWorks: 'Uko bikora',
