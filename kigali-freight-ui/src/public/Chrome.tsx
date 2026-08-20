@@ -156,7 +156,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                 <div className="hidden items-center gap-3 lg:flex">
                     <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
-                        className="focus-ring rounded-md bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft">
+                        className="focus-ring rounded-md bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                 </div>
@@ -201,7 +201,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                         call to action is full width here because on a phone
                         it is the only thing on the row. */}
                     <button onClick={() => go(() => onNavigate('/order'))}
-                        className="focus-ring rounded-md mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft">
+                        className="focus-ring rounded-md mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                     <div className="mt-4">

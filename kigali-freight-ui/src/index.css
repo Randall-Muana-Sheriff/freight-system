@@ -60,37 +60,18 @@
 
      Deliberately drops the driver app's jade. That palette belongs to the
      tools; this is the shopfront and does not have to match. */
-  /* Inverted to a black ground, following nvidia.com: #000 for the page,
-     #161616 for anything raised off it, white text, a mid grey for
-     secondary. Names keep their old meaning — "paper" is still the raised
-     surface and "ink" still the deepest one — so no call site had to change
-     for the inversion itself. What flipped is which of the two is lighter:
-     blocks now sit *above* the ground rather than below it.
-
-     paper2 and ink are both #000 on purpose. The page ground and the hero
-     are one continuous black, which is what makes the reference look the way
-     it does; separation comes from spacing and rules, not from surface
-     colour. ink2/ink3 stay distinct so the hero's gradient overlay still has
-     somewhere to go. */
-  --color-pub-ink: #000000;
-  --color-pub-ink2: #0d0d0d;
-  --color-pub-ink3: #161616;
-  --color-pub-paper: #161616;
-  --color-pub-paper2: #000000;
-  /* Brightened from #bf4e26. Measured, not judged by eye: the old value is
-     4.33:1 on #000 and 3.73:1 on #161616 — below AA for normal text, and it
-     is used 55 times on this site, mostly as links. #d46c40 is 6.02 and
-     5.19, and still carries a dark label as a fill (6.02 against #000),
-     which is the pairing the dispatcher palette already uses for bg-route.
-     Light text on it does NOT pass (3.03), which is why the nine fills that
-     paired it with onink now take ink instead. */
-  --color-pub-laterite: #d46c40;
-  --color-pub-laterite-soft: #e0714a;
+  --color-pub-ink: #0a1712;
+  --color-pub-ink2: #10231a;
+  --color-pub-ink3: #1a3327;
+  --color-pub-paper: #e9e5db;
+  --color-pub-paper2: #dcd6c8;
+  --color-pub-laterite: #bf4e26;
+  --color-pub-laterite-soft: #d46c40;
   --color-pub-signal: #ffc24b;
-  --color-pub-onink: #ffffff;
-  --color-pub-onink-soft: #a7a7a7;
-  --color-pub-onpaper: #ffffff;
-  --color-pub-onpaper-soft: #a7a7a7;
+  --color-pub-onink: #f1efe8;
+  --color-pub-onink-soft: #8ba295;
+  --color-pub-onpaper: #101f18;
+  --color-pub-onpaper-soft: #58685d;
 
   /* Archivo is used on its width axis, not only weight — see index.html. */
   --font-display: 'Archivo', system-ui, sans-serif;
@@ -403,17 +384,10 @@ body, html, #root {
 
    Kept low and soft on purpose. This page is quiet, and a dramatic drop
    shadow on it looks like a component pasted in from another site. */
-/* Elevation on a black ground has to be built the other way round. These
-   shadows were rgba(16, 31, 24, …) — a dark green, which read as depth
-   against warm paper and is simply invisible against #000: nothing can be
-   darker than the ground it sits on. So the edge does the work instead. A
-   hairline inset ring at 7% white defines the card, the surface is already
-   #161616 against a #000 page, and the drop shadow stays only to soften the
-   boundary rather than to carry the effect on its own. */
 @utility card-float {
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-    0 6px 16px -6px rgba(0, 0, 0, 0.55);
+    0 1px 2px rgba(16, 31, 24, 0.06),
+    0 6px 16px -6px rgba(16, 31, 24, 0.14);
   transition: box-shadow 200ms ease, transform 200ms ease;
 }
 
@@ -430,11 +404,9 @@ body, html, #root {
   &:hover {
     z-index: 20;
     transform: translateY(-4px) scale(1.025);
-    /* Hover brightens the ring rather than deepening the shadow, for the
-       same reason: on black there is no darker to go. */
     box-shadow:
-      inset 0 0 0 1px rgba(255, 255, 255, 0.16),
-      0 20px 40px -12px rgba(0, 0, 0, 0.75);
+      0 4px 8px rgba(16, 31, 24, 0.1),
+      0 20px 40px -12px rgba(16, 31, 24, 0.28);
   }
 
   /* The lift is motion, and someone who has asked for less of it should

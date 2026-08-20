@@ -74,7 +74,7 @@ function SkipLink() {
     const { t } = useLanguage();
     return (
         <a href="#main"
-            className="focus-ring sr-only focus:not-sr-only focus:fixed focus:left-5 focus:top-5 focus:z-50 focus:bg-pub-laterite focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-pub-ink">
+            className="focus-ring sr-only focus:not-sr-only focus:fixed focus:left-5 focus:top-5 focus:z-50 focus:bg-pub-laterite focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-pub-onink">
             {t.actions.skipToContent}
         </a>
     );

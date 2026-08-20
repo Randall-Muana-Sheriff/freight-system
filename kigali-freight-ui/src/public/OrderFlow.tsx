@@ -172,7 +172,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
 
                     <div className="mt-10 flex flex-wrap gap-3">
                         <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
-                            className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-ink hover:bg-pub-laterite-soft">
+                            className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
                             {t.steps.trackItNow}
                         </button>
                         <button onClick={() => onNavigate('/')}
@@ -260,7 +260,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                                 onClick={() => setDraft({ ...draft, neededBy: chosen ? undefined : value })}
                                                 className={`focus-ring rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
                                                     chosen
-                                                        ? 'border-pub-laterite bg-pub-laterite text-pub-ink'
+                                                        ? 'border-pub-laterite bg-pub-laterite text-pub-onink'
                                                         : 'border-pub-onpaper/25 text-pub-onpaper-soft hover:border-pub-onpaper/50 hover:text-pub-onpaper'
                                                 }`}
                                             >
@@ -348,7 +348,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                         </button>
                     ) : (
                         <button onClick={confirm} disabled={submitting}
-                            className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                            className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
                             {submitting ? t.actions.placing : t.actions.placeOrder}
                         </button>
                     )}

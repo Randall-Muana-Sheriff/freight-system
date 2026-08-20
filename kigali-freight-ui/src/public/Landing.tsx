@@ -273,7 +273,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                                 placeholder={t.misc.codePlaceholder}
                                 className="focus-ring min-w-0 flex-1 rounded-md border border-pub-onink/20 bg-pub-ink2 px-4 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:text-pub-onink-soft/50 focus:border-pub-onink/50 focus:outline-none" />
                             <button type="submit"
-                                className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft">
+                                className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                                 {t.actions.trackSubmit}
                             </button>
                         </form>

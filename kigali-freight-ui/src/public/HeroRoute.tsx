@@ -133,7 +133,7 @@ export function HeroRoute() {
                 const isEnd = n.id === ROUTE.from || n.id === ROUTE.to;
                 ctx.beginPath();
                 ctx.arc(x, y, isEnd ? 5 : n.hub ? 3.5 : 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = isEnd ? '#ffffff' : 'rgba(139, 162, 149, 0.7)';
+                ctx.fillStyle = isEnd ? '#e9e5db' : 'rgba(139, 162, 149, 0.7)';
                 ctx.fill();
                 if (isEnd) {
                     ctx.beginPath();

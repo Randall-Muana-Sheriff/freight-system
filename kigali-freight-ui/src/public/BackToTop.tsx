@@ -54,7 +54,7 @@ export function BackToTop() {
             // thing a keyboard lands on.
             aria-hidden={!visible}
             tabIndex={visible ? 0 : -1}
-            className={`focus-ring fixed bottom-5 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-pub-laterite text-pub-ink shadow-lg transition-all duration-200 hover:bg-pub-laterite-soft sm:bottom-8 sm:right-8 ${
+            className={`focus-ring fixed bottom-5 right-5 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-pub-laterite text-pub-onink shadow-lg transition-all duration-200 hover:bg-pub-laterite-soft sm:bottom-8 sm:right-8 ${
                 visible ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
             }`}
         >
