@@ -123,7 +123,7 @@ export default function PublicSite() {
         return (
             <LanguageProvider>
                 <PageMeta path={route.path} holding={holding} />
-                <div className="font-body antialiased">
+                <div className="pub-root font-body antialiased">
                     <ComingSoon />
                 </div>
             </LanguageProvider>
@@ -136,7 +136,7 @@ export default function PublicSite() {
         {/* The ground the blocks sit on. A shade darker than the paper
             blocks themselves, since a paper block on a paper ground has no
             edge and the whole arrangement collapses back into one wall. */}
-        <div className="min-h-screen bg-pub-paper2 font-body text-pub-onpaper antialiased">
+        <div className="pub-root min-h-screen bg-pub-paper2 font-body text-pub-onpaper antialiased">
             {/* Four section links and a call to action sit between the top of
                 the page and the content itself. This is the one tab that gets
                 past them, and it stays invisible until it is focused. */}

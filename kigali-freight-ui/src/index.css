@@ -164,6 +164,26 @@
   text-transform: uppercase;
 }
 
+/* The same label, bigger, on the customer-facing pages only.
+   0.68rem is about 11px. That is right on the dispatcher board, where these
+   mark dense rows of operational data and every pixel of vertical space is
+   contested — but on a marketing page the same size reads as fine print.
+   "What we move", "Order before noon" and the "Stop 1" markers are all this
+   utility, and all of them were too quiet.
+
+   13px rather than 14: small text on these pages is 15px and prose is 17px,
+   so a label at 14 would sit level with the copy it is supposed to be
+   subordinate to and flatten the hierarchy. Tracking eases off slightly as
+   the size grows, because 0.14em that reads as deliberate at 11px starts to
+   look loose at 13.
+
+   Scoped to .pub-root rather than changed at 53 call sites, and rather than
+   changed globally — the board's nine uses want to stay where they are. */
+.pub-root .data-label {
+  font-size: 0.8125rem;
+  letter-spacing: 0.12em;
+}
+
 /* Keyboard focus, in one place for the same reason the display setting is:
    every focusable control on the public site should ring identically, and
    the colour should be tunable without visiting twenty call sites.
