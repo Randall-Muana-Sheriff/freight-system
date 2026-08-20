@@ -80,7 +80,7 @@ function ContactForm() {
             <div className="sm:col-span-2">
                 <button type="submit" disabled={state === 'sending'}
                     className="focus-ring bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
-                    {state === 'sending' ? 'Sending…' : 'Send message'}
+                    {state === 'sending' ? t.buttons.sending : t.buttons.send}
                 </button>
             </div>
         </form>
@@ -110,7 +110,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         <div className="mt-9 flex flex-wrap items-center gap-3">
                             <button data-tour="book" onClick={() => onNavigate('/order')}
                                 className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
-                                Book a delivery
+                                {t.actions.book}
                             </button>
                             <form data-tour="track"
                                 onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}

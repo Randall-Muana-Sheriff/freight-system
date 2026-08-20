@@ -236,6 +236,46 @@ export const fr: Strings = {
         UNREADABLE: 'Le serveur a renvoyé une réponse illisible. Merci de réessayer.',
         GENERIC: 'Une erreur est survenue. Merci de réessayer.',
     },
+
+    steps: {
+        heading: 'Où va-t-elle ?',
+        cargo: 'Marchandise',
+        contact: 'Contact',
+        check: 'Vérification',
+        continue: 'Continuer',
+        keepCode: 'Gardez ce code.',
+        keepCodeBody: 'C’est ainsi que vous verrez où se trouve votre marchandise. Un régulateur vérifie les détails et vous appellera si quelque chose doit être confirmé.',
+        trackItNow: 'Suivre maintenant',
+        done: 'Terminé',
+        neededByNote: 'Cela aide le régulateur à organiser votre course. Il confirmera ce qui est possible lors de son appel.',
+        phoneNote: 'Votre code de suivi est envoyé à ce numéro, et c’est également celui que le régulateur appelle si l’adresse d’enlèvement doit être vérifiée.',
+    },
+    trackExtra: {
+        cancelledNote: 'Cette expédition a été annulée. Appelez-nous si cela vous surprend.',
+        photographedAt: 'Photographiée à la remise',
+        onDate: 'le',
+        byDriver: 'par',
+    },
+    comingExtra: {
+        thanks: 'Merci — nous vous enverrons un SMS le jour de l’ouverture.',
+    },
+
+    buttons: {
+        send: 'Envoyer le message',
+        sending: 'Envoi…',
+        copyCode: 'Copier le code',
+        copied: 'Copié',
+        cancel: 'Annuler',
+        back: '← Retour',
+        gotIt: 'Compris',
+        next: 'Suivant',
+    },
+    tour: {
+        bookTitle: 'Commandez ici',
+        bookBody: 'Enlèvement, destination, ce que vous envoyez. Il suffit d’un nom et d’un numéro de téléphone — aucun compte à créer.',
+        trackTitle: 'Déjà envoyé quelque chose ?',
+        trackBody: 'Saisissez ici le code reçu par SMS pour voir où votre marchandise est arrivée.',
+    },
     language: {
         label: 'Langue',
         english: 'Anglais',

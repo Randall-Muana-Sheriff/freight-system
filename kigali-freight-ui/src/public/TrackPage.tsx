@@ -130,7 +130,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
 
                         {cancelled ? (
                             <p className="border-t border-pub-onink/15 pt-7 text-[15px] text-pub-onink-soft">
-                                This shipment was cancelled. Call us if that&apos;s unexpected.
+                                {t.trackExtra.cancelledNote}
                             </p>
                         ) : (
                             <ol className="relative border-t border-pub-onink/15 pt-8">
@@ -180,11 +180,11 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                     </a>
                                 ) : null}
                                 <p className="mt-4 text-[15px] leading-relaxed text-pub-onink-soft">
-                                    Photographed at handover
+                                    {t.trackExtra.photographedAt}
                                     {shipment.proofOfDelivery.confirmedAt
-                                        ? ` on ${formatTime(shipment.proofOfDelivery.confirmedAt)}`
+                                        ? ` ${t.trackExtra.onDate} ${formatTime(shipment.proofOfDelivery.confirmedAt)}`
                                         : ''}
-                                    {shipment.driverFirstName ? ` by ${shipment.driverFirstName}` : ''}.
+                                    {shipment.driverFirstName ? ` ${t.trackExtra.byDriver} ${shipment.driverFirstName}` : ''}.
                                 </p>
                                 {shipment.proofOfDelivery.notes ? (
                                     <p className="mt-3 border-l-2 border-pub-onink/25 pl-4 text-[15px] leading-relaxed text-pub-onink">

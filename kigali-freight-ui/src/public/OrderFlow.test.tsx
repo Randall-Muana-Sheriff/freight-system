@@ -90,6 +90,6 @@ describe('OrderFlow — when do you need it', () => {
 
     it('does not promise the answer will be honoured', async () => {
         render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
-        expect(await screen.findByText(/confirm what's possible when they call/i)).toBeInTheDocument();
+        expect(await screen.findByText(/confirm what.s possible when they call/i)).toBeInTheDocument();
     });
 });

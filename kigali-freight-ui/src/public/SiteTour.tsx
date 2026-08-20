@@ -15,18 +15,11 @@ const STORAGE_KEY = 'inzira.tour.seen.v1';
 
 type Step = { target: string; title: string; body: string };
 
-const STEPS: Step[] = [
-    {
-        target: 'book',
-        title: 'Book from here',
-        body: 'Pickup, destination, what you’re sending. It takes a name and a phone number — no account to create.',
-    },
-    {
-        target: 'track',
-        title: 'Already sent something?',
-        body: 'Put the code from your confirmation text in here to see where your cargo has got to.',
-    },
-];
+// Targets and dictionary keys; the words come from the active language.
+const STEPS = [
+    { target: 'book', title: 'bookTitle', body: 'bookBody' },
+    { target: 'track', title: 'trackTitle', body: 'trackBody' },
+] as const;
 
 const PAD = 8;
 
@@ -145,8 +138,8 @@ export function SiteTour({ onBook }: { onBook: () => void }) {
                 style={{ top: cardTop, left: cardLeft, transform: below ? undefined : 'translateY(-100%)' }}
             >
                 <p className="data-label text-pub-laterite">Step {step + 1} of {STEPS.length}</p>
-                <h2 id="tour-title" className="display-tight mt-2 text-lg text-pub-onpaper">{current.title}</h2>
-                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{current.body}</p>
+                <h2 id="tour-title" className="display-tight mt-2 text-lg text-pub-onpaper">{t.tour[current.title]}</h2>
+                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{t.tour[current.body]}</p>
 
                 <div className="mt-5 flex items-center justify-between gap-3">
                     <button onClick={finish} className="text-sm font-medium text-pub-onpaper-soft hover:text-pub-onpaper">
@@ -166,7 +159,7 @@ export function SiteTour({ onBook }: { onBook: () => void }) {
                             }}
                             className="bg-pub-onpaper px-5 py-2.5 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite"
                         >
-                            {isLast ? 'Got it' : 'Next'}
+                            {isLast ? t.buttons.gotIt : t.buttons.next}
                         </button>
                     </div>
                 </div>

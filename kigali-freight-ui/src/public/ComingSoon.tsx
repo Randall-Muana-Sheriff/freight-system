@@ -59,7 +59,7 @@ function NotifyForm() {
     if (state === 'sent') {
         return (
             <p className="border-l-2 border-pub-laterite pl-5 text-left text-[15px] leading-relaxed text-pub-onink">
-                Thanks — we&apos;ll text you on the day we open.
+                {t.comingExtra.thanks}
             </p>
         );
     }

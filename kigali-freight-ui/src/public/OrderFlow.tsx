@@ -7,7 +7,8 @@ import { useLanguage, useApiError } from './i18n';
 // the point — the hero can be the showpiece, a form someone is filling in
 // with a lorry waiting should be quiet and legible.
 
-const STEPS = ['Cargo', 'Contact', 'Check'] as const;
+// Dictionary keys, not labels — the three step names translate too.
+const STEPS = ['cargo', 'contact', 'check'] as const;
 
 // The step lives in the URL and the draft in sessionStorage, so a refresh
 // mid-booking — or a back button pressed out of habit — returns someone to
@@ -145,11 +146,10 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                 <div className="mx-auto max-w-xl">
                     <p className="data-label text-pub-signal">{t.order.received}</p>
                     <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onink">
-                        Keep this code.
+                        {t.steps.keepCode}
                     </h1>
                     <p className="mt-5 text-[15px] leading-relaxed text-pub-onink-soft">
-                        It&apos;s how you see where your cargo is. A dispatcher is checking the
-                        details now and will call you if anything needs confirming.
+                        {t.steps.keepCodeBody}
                     </p>
 
                     {/* The copy sits on the same rule as the code rather than
@@ -161,7 +161,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                         </p>
                         <button onClick={copyCode}
                             className="focus-ring data-label shrink-0 text-pub-onink-soft transition-colors hover:text-pub-onink">
-                            {copied ? 'Copied' : 'Copy code'}
+                            {copied ? t.buttons.copied : t.buttons.copyCode}
                         </button>
                     </div>
                     <p aria-live="polite" className="sr-only">{copied ? t.order.codeCopied : ''}</p>
@@ -173,12 +173,10 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                     <div className="mt-10 flex flex-wrap gap-3">
                         <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
                             className="focus-ring bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
-                            Track it now
+                            {t.steps.trackItNow}
                         </button>
                         <button onClick={() => onNavigate('/')}
-                            className="focus-ring border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">
-                            Done
-                        </button>
+                            className="focus-ring border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">{t.steps.done}</button>
                     </div>
                 </div>
             </div>
@@ -190,16 +188,16 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
             <div className="mx-auto max-w-2xl">
                 <p className="data-label text-pub-laterite">{t.order.eyebrow}</p>
                 <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onpaper">
-                    Where&apos;s it going?
+                    {t.steps.heading}
                 </h1>
 
                 {/* Progress as a rule that fills, not three circles with
                     ticks — this is a short form, not an achievement. */}
                 <div className="mt-10 flex gap-2" aria-hidden="true">
                     {STEPS.map((name, index) => (
-                        <div key={name} className="flex-1">
+                        <div key={t.steps[name]} className="flex-1">
                             <div className={`h-0.5 ${index <= step ? 'bg-pub-laterite' : 'bg-pub-onpaper/20'}`} />
-                            <p className={`data-label mt-2 ${index === step ? 'text-pub-laterite' : 'text-pub-onpaper-soft'}`}>{name}</p>
+                            <p className={`data-label mt-2 ${index === step ? 'text-pub-laterite' : 'text-pub-onpaper-soft'}`}>{t.steps[name]}</p>
                         </div>
                     ))}
                 </div>
@@ -275,8 +273,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                     easily read as a promise. A dispatcher
                                     decides what is actually possible. */}
                                 <p className="mt-3 text-sm leading-relaxed text-pub-onpaper-soft">
-                                    This tells the dispatcher how to plan your run. They&apos;ll
-                                    confirm what&apos;s possible when they call.
+                                    {t.steps.neededByNote}
                                 </p>
                             </fieldset>
                             <label className="block">
@@ -306,8 +303,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                     onChange={(e) => setDraft({ ...draft, customerEmail: e.target.value })} />
                             </label>
                             <p className="border-l-2 border-pub-laterite pl-4 text-sm leading-relaxed text-pub-onpaper-soft">
-                                Your tracking code goes to this number, and it&apos;s the number the
-                                dispatcher rings if the pickup address needs checking.
+                                {t.steps.phoneNote}
                             </p>
                         </>
                     ) : (
@@ -342,13 +338,13 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                 <div className="mt-12 flex items-center justify-between gap-4 border-t border-pub-onpaper/15 pt-7">
                     <button onClick={() => (step === 0 ? onNavigate('/') : window.history.back())}
                         className="focus-ring text-sm font-semibold text-pub-onpaper-soft hover:text-pub-onpaper">
-                        {step === 0 ? 'Cancel' : '← Back'}
+                        {step === 0 ? t.buttons.cancel : t.buttons.back}
                     </button>
 
                     {step < 2 ? (
                         <button onClick={() => advance(step + 1)} disabled={step === 0 ? !cargoValid : !contactValid}
                             className="focus-ring bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:cursor-not-allowed disabled:opacity-30">
-                            Continue
+                            {t.steps.continue}
                         </button>
                     ) : (
                         <button onClick={confirm} disabled={submitting}

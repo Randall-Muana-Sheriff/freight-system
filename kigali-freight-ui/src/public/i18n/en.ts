@@ -260,6 +260,55 @@ export const en = {
         UNREADABLE: 'The server sent a response we could not read. Please try again.',
         GENERIC: 'Something went wrong. Please try again.',
     },
+
+    // ── Strings the first sweep missed ───────────────────────────────
+    // All multi-line JSX text, which a single-line pattern cannot see.
+    // Worth noting rather than quietly fixing: "no matches" from a search
+    // is only as trustworthy as the pattern behind it.
+    steps: {
+        heading: 'Where’s it going?',
+        cargo: 'Cargo',
+        contact: 'Contact',
+        check: 'Check',
+        continue: 'Continue',
+        keepCode: 'Keep this code.',
+        keepCodeBody: 'It’s how you see where your cargo is. A dispatcher is checking the details now and will call you if anything needs confirming.',
+        trackItNow: 'Track it now',
+        done: 'Done',
+        neededByNote: 'This tells the dispatcher how to plan your run. They’ll confirm what’s possible when they call.',
+        phoneNote: 'Your tracking code goes to this number, and it’s the number the dispatcher rings if the pickup address needs checking.',
+    },
+    trackExtra: {
+        cancelledNote: 'This shipment was cancelled. Call us if that’s unexpected.',
+        photographedAt: 'Photographed at handover',
+        onDate: 'on',
+        byDriver: 'by',
+    },
+    comingExtra: {
+        thanks: 'Thanks — we’ll text you on the day we open.',
+    },
+
+    // ── Buttons whose text lives inside a JSX expression ─────────────
+    // A fourth shape the sweeps kept missing: string literals inside a
+    // ternary. Three separate patterns were needed before the site was
+    // actually clean, which is the real lesson — "no matches" is only ever
+    // as good as the pattern behind it.
+    buttons: {
+        send: 'Send message',
+        sending: 'Sending…',
+        copyCode: 'Copy code',
+        copied: 'Copied',
+        cancel: 'Cancel',
+        back: '← Back',
+        gotIt: 'Got it',
+        next: 'Next',
+    },
+    tour: {
+        bookTitle: 'Book from here',
+        bookBody: 'Pickup, destination, what you’re sending. It takes a name and a phone number — no account to create.',
+        trackTitle: 'Already sent something?',
+        trackBody: 'Put the code from your confirmation text in here to see where your cargo has got to.',
+    },
     language: {
         label: 'Language',
         english: 'English',

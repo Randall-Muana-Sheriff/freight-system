@@ -40,6 +40,7 @@ describe('French is complete', () => {
             'coming.seconds',            // "Sec" — likewise
             'cargo.Documents',           // the same word in French
             'review.contact',            // likewise
+            'steps.contact',             // and again — the step of that name
             'language.kinyarwanda',      // the language's own name
         ];
         const enLeaves = leaves(en);
