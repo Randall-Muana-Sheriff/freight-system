@@ -151,17 +151,21 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         </h1>
                         <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
 
-                        <div className="mt-9 flex flex-wrap items-center gap-3">
+                        {/* Stacked on a phone. Side by side these two were sharing a
+                            row that fits one of them, which squeezed the code
+                            field down to a few characters — the one control on
+                            this page a returning customer came to use. */}
+                        <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                             <button data-tour="book" onClick={() => onNavigate('/order')}
                                 className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                                 {t.actions.book}
                             </button>
                             <form data-tour="track"
                                 onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
-                                className="flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
+                                className="flex flex-1 items-center border-b border-pub-onink/25 focus-within:border-pub-onink sm:flex-none">
                                 <label htmlFor="hero-track" className="sr-only">{t.track.codeLabel}</label>
                                 <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t.misc.haveACode}
-                                    className="w-40 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none" />
+                                    className="w-full min-w-0 flex-1 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none sm:w-40 sm:flex-none" />
                                 <button type="submit" className="focus-ring px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">{t.actions.trackSubmit} →</button>
                             </form>
                         </div>

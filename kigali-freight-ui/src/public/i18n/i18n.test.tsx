@@ -267,3 +267,35 @@ describe('the mobile menu', () => {
         expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
     });
 });
+
+describe('what the header carries at each width', () => {
+    beforeEach(() => window.localStorage.clear());
+
+    it('keeps the booking button and language picker out of the narrow bar', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        const { container } = render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+
+        // Both live in a container hidden below md, so a phone-width bar
+        // holds only the mark and the menu button. Four controls on a row
+        // with space for two is what made the header look broken.
+        const desktopOnly = container.querySelector('.hidden.items-center.gap-3');
+        expect(desktopOnly).not.toBeNull();
+        expect(desktopOnly?.className).toContain('md:flex');
+        expect(desktopOnly?.querySelector('select')).not.toBeNull();
+    });
+
+    it('offers both of them inside the menu instead', async () => {
+        const onNavigate = vi.fn();
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={onNavigate} /></LanguageProvider>);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+        // Two language pickers now exist — one per breakpoint — so the
+        // booking button is the clearer thing to assert on.
+        const booking = screen.getAllByRole('button', { name: 'Book a delivery' });
+        expect(booking.length).toBe(2);
+        await userEvent.click(booking[booking.length - 1]);
+        expect(onNavigate).toHaveBeenCalledWith('/order');
+    });
+});

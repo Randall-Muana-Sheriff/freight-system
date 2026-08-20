@@ -131,29 +131,33 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                     ))}
                 </nav>
 
-                <div className="flex items-center gap-3">
-                    {/* Below md the nav above is display:none, and until now
-                        nothing replaced it — on a phone the four section
-                        links simply did not exist. */}
-                    <button type="button" onClick={() => setMenuOpen((open) => !open)}
-                        aria-expanded={menuOpen}
-                        aria-controls="mobile-nav"
-                        aria-label={menuOpen ? t.nav_mobile.close : t.nav_mobile.open}
-                        className="focus-ring -ml-1 p-2 text-pub-onink md:hidden">
-                        <svg viewBox="0 0 20 14" className="h-3.5 w-5" aria-hidden="true">
-                            {menuOpen ? (
-                                <path d="M2 2 18 12M18 2 2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            ) : (
-                                <path d="M0 1h20M0 7h20M0 13h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                            )}
-                        </svg>
-                    </button>
+                {/* On a narrow screen the bar carries the mark and the menu
+                    button and nothing else — the earlier version kept the
+                    language picker and the booking button inline too, which
+                    put four things on a row with space for two and left the
+                    header looking broken at exactly the width most visitors
+                    arrive at. Both move into the panel below instead. */}
+                <div className="hidden items-center gap-3 md:flex">
                     <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
                         className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                 </div>
+
+                <button type="button" onClick={() => setMenuOpen((open) => !open)}
+                    aria-expanded={menuOpen}
+                    aria-controls="mobile-nav"
+                    aria-label={menuOpen ? t.nav_mobile.close : t.nav_mobile.open}
+                    className="focus-ring -mr-2 p-2 text-pub-onink md:hidden">
+                    <svg viewBox="0 0 20 14" className="h-3.5 w-5" aria-hidden="true">
+                        {menuOpen ? (
+                            <path d="M2 2 18 12M18 2 2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        ) : (
+                            <path d="M0 1h20M0 7h20M0 13h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                        )}
+                    </svg>
+                </button>
             </div>
 
             {/* Rendered only when open rather than hidden with a class, so
@@ -171,11 +175,22 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                         ))}
                         <li>
                             <button onClick={() => go(() => onNavigate('/track'))}
-                                className="focus-ring w-full py-3.5 text-left text-[15px] text-pub-onink-soft transition-colors hover:text-pub-onink">
+                                className="focus-ring w-full border-b border-pub-onink/10 py-3.5 text-left text-[15px] text-pub-onink-soft transition-colors hover:text-pub-onink">
                                 {t.actions.track}
                             </button>
                         </li>
                     </ul>
+
+                    {/* The two controls the bar no longer has room for. The
+                        call to action is full width here because on a phone
+                        it is the only thing on the row. */}
+                    <button onClick={() => go(() => onNavigate('/order'))}
+                        className="focus-ring mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                        {t.actions.book}
+                    </button>
+                    <div className="mt-4">
+                        <LanguagePicker />
+                    </div>
                 </nav>
             ) : null}
         </header>
