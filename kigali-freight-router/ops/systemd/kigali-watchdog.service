@@ -6,6 +6,17 @@ After=network-online.target docker.service
 Type=oneshot
 # Adjust to wherever the router is actually deployed on the real host.
 WorkingDirectory=/opt/kigali-freight/kigali-freight-router
+# This file needs TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, and on a fresh
+# host it will not have them: the containers read .env.production via
+# compose, while these ops scripts read this .env, and the alert credentials
+# only ever lived in the former. Installed without them the watchdog runs,
+# logs its findings to the journal, and tells nobody — a monitor that looks
+# healthy precisely because it is mute.
+#
+# Do NOT solve this by adding .env.production as a second EnvironmentFile.
+# It sets DB_HOST empty (compose supplies that in YAML), which would
+# override the localhost value here and break the backup and purge jobs
+# that share this file.
 EnvironmentFile=/opt/kigali-freight/kigali-freight-router/.env
 ExecStart=/usr/bin/npm run watchdog
 

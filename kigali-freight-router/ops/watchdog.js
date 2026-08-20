@@ -79,7 +79,17 @@ function readState() {
 }
 
 function writeState(problems) {
-    try { fs.writeFileSync(STATE_PATH, JSON.stringify({ problems, at: new Date().toISOString() })); } catch { /* best effort */ }
+    try {
+        fs.writeFileSync(STATE_PATH, JSON.stringify({ problems, at: new Date().toISOString() }));
+    } catch (err) {
+        // Loud, not swallowed. If this file cannot be written the
+        // change-detection above silently degrades to "everything is new",
+        // and a single ongoing fault becomes an alert every five minutes —
+        // the exact behaviour that gets a channel muted. A permission
+        // mismatch is the likely cause: the timer runs as root, so a file
+        // left by a manual run under another user will not be writable.
+        console.error(`[watchdog] could not write ${STATE_PATH}: ${err.message} — alerts will repeat until this is fixed.`);
+    }
 }
 
 const problems = [...checkContainers(), ...checkDisk()];
