@@ -40,7 +40,7 @@ function Answer({ problem, children }: { problem: string; children: React.ReactN
 export default function Support() {
     const d = useSupportDoc();
     return (
-        <div className="mx-auto max-w-3xl px-5 py-16">
+        <div className="mx-auto my-3 max-w-3xl rounded-lg bg-pub-paper px-6 py-14 sm:px-12 sm:py-16">
             <p className="data-label text-pub-laterite">{d.eyebrow}</p>
             <h1 className="display-wide mt-3 text-4xl text-pub-onpaper sm:text-5xl">{d.title}</h1>
 

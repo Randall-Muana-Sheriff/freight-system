@@ -96,6 +96,12 @@ function ContactForm() {
 // instead of three pictograms borrowed from somewhere else. It also keeps
 // an icon library out of a bundle that a customer downloads to book one
 // delivery.
+// Stated once so every band on the page sits in the same column and the
+// gaps between them are even. A section that set its own would be the one
+// that quietly drifts out of line.
+const SECTION = 'px-4 py-3 sm:px-6 sm:py-4';
+const BLOCK = 'mx-auto max-w-6xl overflow-hidden rounded-lg';
+
 const ICONS = {
     // A parcel, drawn isometrically so it reads as a thing with weight
     // rather than a flat square.
@@ -160,9 +166,13 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
         },
     ];
 
+    // Narrower than the block above and pulled up over its lower edge, so
+    // the two read as one composition. Matching the block width exactly
+    // would make them look like a fourth band rather than something
+    // sitting on the hero.
     return (
-        <section className="relative z-20 -mt-14 px-5 sm:-mt-20">
-            <div className="mx-auto grid max-w-6xl gap-px overflow-hidden rounded-sm bg-pub-onpaper/10 sm:grid-cols-3">
+        <section className="relative z-20 -mt-16 px-8 sm:-mt-20 sm:px-12">
+            <div className="mx-auto grid max-w-5xl gap-px overflow-hidden rounded-md bg-pub-onpaper/10 shadow-sm sm:grid-cols-3">
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
                         className="focus-ring group bg-pub-paper px-7 py-8 text-left transition-colors hover:bg-pub-paper2">
@@ -183,11 +193,21 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
     return (
         <>
             {/* ── THE ROAD ─────────────────────────────────────────────── */}
-            <section className="relative isolate overflow-hidden bg-pub-ink px-5 pb-28 pt-14 sm:pb-36 sm:pt-20">
+            {/* Every band on this page is a block in one centred column
+                rather than colour running edge to edge. The page ground
+                shows between them, which is what makes a long page read as
+                a stack of things rather than one continuous wall — and it
+                is what the carriers whose homepages this follows all do.
+
+                SECTION and BLOCK below carry that arrangement so the column
+                width and the gap are stated once; a section that sets its
+                own would be the one that quietly drifts. */}
+            <section className={SECTION}>
+                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-28 pt-14 sm:px-12 sm:pb-36 sm:pt-20`}>
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
-                <div className="relative z-10 mx-auto grid max-w-6xl gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
+                <div className="relative z-10 grid gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
                     <div>
                         <p className="data-label mb-7 text-pub-laterite-soft">{t.hero.eyebrow}</p>
                         <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink"
@@ -218,12 +238,14 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
 
                     <HeroRoute />
                 </div>
+                </div>
             </section>
 
             <EntryCards onNavigate={onNavigate} />
 
             {/* ── THE PAPERWORK ────────────────────────────────────────── */}
-            <section id="services" className="bg-pub-paper px-5 py-20 sm:py-28">
+            <section id="services" className={SECTION}>
+                <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-6xl">
                     <SectionHead eyebrow={t.services.eyebrow} headline={t.services.headline} className="mb-14 max-w-2xl" />
                     <div className="grid gap-x-14 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
@@ -236,11 +258,13 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         ))}
                     </div>
                 </div>
+                </div>
             </section>
 
             {/* The one section that is genuinely a sequence, so the one
                 section drawn as a route with ordinals. */}
-            <section id="how" className="bg-pub-paper2 px-5 py-20 sm:py-28">
+            <section id="how" className={SECTION}>
+                <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-3xl">
                     <SectionHead eyebrow={t.journey.eyebrow} headline={t.journey.headline} className="mb-14" />
                     <ol className="relative">
@@ -260,12 +284,14 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         ))}
                     </ol>
                 </div>
+                </div>
             </section>
 
             {/* Returns to the dark ground: this section is about the
                 machinery on the road, and it gives the long light stretch
                 a break before the page closes on the contact form. */}
-            <section id="about" className="bg-pub-ink px-5 py-20 sm:py-28">
+            <section id="about" className={SECTION}>
+                <div className={`${BLOCK} bg-pub-ink px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-6xl">
                     <div className="mb-14 max-w-2xl">
                         <SectionHead eyebrow={t.about.eyebrow} headline={t.about.headline} onPaper={false} />
@@ -285,9 +311,11 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         {t.about.closing}
                     </p>
                 </div>
+                </div>
             </section>
 
-            <section id="contact" className="bg-pub-paper px-5 py-20 sm:py-28">
+            <section id="contact" className={SECTION}>
+                <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto grid max-w-5xl gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
                     <div>
                         <SectionHead eyebrow={t.contact.eyebrow} headline={t.contact.headline} />
@@ -295,6 +323,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         <p className="data-label mt-8 text-pub-onpaper-soft">{t.contact.address}</p>
                     </div>
                     <ContactForm />
+                </div>
                 </div>
             </section>
         </>
