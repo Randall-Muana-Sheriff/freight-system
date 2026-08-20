@@ -216,6 +216,31 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 own would be the one that quietly drifts. */}
             <section className={SECTION}>
                 <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-16 pt-8 sm:px-12 sm:pb-24 sm:pt-14`}>
+                    {/* Kigali, behind everything else.
+                        A real photograph of the city this company works in
+                        rather than a stock warehouse in a country it does not
+                        operate in — the roofs sit almost exactly on
+                        --color-pub-laterite, which the palette notes describe
+                        as "the red-orange of Rwandan roads". The place and the
+                        palette already agreed.
+
+                        Held well back on purpose. It is a bright daytime shot
+                        and the text over it is light, so it carries a heavy
+                        gradient and low opacity: the photograph is texture and
+                        location, not the subject. The route animation is still
+                        what the hero is about.
+
+                        aria-hidden with an empty alt — announcing "photograph
+                        of Kigali" before the tracking field would be noise.
+                        Source: unsplash.com/photos/VikU8k-XJ54 */}
+                    <img
+                        src="/images/kigali-hills.jpg"
+                        alt=""
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-[0.18]"
+                    />
+                    <div aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-pub-ink via-pub-ink/85 to-pub-ink/70" />
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
