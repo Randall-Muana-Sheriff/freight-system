@@ -80,8 +80,7 @@ export const en = {
     // also the natural unit for whoever is doing the writing.
     hero: {
         eyebrow: 'Freight across Kigali',
-        headlineTop: 'Know where',
-        headlineBottom: 'your cargo is.',
+        headline: 'Know where your cargo is.',
         body:
             'Most freight goes quiet the moment it leaves your gate. Ours doesn\u2019t \u2014 every ' +
             'consignment carries a code that shows you its position until somebody signs for it.',

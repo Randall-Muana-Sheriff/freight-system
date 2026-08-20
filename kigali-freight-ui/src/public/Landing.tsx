@@ -225,14 +225,27 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         it can sit beside the copy, it should. At lg the gap
                         between them was leaving a band of widths with a
                         half-empty hero and no diagram in it. */}
-                    <div className="relative z-10 grid gap-8 md:grid-cols-[1.05fr_1fr] md:items-center md:gap-10 lg:gap-14">
+                    <div className="relative z-10">
+                    <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
+                    {/* Across the whole block rather than inside a column, so
+                        it can hold one line. In half the width it could not:
+                        twenty-five characters at this size need the full
+                        measure, and the earlier version bought the fit with a
+                        hard <br /> that broke the sentence in a place no
+                        other language would break it.
+
+                        It still wraps where it must — a phone, or a French
+                        rendering half again as long — which is why the break
+                        is left to the browser and balanced rather than
+                        forced. */}
+                    <h1 className="display-hero text-[clamp(1.9rem,4.4vw,3.1rem)] text-pub-onink"
+                        style={{ textWrap: 'balance' } as React.CSSProperties}>
+                        {t.hero.headline}
+                    </h1>
+
+                    <div className="mt-8 grid gap-8 md:grid-cols-[1.05fr_1fr] md:items-center md:gap-10 lg:gap-14">
                     <div>
-                        <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
-                        <h1 className="display-hero text-[clamp(2.5rem,5.6vw,3.9rem)] text-pub-onink"
-                            style={{ textWrap: 'balance' } as React.CSSProperties}>
-                            {t.hero.headlineTop}<br />{t.hero.headlineBottom}
-                        </h1>
-                        <p className="mt-5 max-w-md text-[17px] leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
+                        <p className="max-w-md text-[17px] leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
 
                         {/* Stacked on a phone. Side by side these two were sharing a
                             row that fits one of them, which squeezed the code
@@ -263,6 +276,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         than squeezed. */}
                     <div className="hidden md:block">
                         <HeroRoute />
+                    </div>
                     </div>
                 </div>
                 </div>
