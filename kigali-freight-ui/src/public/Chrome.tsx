@@ -112,11 +112,11 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
 
     return (
         <header className="bg-pub-ink">
-            <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-5">
+            <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-4 sm:py-5">
                 <button onClick={() => onNavigate('/')} aria-label={t.nav.home}
                     className="focus-ring flex items-baseline gap-3">
-                    <InziraMark className="h-6 w-6 translate-y-1" />
-                    <span className="display-tight text-xl text-pub-onink">Inzira</span>
+                    <InziraMark className="h-9 w-9 translate-y-1.5 sm:h-10 sm:w-10" />
+                    <span className="display-tight text-2xl text-pub-onink sm:text-3xl">Inzira</span>
                     {/* The word is Kinyarwanda for "the way". Worth saying
                         once, quietly, rather than assuming everyone knows. */}
                     <span className="data-label hidden text-pub-onink-soft/70 sm:inline">the way</span>
@@ -207,8 +207,8 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                 <div className="grid gap-10 border-b border-pub-onink/10 pb-12 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="lg:col-span-2">
                         <div className="flex items-baseline gap-3">
-                            <InziraMark className="h-6 w-6 translate-y-1" />
-                            <span className="display-tight text-xl text-pub-onink">Inzira</span>
+                            <InziraMark className="h-8 w-8 translate-y-1" />
+                            <span className="display-tight text-2xl text-pub-onink">Inzira</span>
                         </div>
                         <p className="mt-4 max-w-xs text-sm leading-relaxed text-pub-onink-soft">{t.footer.tagline}</p>
                     </div>
