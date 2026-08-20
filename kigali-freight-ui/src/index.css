@@ -228,6 +228,36 @@ body, html, #root {
   overflow: hidden;
 }
 
+/* Every browser hands <a href> the pointer cursor for free and gives
+   <button> the plain arrow. That split is the actual bug: on the landing
+   page "Track" is an anchor and "Book a delivery" is a button, so two
+   controls sitting side by side were telling the visitor different things
+   about whether they could be clicked.
+
+   Inside @layer base on purpose rather than as a bare rule. Tailwind's
+   utilities layer outranks base regardless of specificity, so the places
+   that deliberately opt out keep winning without an !important or a
+   :not() chain growing here — the full-screen backdrop buttons in
+   DialogProvider and SiteTour, which span the whole viewport to catch a
+   click-away and must not turn the entire screen into a pointer, and any
+   disabled:cursor-not-allowed a call site asks for. */
+@layer base {
+  button,
+  summary,
+  select,
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  /* A control that cannot be operated should not invite the click. Still
+     below the utilities layer, so disabled:cursor-not-allowed remains
+     authoritative wherever it is set explicitly. */
+  button:disabled,
+  select:disabled {
+    cursor: default;
+  }
+}
+
 .leaflet-container {
   width: 100%;
   height: 100%;
