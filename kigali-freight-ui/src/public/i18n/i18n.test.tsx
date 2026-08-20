@@ -299,3 +299,30 @@ describe('what the header carries at each width', () => {
         expect(onNavigate).toHaveBeenCalledWith('/order');
     });
 });
+
+describe('the hero entry cards', () => {
+    beforeEach(() => window.localStorage.clear());
+
+    it('offers the three ways into the service, each with an icon', async () => {
+        const { Landing } = await import('../Landing');
+        const { container } = render(<LanguageProvider><Landing onNavigate={() => {}} /></LanguageProvider>);
+
+        for (const label of ['Book a delivery', 'Track a shipment', 'Standing routes']) {
+            expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+        }
+        // Decorative, so hidden from screen readers — the card's own text
+        // already says what it is, and an announced icon just repeats it.
+        const icons = container.querySelectorAll('svg[aria-hidden="true"][stroke="currentColor"]');
+        expect(icons.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('sends each card where it says it will', async () => {
+        const onNavigate = vi.fn();
+        const { Landing } = await import('../Landing');
+        render(<LanguageProvider><Landing onNavigate={onNavigate} /></LanguageProvider>);
+
+        const cards = screen.getAllByRole('button', { name: /Track a shipment/ });
+        await userEvent.click(cards[cards.length - 1]);
+        expect(onNavigate).toHaveBeenCalledWith('/track');
+    });
+});

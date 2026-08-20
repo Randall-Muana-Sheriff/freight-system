@@ -88,14 +88,62 @@ function ContactForm() {
 }
 
 
+// Icons for the three entry cards.
+//
+// Drawn here rather than pulled from an icon set. The brand mark is a
+// stroked route ending in a dot, so these use the same language — one
+// weight, round caps, currentColor — and read as part of the same family
+// instead of three pictograms borrowed from somewhere else. It also keeps
+// an icon library out of a bundle that a customer downloads to book one
+// delivery.
+const ICONS = {
+    // A parcel, drawn isometrically so it reads as a thing with weight
+    // rather than a flat square.
+    parcel: (
+        <>
+            <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z" />
+            <path d="M3.5 7.5 12 12l8.5-4.5" />
+            <path d="M12 12v9" />
+        </>
+    ),
+    // A destination pin — the same dot that ends the mark, given a place
+    // to sit.
+    pin: (
+        <>
+            <path d="M12 21c0 0 6.5-5.6 6.5-10.5a6.5 6.5 0 1 0-13 0C5.5 15.4 12 21 12 21z" />
+            <circle cx="12" cy="10.5" r="2.4" />
+        </>
+    ),
+    // A route that comes back round: the same journey, run again tomorrow.
+    repeat: (
+        <>
+            <path d="M17 3.5 20.5 7 17 10.5" />
+            <path d="M20.5 7H8.5a4.5 4.5 0 0 0 0 9H10" />
+            <path d="M7 13.5 3.5 17 7 20.5" />
+            <path d="M3.5 17h12a4.5 4.5 0 0 0 0-9h-1.5" />
+        </>
+    ),
+};
+
+function CardIcon({ shape }: { shape: keyof typeof ICONS }) {
+    return (
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+            className="h-7 w-7 text-pub-laterite transition-transform duration-200 group-hover:-translate-y-0.5"
+            fill="none" stroke="currentColor" strokeWidth={1.6}
+            strokeLinecap="round" strokeLinejoin="round">
+            {ICONS[shape]}
+        </svg>
+    );
+}
+
 // The three ways into the service, sitting across the join between the
 // hero and the page below it.
 //
 // Borrowed in structure from how large carriers open their homepage —
 // the entry points are the first thing you meet, before any prose — but
 // not in palette. DHL floats white cards on a wall of yellow; the accent
-// here is used once and sparingly, so these are paper on ink, with
-// laterite only on the rule that marks each card.
+// here is used once and sparingly, so these are paper on ink with
+// laterite carried by the icon alone.
 //
 // Overlapping is what makes it read as one composition rather than two
 // stacked bands: the cards are pulled up over the hero's lower edge, and
@@ -104,10 +152,10 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
     const { t } = useLanguage();
 
     const cards = [
-        { title: t.entries.bookTitle, body: t.entries.bookBody, go: () => onNavigate('/order') },
-        { title: t.entries.trackTitle, body: t.entries.trackBody, go: () => onNavigate('/track') },
+        { icon: 'parcel' as const, title: t.entries.bookTitle, body: t.entries.bookBody, go: () => onNavigate('/order') },
+        { icon: 'pin' as const, title: t.entries.trackTitle, body: t.entries.trackBody, go: () => onNavigate('/track') },
         {
-            title: t.entries.standingTitle, body: t.entries.standingBody,
+            icon: 'repeat' as const, title: t.entries.standingTitle, body: t.entries.standingBody,
             go: () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
         },
     ];
@@ -118,11 +166,8 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
                         className="focus-ring group bg-pub-paper px-7 py-8 text-left transition-colors hover:bg-pub-paper2">
-                        {/* A short rule rather than an icon: the site has one
-                            mark and does not need a second visual language of
-                            pictograms to say "delivery" three times. */}
-                        <span className="block h-0.5 w-8 bg-pub-laterite transition-all group-hover:w-14" />
-                        <h2 className="display-tight mt-5 text-lg text-pub-onpaper">{card.title}</h2>
+                        <CardIcon shape={card.icon} />
+                        <h2 className="display-tight mt-4 text-lg text-pub-onpaper">{card.title}</h2>
                         <p className="mt-2 text-sm leading-relaxed text-pub-onpaper-soft">{card.body}</p>
                     </button>
                 ))}
