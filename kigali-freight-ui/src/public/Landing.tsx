@@ -184,7 +184,7 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
     // sitting on the hero.
     return (
         <section className="relative z-20 -mt-12 px-8 sm:-mt-14 sm:px-12">
-            <div className="mx-auto grid max-w-4xl gap-1.5 sm:grid-cols-3 sm:gap-2">
+            <div className="mx-auto grid max-w-4xl gap-1.5 md:grid-cols-3 md:gap-2">
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
                         className={`focus-ring group bg-pub-paper px-5 py-6 text-center ${CARD} ${CARD_HOVER}`}>
@@ -215,11 +215,11 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 width and the gap are stated once; a section that sets its
                 own would be the one that quietly drifts. */}
             <section className={SECTION}>
-                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-20 pt-10 sm:px-12 sm:pb-24 sm:pt-14`}>
+                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-16 pt-8 sm:px-12 sm:pb-24 sm:pt-14`}>
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
-                <div className="relative z-10 grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14">
+                <div className="relative z-10 grid gap-8 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14">
                     <div>
                         <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
                         <h1 className="display-wide text-[clamp(2.5rem,5.6vw,3.9rem)] text-pub-onink"
@@ -248,7 +248,16 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         </div>
                     </div>
 
-                    <HeroRoute />
+                    {/* Only where it sits beside the copy. Stacked under
+                        it on a phone the diagram ran to nearly 300px and
+                        pushed the three entry cards clean off the screen —
+                        a decorative element burying the actual ways into
+                        the service. Photographic heroes crop; a wide route
+                        diagram does not, so below lg it is dropped rather
+                        than squeezed. */}
+                    <div className="hidden lg:block">
+                        <HeroRoute />
+                    </div>
                 </div>
                 </div>
             </section>
