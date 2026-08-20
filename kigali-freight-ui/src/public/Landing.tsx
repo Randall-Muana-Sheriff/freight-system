@@ -223,11 +223,13 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         invisible and the difference in what a visitor on a
                         Kigali mobile connection waits for is not.
 
-                        Held well back on purpose. It is a bright daytime shot
-                        and the text over it is light, so it carries a heavy
-                        gradient and low opacity: the photograph is texture and
-                        location, not the subject. The route animation is still
-                        what the hero is about.
+                        The green wash over it is lighter than it was, so more
+                        of the photograph reads through. It still runs strongest
+                        at the top left and thins toward the bottom right, which
+                        is not decorative: that is the corner the prompt, the
+                        code field and the booking button sit in, and light text
+                        needs the ground under it to stay dark whatever the
+                        picture behind is doing.
 
                         aria-hidden with an empty alt — announcing "photograph
                         of Kigali" before the tracking field would be noise.
@@ -236,10 +238,10 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         src="/images/hero-fleet.jpg"
                         alt=""
                         aria-hidden="true"
-                        className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-[0.18]"
+                        className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-[0.30]"
                     />
                     <div aria-hidden="true"
-                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-pub-ink via-pub-ink/85 to-pub-ink/70" />
+                        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br from-pub-ink/85 via-pub-ink/60 to-pub-ink/35" />
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
