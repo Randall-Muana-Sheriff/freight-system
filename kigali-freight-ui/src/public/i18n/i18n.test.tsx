@@ -275,12 +275,13 @@ describe('what the header carries at each width', () => {
         const { PublicHeader } = await import('../Chrome');
         const { container } = render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
 
-        // Both live in a container hidden below md, so a phone-width bar
-        // holds only the mark and the menu button. Four controls on a row
-        // with space for two is what made the header look broken.
+        // Both live in a container hidden below lg, so anything narrower
+        // than a laptop gets the mark and the menu button only. Four
+        // controls on a row with space for two is what made the header
+        // look broken.
         const desktopOnly = container.querySelector('.hidden.items-center.gap-3');
         expect(desktopOnly).not.toBeNull();
-        expect(desktopOnly?.className).toContain('md:flex');
+        expect(desktopOnly?.className).toContain('lg:flex');
         expect(desktopOnly?.querySelector('select')).not.toBeNull();
     });
 

@@ -131,7 +131,14 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                     </span>
                 </button>
 
-                <nav className="hidden items-center gap-8 md:flex">
+                {/* Collapses at lg, not md. Between 768 and 1024 the four section
+                    links, the language picker and the booking button were all
+                    still inline and had visibly run out of room — the sites
+                    this follows are already showing a menu button by that
+                    width. All four breakpoints in this header move together;
+                    one left behind gives a width where the nav is hidden and
+                    nothing replaces it. */}
+                <nav className="hidden items-center gap-8 lg:flex">
                     {SECTIONS.map((section) => (
                         <button key={section.id} onClick={() => goToSection(section.id, onNavigate)}
                             className="focus-ring text-sm text-pub-onink-soft transition-colors hover:text-pub-onink">
@@ -146,7 +153,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                     put four things on a row with space for two and left the
                     header looking broken at exactly the width most visitors
                     arrive at. Both move into the panel below instead. */}
-                <div className="hidden items-center gap-3 md:flex">
+                <div className="hidden items-center gap-3 lg:flex">
                     <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
                         className="focus-ring rounded-md bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
@@ -158,7 +165,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                     aria-expanded={menuOpen}
                     aria-controls="mobile-nav"
                     aria-label={menuOpen ? t.nav_mobile.close : t.nav_mobile.open}
-                    className="focus-ring -mr-2 p-2 text-pub-onink md:hidden">
+                    className="focus-ring -mr-2 p-2 text-pub-onink lg:hidden">
                     <svg viewBox="0 0 20 14" className="h-3.5 w-5" aria-hidden="true">
                         {menuOpen ? (
                             <path d="M2 2 18 12M18 2 2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -172,7 +179,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
             {/* Rendered only when open rather than hidden with a class, so
                 its links are not reachable by keyboard while invisible. */}
             {menuOpen ? (
-                <nav id="mobile-nav" className="border-t border-pub-onink/10 px-5 pb-5 md:hidden">
+                <nav id="mobile-nav" className="border-t border-pub-onink/10 px-5 pb-5 lg:hidden">
                     <ul className="flex flex-col">
                         {SECTIONS.map((section) => (
                             <li key={section.id}>
