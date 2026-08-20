@@ -207,6 +207,59 @@ export const en = {
         opensOn: 'Inzira opens on',
         notifyMe: 'Tell me',
     },
+
+    // ── Server-supplied values ───────────────────────────────────────
+    // The cargo list comes from the API and the API validates against it,
+    // so the English string is the identifier and must travel back
+    // unchanged. Only the label is translated. Keyed by that identifier,
+    // and looked up with a fallback to the raw value: a type added on the
+    // server should appear in English rather than vanish from the form.
+    cargo: {
+        'General goods': 'General goods',
+        'Retail stock': 'Retail stock',
+        'Construction materials': 'Construction materials',
+        'Perishables': 'Perishables',
+        'Documents': 'Documents',
+        'Fragile / high-value': 'Fragile / high-value',
+        'Other': 'Other',
+    },
+    neededBy: {
+        today: 'Today',
+        tomorrow: 'Tomorrow',
+        this_week: 'This week',
+        flexible: 'I’m flexible',
+    },
+    review: {
+        collectFrom: 'Collect from',
+        deliverTo: 'Deliver to',
+        cargo: 'Cargo',
+        weight: 'Weight',
+        needed: 'Needed',
+        contact: 'Contact',
+        notes: 'Notes',
+    },
+
+    // ── API errors ───────────────────────────────────────────────────
+    // Keyed by the server's error code so the wording can be translated.
+    // Any code missing here falls back to the server's own message, which
+    // is English — readable, if not ideal, and better than a blank.
+    errors: {
+        NOT_FOUND: 'No shipment found with that code. Check the code from your confirmation text.',
+        MISSING_CODE: 'Enter a tracking code.',
+        MISSING_FIELDS: 'Please fill in the pickup and delivery addresses and what is being moved.',
+        MISSING_LOCATIONS: 'Please give both a pickup and a delivery address.',
+        MISSING_CONTACT: 'Please give a name and a phone number so we can reach you.',
+        INVALID_CARGO_TYPE: 'Choose a cargo type from the list.',
+        INVALID_NEEDED_BY: 'Choose one of the offered times, or leave it blank.',
+        INVALID_PHONE: 'That does not look like a Rwandan mobile number.',
+        INVALID_WEIGHT: 'Enter the weight in kilograms as a number.',
+        ORDER_CREATE_FAILED: 'We could not place your order just now. Please try again.',
+        TRACK_FAILED: 'We could not look that up just now. Please try again.',
+        CONTACT_FAILED: 'We could not send your message just now. Please try again.',
+        TOKEN_COLLISION: 'Something went wrong generating your tracking code. Please try again.',
+        UNREADABLE: 'The server sent a response we could not read. Please try again.',
+        GENERIC: 'Something went wrong. Please try again.',
+    },
     language: {
         label: 'Language',
         english: 'English',

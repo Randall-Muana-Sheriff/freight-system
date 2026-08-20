@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { trackShipment, type TrackedShipment } from './publicApi';
 import { RouteLoader } from '../components/RouteLoader';
-import { useLanguage } from './i18n';
+import { useLanguage, useApiError } from './i18n';
 
 // Tracking is the road, not the paperwork, so it runs on the dark ground —
 // and it is the one page where signal amber earns its keep, marking the
@@ -30,6 +30,7 @@ function formatTime(iso?: string) {
 
 export function TrackPage({ initialCode, onNavigate }: { initialCode: string; onNavigate: (path: string) => void }) {
     const { t } = useLanguage();
+    const describeError = useApiError();
     const [code, setCode] = useState(initialCode);
     const [shipment, setShipment] = useState<TrackedShipment | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -43,7 +44,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
         try {
             setShipment(await trackShipment(value));
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Could not look that up.');
+            setError(describeError(err));
         } finally {
             setLoading(false);
         }

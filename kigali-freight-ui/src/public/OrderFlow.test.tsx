@@ -46,7 +46,7 @@ describe('OrderFlow — when do you need it', () => {
     it('asks the question on the first step, with every option reachable', async () => {
         render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         expect(await screen.findByText(/When do you need it/i)).toBeInTheDocument();
-        for (const label of ['Today', 'Tomorrow', 'This week', "I'm flexible"]) {
+        for (const label of ['Today', 'Tomorrow', 'This week', "I’m flexible"]) {
             expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
         }
     });

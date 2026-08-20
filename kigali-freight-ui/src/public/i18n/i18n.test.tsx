@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { LanguageProvider, useLanguage, preferredLanguage, isLanguage } from './index';
+import { LanguageProvider, useLanguage, preferredLanguage, isLanguage, useApiError } from './index';
+import { ApiError } from '../publicApi';
 import { en } from './en';
 import { rw } from './rw';
 import { fr } from './fr';
@@ -37,6 +38,8 @@ describe('French is complete', () => {
             'misc.cityCountry',          // "Kigali, Rwanda" — proper nouns
             'coming.minutes',            // "Min" — the same abbreviation in French
             'coming.seconds',            // "Sec" — likewise
+            'cargo.Documents',           // the same word in French
+            'review.contact',            // likewise
             'language.kinyarwanda',      // the language's own name
         ];
         const enLeaves = leaves(en);
@@ -101,8 +104,11 @@ describe('choosing a language for a first-time visitor', () => {
     });
 
     it('ignores a stored value that is not a language we have', () => {
-        expect(preferredLanguage('fr', ['en'])).toBe('en');
-        expect(isLanguage('fr')).toBe(false);
+        // 'fr' was the example here until French was added — which is
+        // exactly the drift that made isLanguage reject a real language.
+        expect(preferredLanguage('de', ['en'])).toBe('en');
+        expect(isLanguage('de')).toBe(false);
+        expect(isLanguage('fr')).toBe(true);
     });
 });
 
@@ -180,5 +186,31 @@ describe('the language picker', () => {
         // Visually hidden, but present — a bare select with a flag icon is
         // an unlabelled control to anyone not looking at it.
         expect(screen.getByLabelText('Language')).toBeInTheDocument();
+    });
+});
+
+describe('API errors in the reader’s language', () => {
+    function ErrorProbe({ thrown }: { thrown: unknown }) {
+        const describe_ = useApiError();
+        return <p>{describe_(thrown)}</p>;
+    }
+
+    it('translates a known error code', () => {
+        window.localStorage.setItem('inzira_lang', 'fr');
+        render(<LanguageProvider><ErrorProbe thrown={new ApiError('No shipment found with that code.', 'NOT_FOUND')} /></LanguageProvider>);
+        expect(screen.getByText(/Aucune expédition ne correspond/)).toBeInTheDocument();
+    });
+
+    it('falls back to the server’s own message for a code it does not know', () => {
+        // Readable-but-English beats blank when the server grows a new error.
+        window.localStorage.setItem('inzira_lang', 'fr');
+        render(<LanguageProvider><ErrorProbe thrown={new ApiError('Some brand new failure', 'NEVER_SEEN_BEFORE')} /></LanguageProvider>);
+        expect(screen.getByText('Some brand new failure')).toBeInTheDocument();
+    });
+
+    it('says something even when what was thrown carries nothing useful', () => {
+        window.localStorage.setItem('inzira_lang', 'fr');
+        render(<LanguageProvider><ErrorProbe thrown={{}} /></LanguageProvider>);
+        expect(screen.getByText('Une erreur est survenue. Merci de réessayer.')).toBeInTheDocument();
     });
 });

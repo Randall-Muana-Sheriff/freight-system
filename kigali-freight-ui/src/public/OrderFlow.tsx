@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchCargoTypes, submitOrder, type OrderDraft } from './publicApi';
-import { useLanguage } from './i18n';
+import { useLanguage, useApiError } from './i18n';
 
 // Booking is paperwork, so it is styled as paperwork: daylight, ruled
 // fields, mono labels, no cards floating on a gradient. The restraint is
@@ -50,17 +50,15 @@ function readStepParam() {
 // not "priority": asked how important their delivery is, everybody says
 // very — asked when they need it, people answer honestly, because it is a
 // fact about their week rather than a status they are claiming.
-const NEEDED_BY = [
-    { value: 'today', label: 'Today' },
-    { value: 'tomorrow', label: 'Tomorrow' },
-    { value: 'this_week', label: 'This week' },
-    { value: 'flexible', label: "I'm flexible" },
-];
+// Values only. The value is what the server stores and validates; the
+// label is looked up per language at render time.
+const NEEDED_BY = ['today', 'tomorrow', 'this_week', 'flexible'] as const;
 
 const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
 export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }) {
     const { t } = useLanguage();
+    const describeError = useApiError();
     const [stored] = useState(readStored);
     const [requestedStep, setRequestedStep] = useState(readStepParam);
     const [cargoTypes, setCargoTypes] = useState<string[]>([]);
@@ -120,7 +118,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                 // Nothing to clean up if it was never writable.
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : t.order.failed);
+            setError(describeError(err));
         } finally {
             setSubmitting(false);
         }
@@ -226,7 +224,15 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                     <select className={field} value={draft.cargoType}
                                         onChange={(e) => setDraft({ ...draft, cargoType: e.target.value })}>
                                         <option value="">{t.order.choose}</option>
-                                        {cargoTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                                        {cargoTypes.map((type) => (
+                                            // value stays the server's English
+                                            // identifier; only the label is
+                                            // translated, and an unknown type
+                                            // falls back to showing itself.
+                                            <option key={type} value={type}>
+                                                {t.cargo[type as keyof typeof t.cargo] ?? type}
+                                            </option>
+                                        ))}
                                     </select>
                                 </label>
                                 <label className="block">
@@ -243,24 +249,24 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                             <fieldset className="block">
                                 <legend className="data-label text-pub-onpaper-soft">{t.order.neededBy}</legend>
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                    {NEEDED_BY.map((option) => {
-                                        const chosen = draft.neededBy === option.value;
+                                    {NEEDED_BY.map((value) => {
+                                        const chosen = draft.neededBy === value;
                                         return (
                                             <button
-                                                key={option.value}
+                                                key={value}
                                                 type="button"
                                                 aria-pressed={chosen}
                                                 // Tapping the chosen one again clears it, so
                                                 // an optional question stays optional once
                                                 // it has been answered by accident.
-                                                onClick={() => setDraft({ ...draft, neededBy: chosen ? undefined : option.value })}
+                                                onClick={() => setDraft({ ...draft, neededBy: chosen ? undefined : value })}
                                                 className={`focus-ring border px-4 py-2 text-sm font-medium transition-colors ${
                                                     chosen
                                                         ? 'border-pub-laterite bg-pub-laterite text-pub-onink'
                                                         : 'border-pub-onpaper/25 text-pub-onpaper-soft hover:border-pub-onpaper/50 hover:text-pub-onpaper'
                                                 }`}
                                             >
-                                                {option.label}
+                                                {t.neededBy[value]}
                                             </button>
                                         );
                                     })}
@@ -308,15 +314,15 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                         <>
                             <dl className="grid gap-0">
                                 {[
-                                    ['Collect from', draft.pickupAddress],
-                                    ['Deliver to', draft.deliveryAddress],
-                                    ['Cargo', draft.cargoType],
-                                    ['Weight', weightInput ? `${weightInput} kg` : ''],
+                                    [t.review.collectFrom, draft.pickupAddress],
+                                    [t.review.deliverTo, draft.deliveryAddress],
+                                    [t.review.cargo, t.cargo[draft.cargoType as keyof typeof t.cargo] ?? draft.cargoType],
+                                    [t.review.weight, weightInput ? `${weightInput} kg` : ''],
                                     ...(draft.neededBy
-                                        ? [['Needed', NEEDED_BY.find((o) => o.value === draft.neededBy)?.label ?? '']]
+                                        ? [[t.review.needed, t.neededBy[draft.neededBy as keyof typeof t.neededBy] ?? '']]
                                         : []),
-                                    ['Contact', `${draft.customerName} · ${draft.customerPhone}`],
-                                    ...(draft.specialInstructions ? [['Notes', draft.specialInstructions]] : []),
+                                    [t.review.contact, `${draft.customerName} · ${draft.customerPhone}`],
+                                    ...(draft.specialInstructions ? [[t.review.notes, draft.specialInstructions]] : []),
                                 ].map(([term, value]) => (
                                     <div key={term} className="grid grid-cols-[9rem_1fr] gap-4 border-b border-pub-onpaper/15 py-3.5">
                                         <dt className="data-label pt-0.5 text-pub-onpaper-soft">{term}</dt>

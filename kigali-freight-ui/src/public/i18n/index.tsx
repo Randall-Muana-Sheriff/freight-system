@@ -71,8 +71,13 @@ export function coverage(lang: Language): { translated: number; total: number } 
 }
 const STORAGE_KEY = 'inzira_lang';
 
+// Derived from LANGUAGES rather than listed again. The first version
+// hardcoded 'en' and 'rw'; French was added to LANGUAGES and this was
+// forgotten, so a stored choice of "fr" was rejected as not-a-language
+// and every French visitor silently reverted to English on their next
+// visit. A list written twice is a list that will disagree with itself.
 export function isLanguage(value: unknown): value is Language {
-    return value === 'en' || value === 'rw';
+    return typeof value === 'string' && Object.hasOwn(LANGUAGES, value);
 }
 
 // A returning visitor's own choice first, then what their browser asks
@@ -148,6 +153,20 @@ export function useSupportDoc() {
 
 export function usePrivacyDoc() {
     return DOCS.privacy[useLanguage().lang];
+}
+
+// Turns whatever a fetch threw into a sentence in the reader's language.
+// Falls back to the server's own message for a code we have no wording
+// for, and only then to a generic line — an unrecognised failure should
+// still say something, and something English beats something blank.
+export function useApiError() {
+    const { t } = useLanguage();
+    return (err: unknown): string => {
+        const code = (err as { code?: string | null })?.code;
+        if (code && code in t.errors) return t.errors[code as keyof typeof t.errors];
+        const message = err instanceof Error ? err.message : '';
+        return message || t.errors.GENERIC;
+    };
 }
 
 export function useLanguage(): LanguageValue {

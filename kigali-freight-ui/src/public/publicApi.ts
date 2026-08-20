@@ -48,16 +48,37 @@ function base() {
 // The API's own message is surfaced rather than a generic one: the server
 // already distinguishes "that phone number does not look right" from
 // "weight must be a positive number", and a customer can act on those.
+// Carries the server's error code alongside its message.
+//
+// The code was previously discarded and only the English message kept,
+// which made every API failure untranslatable: a French visitor typing a
+// bad tracking code got a French page and an English explanation of what
+// they had done wrong — at exactly the moment they most needed to
+// understand it. The message is retained as the fallback for a code the
+// site has no wording for, so a new server-side error is still readable
+// rather than blank.
+export class ApiError extends Error {
+    readonly code: string | null;
+    constructor(message: string, code: string | null) {
+        super(message);
+        this.name = 'ApiError';
+        this.code = code;
+    }
+}
+
 async function parse<T>(response: Response): Promise<T> {
     let body: unknown = null;
     try {
         body = await response.json();
     } catch {
-        throw new Error('The server sent a response we could not read. Please try again.');
+        throw new ApiError('The server sent a response we could not read. Please try again.', 'UNREADABLE');
     }
-    const payload = body as { success?: boolean; data?: T; error?: { message?: string } };
+    const payload = body as { success?: boolean; data?: T; error?: { message?: string; code?: string } };
     if (!response.ok || !payload?.success) {
-        throw new Error(payload?.error?.message || 'Something went wrong. Please try again.');
+        throw new ApiError(
+            payload?.error?.message || 'Something went wrong. Please try again.',
+            payload?.error?.code ?? null
+        );
     }
     return payload.data as T;
 }
