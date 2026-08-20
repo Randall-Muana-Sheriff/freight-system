@@ -114,12 +114,21 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
         <header className="bg-pub-ink">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-4 sm:py-5">
                 <button onClick={() => onNavigate('/')} aria-label={t.nav.home}
-                    className="focus-ring flex items-baseline gap-3">
-                    <InziraMark className="h-9 w-9 translate-y-1.5 sm:h-10 sm:w-10" />
-                    <span className="display-tight text-2xl text-pub-onink sm:text-3xl">Inzira</span>
-                    {/* The word is Kinyarwanda for "the way". Worth saying
-                        once, quietly, rather than assuming everyone knows. */}
-                    <span className="data-label hidden text-pub-onink-soft/70 sm:inline">the way</span>
+                    className="focus-ring flex items-center gap-3">
+                    <InziraMark className="h-9 w-9 sm:h-10 sm:w-10" />
+                    {/* The name and its meaning as one stacked lockup rather
+                        than three things in a row. Set beside the wordmark,
+                        "the way" read as a third item in the bar; under it,
+                        it reads as what it is — a gloss on the name.
+
+                        No longer hidden on small screens either: stacked it
+                        costs no width, and the whole point of the line is to
+                        explain the name to someone meeting it for the first
+                        time, which is most likely on a phone. */}
+                    <span className="flex flex-col leading-none">
+                        <span className="display-tight text-2xl text-pub-onink sm:text-3xl">Inzira</span>
+                        <span className="data-label mt-1 text-pub-onink-soft/70">the way</span>
+                    </span>
                 </button>
 
                 <nav className="hidden items-center gap-8 md:flex">
