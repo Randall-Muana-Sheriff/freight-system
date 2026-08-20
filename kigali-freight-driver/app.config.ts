@@ -102,9 +102,16 @@ const config: ExpoConfig = {
     // Edge-to-edge is mandatory (no opt-out) as of Android 16 / this SDK —
     // the old edgeToEdgeEnabled toggle was removed since there's nothing
     // left to toggle.
+    // A separate foreground from icon.png, which is full-bleed. Android's
+    // launcher mask keeps only the middle ~66% of an adaptive icon and crops
+    // the rest, and the mark's destination dot sits at x 768-1036 of the
+    // 1024 source — entirely outside that. Pointing this at icon.png, as it
+    // did, cropped the dot to a sliver at the edge and left the curve
+    // running off-frame. adaptive-icon.png is the same mark scaled to 0.709
+    // and centred so the whole of it survives the mask.
     adaptiveIcon: {
-      foregroundImage: './assets/icon.png',
-      backgroundColor: '#050C18',
+      foregroundImage: './assets/adaptive-icon.png',
+      backgroundColor: '#0a1712',
     },
     // EAS Build injects GOOGLE_SERVICES_JSON as a path to the securely
     // uploaded file (set via `eas env:create`) since the real file is
@@ -148,7 +155,7 @@ const config: ExpoConfig = {
         //
         // Both screens are then this same flat colour, so the handoff from
         // native splash to JS has nothing to flash.
-        backgroundColor: '#050C18',
+        backgroundColor: '#0a1712',
         image: './assets/splash-blank.png',
         imageWidth: 200,
         resizeMode: 'contain',

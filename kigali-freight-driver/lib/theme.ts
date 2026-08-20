@@ -1,11 +1,11 @@
 // Inzira driver app visual system, per the dispatcher-provided
-// design handoff: Electric Jade on a deep navy-black ground, with layered
+// design handoff: Electric Jade on a deep green-black ground, with layered
 // surfaces for elevation instead of one flat dark background. Gold is
 // reserved for earnings/highlight metrics only, red for safety/emergency
 // only — neither should leak into general UI the way `primary` does.
 export const theme = {
   colors: {
-    // Depth is carried by surface tint, not shadow. On a #050C18 ground a
+    // Depth is carried by surface tint, not shadow. On a #060d0b ground a
     // drop shadow has nothing darker to fall on: raise it far enough to
     // see and it stops being a shadow and becomes a grey haze. A hairline
     // border plus a lighter fill also survives direct sunlight through a
@@ -26,24 +26,40 @@ export const theme = {
     // Anything nested inside another surface uses panelSoft instead: it is
     // translucent, so it lightens whatever it happens to sit on rather
     // than needing a step of its own per parent.
-    bg: '#050C18',
-    surface1: '#0A1628',
-    surface2: '#0F1E35',
-    surface3: '#162440',
-    panel: 'rgba(15, 30, 53, 0.94)',
-    panelSoft: 'rgba(242, 246, 251, 0.05)',
+    // Green-black rather than navy, so the app sits in the same colour
+    // world as inzira.systems and the dispatcher board instead of a blue
+    // one of its own. The ground stays dark — that is correct for a cab at
+    // night and for glare through a windscreen — only the hue moved.
+    //
+    // Each step was solved for equal RELATIVE LUMINANCE against the navy it
+    // replaces, not equal HSL lightness. That distinction is the whole
+    // exercise: green carries a 0.7152 coefficient against blue's 0.0722,
+    // so a green at matching HSL lightness is far brighter in luminance
+    // terms. Matching lightness first compressed every contrast ratio and
+    // pushed danger-on-surface3 to 3.56, under AA. Solved on luminance, the
+    // surfaces land within 0.0002 of the originals and the elevation ladder
+    // holds at 1.086/1.077/1.089 against the old 1.080/1.086/1.082.
+    bg: '#060d0b',
+    surface1: '#0b1913',
+    surface2: '#0f211a',
+    surface3: '#122920',
+    panel: 'rgba(15, 33, 26, 0.94)',
+    panelSoft: 'rgba(241, 239, 232, 0.05)',
     primary: '#00D97C',
     primaryDeep: '#00A85F',
     accent: '#3B9EFF',
     gold: '#F0C040',
     danger: '#FF4444',
-    text: '#F2F6FB',
-    muted: '#7C8AA6',
-    border: 'rgba(242, 246, 251, 0.10)',
+    // The website's own onink/onink-soft. muted gains from the swap rather
+    // than losing: #8ba295 is lighter than the blue-grey it replaces, so it
+    // goes from 4.44:1 on surface3 — borderline — to 5.65:1.
+    text: '#f1efe8',
+    muted: '#8ba295',
+    border: 'rgba(241, 239, 232, 0.10)',
     success: '#00D97C',
     warning: '#F5A623',
-    paper: '#EDF3FA',
-    ink: '#050C18',
+    paper: '#e9e5db',
+    ink: '#060d0b',
   },
   fonts: {
     // One Outfit weight, not two. 800 and 900 were both loaded but are
