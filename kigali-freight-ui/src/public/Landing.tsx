@@ -215,24 +215,24 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 width and the gap are stated once; a section that sets its
                 own would be the one that quietly drifts. */}
             <section className={SECTION}>
-                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-28 pt-14 sm:px-12 sm:pb-36 sm:pt-20`}>
+                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-24 pt-10 sm:px-12 sm:pb-28 sm:pt-14`}>
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
-                <div className="relative z-10 grid gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-16">
+                <div className="relative z-10 grid gap-10 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14">
                     <div>
-                        <p className="data-label mb-7 text-pub-laterite-soft">{t.hero.eyebrow}</p>
-                        <h1 className="display-wide text-[clamp(2.9rem,7.5vw,5.2rem)] text-pub-onink"
+                        <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
+                        <h1 className="display-wide text-[clamp(2.5rem,5.6vw,3.9rem)] text-pub-onink"
                             style={{ textWrap: 'balance' } as React.CSSProperties}>
                             {t.hero.headlineTop}<br />{t.hero.headlineBottom}
                         </h1>
-                        <p className="mt-7 max-w-md text-lg leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
+                        <p className="mt-5 max-w-md text-[17px] leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
 
                         {/* Stacked on a phone. Side by side these two were sharing a
                             row that fits one of them, which squeezed the code
                             field down to a few characters — the one control on
                             this page a returning customer came to use. */}
-                        <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+                        <div className="mt-7 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                             <button data-tour="book" onClick={() => onNavigate('/order')}
                                 className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                                 {t.actions.book}

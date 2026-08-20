@@ -185,7 +185,7 @@ export function HeroRoute() {
             <div className="relative">
                 <canvas
                     ref={canvasRef}
-                    className="block h-[300px] w-full sm:h-[380px]"
+                    className="block h-[230px] w-full sm:h-[280px]"
                     role="img"
                     aria-label={t.hero_art.alt}
                 />
