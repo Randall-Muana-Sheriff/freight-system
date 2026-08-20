@@ -219,7 +219,13 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
-                <div className="relative z-10 grid gap-8 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14">
+                {/* Two columns from md, not lg. The illustration is only hidden
+                        because below the two-column breakpoint it stacks under
+                        the copy and pushes the cards off the screen — so where
+                        it can sit beside the copy, it should. At lg the gap
+                        between them was leaving a band of widths with a
+                        half-empty hero and no diagram in it. */}
+                    <div className="relative z-10 grid gap-8 md:grid-cols-[1.05fr_1fr] md:items-center md:gap-10 lg:gap-14">
                     <div>
                         <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
                         <h1 className="display-hero text-[clamp(2.5rem,5.6vw,3.9rem)] text-pub-onink"
@@ -255,7 +261,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         the service. Photographic heroes crop; a wide route
                         diagram does not, so below lg it is dropped rather
                         than squeezed. */}
-                    <div className="hidden lg:block">
+                    <div className="hidden md:block">
                         <HeroRoute />
                     </div>
                 </div>
