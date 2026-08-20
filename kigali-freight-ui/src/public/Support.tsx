@@ -9,6 +9,8 @@
 // answers to real failure modes read as support in a way that a contact
 // form alone does not.
 
+import { useSupportDoc } from './i18n';
+
 const EMAIL = 'sherifimran2000@gmail.com';
 const PHONE = '+250 732 324 860';
 const PHONE_HREF = '+250732324860';
@@ -36,27 +38,24 @@ function Answer({ problem, children }: { problem: string; children: React.ReactN
 }
 
 export default function Support() {
+    const d = useSupportDoc();
     return (
         <div className="mx-auto max-w-3xl px-5 py-16">
-            <p className="data-label text-pub-laterite">Help</p>
-            <h1 className="display-wide mt-3 text-4xl text-pub-onpaper sm:text-5xl">Support</h1>
+            <p className="data-label text-pub-laterite">{d.eyebrow}</p>
+            <h1 className="display-wide mt-3 text-4xl text-pub-onpaper sm:text-5xl">{d.title}</h1>
 
-            <p className="mt-8 text-base leading-relaxed text-pub-onpaper">
-                Something wrong with a delivery, or with the Inzira Driver app?
-                Reach us directly — during working hours the phone is faster
-                than email, and if cargo is on a truck right now, call.
-            </p>
+            <p className="mt-8 text-base leading-relaxed text-pub-onpaper">{d.intro}</p>
 
             <div className="mt-6 flex flex-col gap-3 border-y border-pub-onpaper/10 py-6 sm:flex-row sm:gap-10">
                 <div>
-                    <p className="data-label text-pub-onpaper-soft/70">Phone</p>
+                    <p className="data-label text-pub-onpaper-soft/70">{d.phoneLabel}</p>
                     <a href={`tel:${PHONE_HREF}`}
                         className="focus-ring mt-1 block font-mono text-lg font-medium text-pub-laterite underline underline-offset-4">
                         {PHONE}
                     </a>
                 </div>
                 <div>
-                    <p className="data-label text-pub-onpaper-soft/70">Email</p>
+                    <p className="data-label text-pub-onpaper-soft/70">{d.emailLabel}</p>
                     <a href={`mailto:${EMAIL}`}
                         className="focus-ring mt-1 block text-lg font-medium text-pub-laterite underline underline-offset-4">
                         {EMAIL}
@@ -64,67 +63,32 @@ export default function Support() {
                 </div>
             </div>
 
-            <Section title="Drivers">
-                <p>
-                    Accounts are created by dispatch — there is no sign-up in
-                    the app. If your number is not recognised, it has not been
-                    registered yet, and dispatch can do that in a moment.
-                </p>
+            <Section title={d.drivers.title}>
+                <p>{d.drivers.intro}</p>
                 <div className="mt-4">
-                    <Answer problem="The verification code never arrives">
-                        Codes are sent by text and can take a minute on a busy
-                        network. Check the number you typed is the one dispatch
-                        registered, then request a new code. If nothing comes
-                        through twice, call us and we will read one to you.
-                    </Answer>
-                    <Answer problem="I have forgotten my PIN">
-                        Call dispatch. They can reset it, and the app will walk
-                        you through choosing a new one the next time you sign in.
-                    </Answer>
-                    <Answer problem="Dispatch says they cannot see where I am">
-                        Location only reports while a shift is active, so check
-                        the home screen says you are on shift. If it does, open
-                        your phone&rsquo;s settings for Inzira Driver and make
-                        sure location permission is set to <em>Always</em> —
-                        &ldquo;While Using&rdquo; stops reporting the moment the
-                        screen locks, which is most of a driving day.
-                    </Answer>
-                    <Answer problem="I cannot upload a delivery photo">
-                        The photo needs a data connection to reach the office.
-                        In a weak-signal spot, complete the stop when you are
-                        moving again — the job stays on your list until it goes
-                        through.
-                    </Answer>
-                    <Answer problem="The app says my documents need attention">
-                        One of your licences, insurance or roadworthiness
-                        certificates is missing, rejected or expired, and work
-                        cannot be assigned until it is approved. The Profile
-                        screen shows which one. Photograph the document again in
-                        good light and re-upload it.
-                    </Answer>
+                    {d.drivers.answers.map((a) => (
+                        <Answer key={a.problem} problem={a.problem}>{a.body}</Answer>
+                    ))}
                 </div>
             </Section>
 
-            <Section title="Customers">
+            <Section title={d.customers.title}>
                 <p>
-                    If you are waiting on a consignment, the tracking code from
-                    your confirmation text shows where it has reached on our{' '}
+                    {d.customers.bodyBefore}
                     <a href="/track" className="focus-ring font-medium text-pub-laterite underline underline-offset-4">
-                        tracking page
+                        {d.customers.trackingLink}
                     </a>
-                    . If the code does not work, or the delivery is late, call
-                    the number above with the code to hand.
+                    {d.customers.bodyAfter}
                 </p>
             </Section>
 
-            <Section title="Your data">
+            <Section title={d.data.title}>
                 <p>
-                    What we collect, why, and how to ask for a copy or deletion
-                    is set out in our{' '}
+                    {d.data.bodyBefore}
                     <a href="/privacy" className="focus-ring font-medium text-pub-laterite underline underline-offset-4">
-                        privacy policy
+                        {d.data.privacyLink}
                     </a>
-                    .
+                    {d.data.bodyAfter}
                 </p>
             </Section>
         </div>

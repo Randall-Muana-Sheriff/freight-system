@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLanguage } from './i18n';
 
 // The hero. A freight company whose whole pitch is "you can see where your
 // cargo is" should not open with a photograph of a lorry — it should open
@@ -53,6 +54,7 @@ function controlFor(a: { x: number; y: number }, b: { x: number; y: number }, be
 const TOTAL_KM = 8.6;
 
 export function HeroRoute() {
+    const { t } = useLanguage();
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [progress, setProgress] = useState(0);
 
@@ -185,7 +187,7 @@ export function HeroRoute() {
                     ref={canvasRef}
                     className="block h-[300px] w-full sm:h-[380px]"
                     role="img"
-                    aria-label="Illustration of a shipment moving from Gikondo to Kimironko across the Inzira hub network"
+                    aria-label={t.hero_art.alt}
                 />
 
                 {/* Node names live in DOM rather than on the canvas so they
@@ -205,14 +207,14 @@ export function HeroRoute() {
             <figcaption className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-pub-onink/10 pt-4">
                 <span className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-pub-signal" />
-                    <span className="data-label text-pub-signal">In transit</span>
+                    <span className="data-label text-pub-signal">{t.hero_art.inTransit}</span>
                 </span>
                 <span className="data-label text-pub-onink-soft">Gikondo → Kimironko</span>
                 <span className="data-label text-pub-onink tabular-nums">{remaining} km to run</span>
                 <span className="data-label text-pub-onink-soft tabular-nums">ETA {etaMinutes} min</span>
                 {/* Said plainly. The map is a demonstration of the tracking
                     view, not a window onto somebody's real consignment. */}
-                <span className="data-label ml-auto text-pub-onink-soft/60">Sample shipment</span>
+                <span className="data-label ml-auto text-pub-onink-soft/60">{t.hero_art.sampleShipment}</span>
             </figcaption>
         </figure>
     );

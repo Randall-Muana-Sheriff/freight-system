@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLanguage } from './i18n';
 
 // A two-stop tour for someone arriving for the first time: where to book,
 // and where to check on something already booked. Those are the only two
@@ -32,6 +33,7 @@ const PAD = 8;
 interface Rect { top: number; left: number; width: number; height: number }
 
 export function SiteTour({ onBook }: { onBook: () => void }) {
+    const { t } = useLanguage();
     const [step, setStep] = useState(0);
     const [rect, setRect] = useState<Rect | null>(null);
     const [open, setOpen] = useState(false);
@@ -129,7 +131,7 @@ export function SiteTour({ onBook }: { onBook: () => void }) {
                 someone jabbing at the page is trying to do. */}
             <button
                 className="absolute inset-0 h-full w-full cursor-default"
-                aria-label="Close the tour"
+                aria-label={t.misc.closeTour}
                 onClick={finish}
             />
 

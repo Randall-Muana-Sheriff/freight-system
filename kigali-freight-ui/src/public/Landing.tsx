@@ -55,23 +55,23 @@ function ContactForm() {
         <form onSubmit={submit} className="grid gap-6 sm:grid-cols-2">
             <label className="block">
                 <span className="data-label text-pub-onpaper-soft">{t.form.name}</span>
-                <input required className={field} value={form.name} placeholder="Jean Mutabazi"
+                <input required className={field} value={form.name} placeholder={t.order.namePlaceholder}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label className="block">
                 <span className="data-label text-pub-onpaper-soft">{t.form.phone}</span>
-                <input required className={field} value={form.phone} placeholder="0788 000 000"
+                <input required className={field} value={form.phone} placeholder={t.order.phonePlaceholder}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </label>
             <label className="block sm:col-span-2">
                 <span className="data-label text-pub-onpaper-soft">{t.form.emailOptional}</span>
-                <input type="email" className={field} value={form.email} placeholder="you@company.rw"
+                <input type="email" className={field} value={form.email} placeholder={t.order.emailPlaceholder}
                     onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </label>
             <label className="block sm:col-span-2">
                 <span className="data-label text-pub-onpaper-soft">{t.form.whatMoved}</span>
                 <textarea required rows={3} className={`${field} resize-none`} value={form.message}
-                    placeholder="Two pallets a week from Gikondo to Musanze…"
+                    placeholder={t.misc.enquiryPlaceholder}
                     onChange={(e) => setForm({ ...form, message: e.target.value })} />
             </label>
 
@@ -116,7 +116,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                                 onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
                                 className="flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
                                 <label htmlFor="hero-track" className="sr-only">{t.track.codeLabel}</label>
-                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"
+                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t.misc.haveACode}
                                     className="w-40 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none" />
                                 <button type="submit" className="focus-ring px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">{t.actions.trackSubmit} →</button>
                             </form>

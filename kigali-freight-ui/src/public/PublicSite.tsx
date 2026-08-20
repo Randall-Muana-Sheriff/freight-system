@@ -25,24 +25,6 @@ function readRoute(): Route {
     return { path, code };
 }
 
-// Customer-facing wording, not the internal screen names — "Dispatch" and
-// "Control centre" mean nothing to someone checking on a delivery.
-const TITLES: Record<string, string> = {
-    '/order': 'Place an order',
-    '/track': 'Track shipment',
-    '/privacy': 'Privacy policy',
-    '/support': 'Support',
-};
-
-// Each route needs its own, or all three compete in search results with
-// the same summary and Google picks one arbitrarily.
-const DESCRIPTIONS: Record<string, string> = {
-    '/order': 'Book freight across Kigali in under a minute. Pickup, destination and cargo type — no account needed, and a tracking code by text as soon as it is placed.',
-    '/track': 'Enter the code from your confirmation text to see where your Inzira consignment is, which stage it has reached, and who is driving it.',
-    '/privacy': 'What the Inzira website and the Inzira Driver app collect, why, who it is shared with, and how to ask for your own data.',
-    '/support': 'Help with a delivery or the Inzira Driver app — phone, email, and answers to the problems drivers hit most often.',
-};
-const DEFAULT_DESCRIPTION = 'Same-day and bulk freight across Kigali. Book in under a minute with no account, then follow your cargo from pickup to signature with a tracking code.';
 
 // The search snippet has to match what the page actually says. Advertising
 // a bookable service while the page tells visitors it is not open yet is
@@ -53,6 +35,40 @@ const PRE_LAUNCH_DESCRIPTION = `Inzira is a freight service for Kigali where you
 // read from it in the same body — and this link, of all of them, has to be
 // in the reader's language: it exists for people navigating by keyboard and
 // screen reader, who are least served by guessing.
+// Title and search description, in the reader's language.
+//
+// These were module constants keyed by path, which meant a French visitor
+// got a French page inside an English browser tab and, worse, an English
+// snippet in a French search result. Living inside the provider is what
+// lets them follow the language.
+function PageMeta({ path, holding }: { path: string; holding: boolean }) {
+    const { t } = useLanguage();
+
+    const titles: Record<string, string> = {
+        '/order': t.meta.titleOrder,
+        '/track': t.meta.titleTrack,
+        '/privacy': t.meta.titlePrivacy,
+        '/support': t.meta.titleSupport,
+    };
+    const descriptions: Record<string, string> = {
+        '/order': t.meta.descOrder,
+        '/track': t.meta.descTrack,
+        '/privacy': t.meta.descPrivacy,
+        '/support': t.meta.descSupport,
+    };
+
+    // Landing gets the bare product name: a company's home page titling
+    // itself "Home · Inzira" reads like a site map, not a front door.
+    useDocumentTitle(holding ? `Opening ${LAUNCH_LABEL}` : (titles[path] ?? ''));
+
+    useEffect(() => {
+        setCanonical();
+        setDescription(holding ? PRE_LAUNCH_DESCRIPTION : (descriptions[path] ?? t.meta.descDefault));
+    }, [path, holding, descriptions, t]);
+
+    return null;
+}
+
 function SkipLink() {
     const { t } = useLanguage();
     return (
@@ -72,13 +88,6 @@ export default function PublicSite() {
     // during the pre-launch period so the site can still be worked on and
     // shown to people, without being what a visitor to the root gets.
     const holding = isPreLaunch() && route.path === '/';
-
-    useDocumentTitle(holding ? `Opening ${LAUNCH_LABEL}` : (TITLES[route.path] ?? ''));
-
-    useEffect(() => {
-        setCanonical();
-        setDescription(holding ? PRE_LAUNCH_DESCRIPTION : (DESCRIPTIONS[route.path] ?? DEFAULT_DESCRIPTION));
-    }, [route.path, holding]);
 
     // A marketing page scrolls; the dispatcher board does not. index.css
     // pins overflow:hidden on the root elements for the board's sake, so
@@ -112,6 +121,7 @@ export default function PublicSite() {
     if (holding) {
         return (
             <LanguageProvider>
+                <PageMeta path={route.path} holding={holding} />
                 <div className="font-body antialiased">
                     <ComingSoon />
                 </div>
@@ -121,6 +131,7 @@ export default function PublicSite() {
 
     return (
         <LanguageProvider>
+        <PageMeta path={route.path} holding={holding} />
         <div className="min-h-screen bg-pub-paper font-body text-pub-onpaper antialiased">
             {/* Four section links and a call to action sit between the top of
                 the page and the content itself. This is the one tab that gets

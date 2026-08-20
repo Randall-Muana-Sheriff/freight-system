@@ -154,8 +154,8 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
 
                     <div className="flex flex-col items-start gap-2.5">
                         <p className="data-label mb-1 text-pub-onink-soft/60">{t.footer.company}</p>
-                        <span className="text-sm text-pub-onink-soft">Gikondo Industrial Zone</span>
-                        <span className="text-sm text-pub-onink-soft">Kigali, Rwanda</span>
+                        <span className="text-sm text-pub-onink-soft">{t.misc.address}</span>
+                        <span className="text-sm text-pub-onink-soft">{t.misc.cityCountry}</span>
                         <button className={link} onClick={restartTour}>{t.actions.showMeAround}</button>
                         {/* A real anchor to the board's canonical host, not a
                             path nav. The session is per-origin, so sending

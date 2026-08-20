@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import { trackShipment, type TrackedShipment } from './publicApi';
 import { RouteLoader } from '../components/RouteLoader';
+import { useLanguage } from './i18n';
 
 // Tracking is the road, not the paperwork, so it runs on the dark ground —
 // and it is the one page where signal amber earns its keep, marking the
 // leg that is actually happening right now.
 
+// Status key plus the dictionary keys for its label and note, so the four
+// milestones translate with everything else rather than being the one
+// English column left on a French page.
 const MILESTONES = [
-    { key: 'PENDING', label: 'Order received', note: 'With a dispatcher for checking.' },
-    { key: 'ASSIGNED', label: 'Driver assigned', note: 'On a driver’s manifest.' },
-    { key: 'PICKED_UP', label: 'Collected', note: 'Cargo is on the vehicle.' },
-    { key: 'DELIVERED', label: 'Delivered', note: 'Signed for, with photo proof.' },
-];
+    { key: 'PENDING', label: 'received', note: 'receivedNote' },
+    { key: 'ASSIGNED', label: 'assigned', note: 'assignedNote' },
+    { key: 'PICKED_UP', label: 'collected', note: 'collectedNote' },
+    { key: 'DELIVERED', label: 'delivered', note: 'deliveredNote' },
+] as const;
 
 // Seven backend statuses folded into the four a customer cares about.
 // ARRIVED reads the same as IN_TRANSIT from outside the cab.
@@ -25,6 +29,7 @@ function formatTime(iso?: string) {
 }
 
 export function TrackPage({ initialCode, onNavigate }: { initialCode: string; onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
     const [code, setCode] = useState(initialCode);
     const [shipment, setShipment] = useState<TrackedShipment | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -56,20 +61,20 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
     return (
         <div className="min-h-[70vh] bg-pub-ink px-5 py-16 sm:py-20">
             <div className="mx-auto max-w-2xl">
-                <p className="data-label text-pub-laterite-soft">Tracking</p>
+                <p className="data-label text-pub-laterite-soft">{t.track.eyebrow}</p>
                 <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onink">
-                    Where is it?
+                    {t.track.title}
                 </h1>
 
                 <form onSubmit={(e) => { e.preventDefault(); lookup(code); }}
                     className="mt-9 flex items-center border-b border-pub-onink/25 focus-within:border-pub-onink">
-                    <label htmlFor="track-code" className="sr-only">Tracking code</label>
+                    <label htmlFor="track-code" className="sr-only">{t.track.codeLabel}</label>
                     <input id="track-code" value={code} onChange={(e) => setCode(e.target.value)}
-                        placeholder="INZ-XXXXXXXX"
+                        placeholder={t.misc.codePlaceholder}
                         className="min-w-0 flex-1 bg-transparent py-3.5 font-mono text-lg uppercase tracking-wider text-pub-onink placeholder:text-pub-onink-soft/50 focus:outline-none" />
                     <button type="submit" disabled={loading}
                         className="focus-ring shrink-0 px-3 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal disabled:opacity-50">
-                        {loading ? 'Looking…' : 'Track →'}
+                        {loading ? t.actions.looking : `${t.actions.trackSubmit} →`}
                     </button>
                 </form>
 
@@ -79,7 +84,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                     it had ignored the question. The route motion answers in
                     the same terms the page just asked in. */}
                 {loading && !shipment && !error ? (
-                    <RouteLoader tone="public-ink" fullScreen={false} label="Finding your consignment" />
+                    <RouteLoader tone="public-ink" fullScreen={false} label={t.track.finding} />
                 ) : null}
 
                 {error ? (
@@ -87,7 +92,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                         <p className="text-[15px] text-pub-onink">{error}</p>
                         <button onClick={() => onNavigate('/order')}
                             className="focus-ring data-label mt-3 text-pub-laterite-soft hover:text-pub-onink">
-                            Book a delivery instead →
+                            {t.actions.bookInstead}
                         </button>
                     </div>
                 ) : null}
@@ -97,27 +102,27 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-pub-onink/15 pb-6">
                             <h2 className="display-tight text-2xl text-pub-onink">{shipment.cargo}</h2>
                             <span className={`data-label ${cancelled ? 'text-pub-laterite-soft' : delivered ? 'text-pub-onink-soft' : 'text-pub-signal'}`}>
-                                {cancelled ? 'Cancelled' : delivered ? 'Delivered' : 'In progress'}
+                                {cancelled ? t.track.statusCancelled : delivered ? t.track.statusDelivered : t.track.statusInProgress}
                             </span>
                         </div>
 
                         <dl className="grid gap-x-8 gap-y-5 py-7 sm:grid-cols-2">
                             <div>
-                                <dt className="data-label text-pub-onink-soft">Collect from</dt>
+                                <dt className="data-label text-pub-onink-soft">{t.track.collectFrom}</dt>
                                 <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.pickup || 'Being confirmed'}</dd>
                             </div>
                             <div>
-                                <dt className="data-label text-pub-onink-soft">Deliver to</dt>
+                                <dt className="data-label text-pub-onink-soft">{t.track.deliverTo}</dt>
                                 <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.delivery || 'Being confirmed'}</dd>
                             </div>
                             {shipment.driverFirstName ? (
                                 <div>
-                                    <dt className="data-label text-pub-onink-soft">Driver</dt>
+                                    <dt className="data-label text-pub-onink-soft">{t.track.driver}</dt>
                                     <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.driverFirstName}</dd>
                                 </div>
                             ) : null}
                             <div>
-                                <dt className="data-label text-pub-onink-soft">Reference</dt>
+                                <dt className="data-label text-pub-onink-soft">{t.misc.reference}</dt>
                                 <dd className="mt-1.5 font-mono text-[15px] tracking-wider text-pub-onink">{shipment.trackingToken}</dd>
                             </div>
                         </dl>
@@ -142,10 +147,10 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                                 }`} />
                                             <div className={done ? '' : 'opacity-40'}>
                                                 <p className={`text-[15px] font-semibold ${current ? 'text-pub-signal' : 'text-pub-onink'}`}>
-                                                    {milestone.label}
+                                                    {t.track.milestones[milestone.label]}
                                                 </p>
-                                                <p className="mt-0.5 text-sm text-pub-onink-soft">{milestone.note}</p>
-                                                <p className="data-label mt-1.5 text-pub-onink-soft/70">{done ? (at || '—') : 'Not yet'}</p>
+                                                <p className="mt-0.5 text-sm text-pub-onink-soft">{t.track.milestones[milestone.note]}</p>
+                                                <p className="data-label mt-1.5 text-pub-onink-soft/70">{done ? (at || '—') : t.track.notYet}</p>
                                             </div>
                                         </li>
                                     );
@@ -160,7 +165,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                             page was making a promise it never kept. */}
                         {shipment.proofOfDelivery ? (
                             <div className="mt-12 border-t border-pub-onink/15 pt-8">
-                                <p className="data-label text-pub-onink-soft">Proof of delivery</p>
+                                <p className="data-label text-pub-onink-soft">{t.track.proofTitle}</p>
                                 {shipment.proofOfDelivery.photoUrl ? (
                                     <a href={shipment.proofOfDelivery.photoUrl}
                                         target="_blank" rel="noopener noreferrer"

@@ -26,11 +26,22 @@ describe('French is complete', () => {
 
     it('is a translation and not a copy of the English', () => {
         // A dictionary that silently mirrors English passes every other
-        // check here while shipping an untranslated page. "Kinyarwanda" is
-        // the one word that is legitimately identical in both.
+        // check here while shipping an untranslated page. Listed rather
+        // than merely tolerated: each of these is identical for a reason,
+        // and a ninth appearing means somebody forgot to translate it.
+        const legitimatelyIdentical = [
+            'order.weightPlaceholder',   // "150" — a number
+            'order.namePlaceholder',     // "Jean Mutabazi" — a Rwandan name
+            'order.phonePlaceholder',    // "0788 000 000" — a number
+            'misc.codePlaceholder',      // "INZ-XXXXXXXX" — a code format
+            'misc.cityCountry',          // "Kigali, Rwanda" — proper nouns
+            'coming.minutes',            // "Min" — the same abbreviation in French
+            'coming.seconds',            // "Sec" — likewise
+            'language.kinyarwanda',      // the language's own name
+        ];
         const enLeaves = leaves(en);
         const same = leaves(fr).filter(([, v], i) => v === enLeaves[i][1]).map(([k]) => k);
-        expect(same).toEqual(['language.kinyarwanda']);
+        expect(same.sort()).toEqual([...legitimatelyIdentical].sort());
     });
 });
 

@@ -3,6 +3,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderFlow } from './OrderFlow';
 import { fetchCargoTypes, submitOrder } from './publicApi';
+import { LanguageProvider } from './i18n';
+
+// These components read their labels from the language context and throw
+// without one, so tests supply it exactly as the app does.
+const inProvider = (ui: React.ReactElement) => <LanguageProvider>{ui}</LanguageProvider>;
 
 vi.mock('./publicApi', () => ({
     fetchCargoTypes: vi.fn(),
@@ -39,7 +44,7 @@ describe('OrderFlow — when do you need it', () => {
     });
 
     it('asks the question on the first step, with every option reachable', async () => {
-        render(<OrderFlow onNavigate={vi.fn()} />);
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         expect(await screen.findByText(/When do you need it/i)).toBeInTheDocument();
         for (const label of ['Today', 'Tomorrow', 'This week', "I'm flexible"]) {
             expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
@@ -48,7 +53,7 @@ describe('OrderFlow — when do you need it', () => {
 
     it('sends the chosen answer with the booking', async () => {
         const user = userEvent.setup();
-        render(<OrderFlow onNavigate={vi.fn()} />);
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         await screen.findByText(/When do you need it/i);
 
         await fillCargoStep(user);
@@ -65,7 +70,7 @@ describe('OrderFlow — when do you need it', () => {
 
     it('stays optional — unanswered, and clearable once answered', async () => {
         const user = userEvent.setup();
-        render(<OrderFlow onNavigate={vi.fn()} />);
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         await screen.findByText(/When do you need it/i);
 
         await fillCargoStep(user);
@@ -84,7 +89,7 @@ describe('OrderFlow — when do you need it', () => {
     });
 
     it('does not promise the answer will be honoured', async () => {
-        render(<OrderFlow onNavigate={vi.fn()} />);
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         expect(await screen.findByText(/confirm what's possible when they call/i)).toBeInTheDocument();
     });
 });

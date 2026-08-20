@@ -2,6 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { en, type Strings, type PartialStrings } from './en';
 import { rw } from './rw';
 import { fr } from './fr';
+import { supportEn } from './docs/support.en';
+import { supportFr } from './docs/support.fr';
+import { privacyEn } from './docs/privacy.en';
+import { privacyFr } from './docs/privacy.fr';
 
 // Language for the customer site.
 //
@@ -127,6 +131,23 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     );
 
     return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+// Long-form pages, kept out of the interface dictionary so en.ts stays
+// about the interface and a translator can read a whole document in
+// order. Kinyarwanda has none yet and falls back to English, exactly as
+// the prose in the main dictionary does.
+const DOCS = {
+    support: { en: supportEn, fr: supportFr, rw: supportEn },
+    privacy: { en: privacyEn, fr: privacyFr, rw: privacyEn },
+} as const;
+
+export function useSupportDoc() {
+    return DOCS.support[useLanguage().lang];
+}
+
+export function usePrivacyDoc() {
+    return DOCS.privacy[useLanguage().lang];
 }
 
 export function useLanguage(): LanguageValue {

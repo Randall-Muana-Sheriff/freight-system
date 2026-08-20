@@ -134,6 +134,79 @@ export const en = {
             'Tell us the shape of it and we will come back with a number.',
         address: 'Gikondo Industrial Zone \u00b7 Kigali',
     },
+
+    // ── Booking form ─────────────────────────────────────────────────
+    order: {
+        eyebrow: 'Booking · no account needed',
+        received: 'Order received',
+        collectFrom: 'Collect from',
+        collectPlaceholder: 'Gikondo Industrial Zone, gate 3',
+        deliverTo: 'Deliver to',
+        deliverPlaceholder: 'Kimironko Market, shop 14',
+        whatIsIt: 'What is it',
+        choose: 'Choose…',
+        weight: 'Weight in kg',
+        weightPlaceholder: '150',
+        neededBy: 'When do you need it — optional',
+        instructions: 'Anything the driver should know — optional',
+        instructionsPlaceholder: 'Fragile. Ask for Claudine at the gate.',
+        yourName: 'Your name',
+        namePlaceholder: 'Jean Mutabazi',
+        phonePlaceholder: '0788 000 000',
+        emailPlaceholder: 'you@company.rw',
+        failed: 'Could not place your order.',
+        codeCopied: 'Tracking code copied',
+    },
+    // ── Hero illustration ────────────────────────────────────────────
+    hero_art: {
+        alt: 'Illustration of a shipment moving from Gikondo to Kimironko across the Inzira hub network',
+        inTransit: 'In transit',
+        sampleShipment: 'Sample shipment',
+    },
+    misc: {
+        closeTour: 'Close the tour',
+        reference: 'Reference',
+        haveACode: 'Have a code?',
+        codePlaceholder: 'INZ-XXXXXXXX',
+        enquiryPlaceholder: 'Two pallets a week from Gikondo to Musanze…',
+        address: 'Gikondo Industrial Zone',
+        cityCountry: 'Kigali, Rwanda',
+    },
+    // ── Page titles and search descriptions ──────────────────────────
+    // Translated too: a French visitor's browser tab and a French search
+    // result should not be in English.
+    meta: {
+        titleOrder: 'Place an order',
+        titleTrack: 'Track shipment',
+        titlePrivacy: 'Privacy policy',
+        titleSupport: 'Support',
+        descOrder: 'Book freight across Kigali in under a minute. Pickup, destination and cargo type — no account needed, and a tracking code by text as soon as it is placed.',
+        descTrack: 'Enter the code from your confirmation text to see where your Inzira consignment is, which stage it has reached, and who is driving it.',
+        descPrivacy: 'What the Inzira website and the Inzira Driver app collect, why, who it is shared with, and how to ask for your own data.',
+        descSupport: 'Help with a delivery or the Inzira Driver app — phone, email, and answers to the problems drivers hit most often.',
+        descDefault: 'Same-day and bulk freight across Kigali. Book in under a minute with no account, then follow your cargo from pickup to signature with a tracking code.',
+    },
+
+    // ── Holding page ─────────────────────────────────────────────────
+    // Translated even though the countdown is currently off: it is turned
+    // on and off by a switch, and the language should not be the thing
+    // that decides whether it can be.
+    coming: {
+        theWay: 'the way',
+        openingPrefix: 'Opening',
+        headlineTop: 'Freight across Kigali,',
+        headlineBottom: 'with nothing hidden.',
+        body:
+            'We’re building a freight service where the person who sent the cargo can see ' +
+            'exactly where it is, the whole way. Not open to the public yet — leave your ' +
+            'number and we’ll tell you the day it is.',
+        days: 'Days',
+        hours: 'Hours',
+        minutes: 'Min',
+        seconds: 'Sec',
+        opensOn: 'Inzira opens on',
+        notifyMe: 'Tell me',
+    },
     language: {
         label: 'Language',
         english: 'English',

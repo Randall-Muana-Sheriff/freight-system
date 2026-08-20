@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchCargoTypes, submitOrder, type OrderDraft } from './publicApi';
+import { useLanguage } from './i18n';
 
 // Booking is paperwork, so it is styled as paperwork: daylight, ruled
 // fields, mono labels, no cards floating on a gradient. The restraint is
@@ -59,6 +60,7 @@ const NEEDED_BY = [
 const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
 export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
     const [stored] = useState(readStored);
     const [requestedStep, setRequestedStep] = useState(readStepParam);
     const [cargoTypes, setCargoTypes] = useState<string[]>([]);
@@ -118,7 +120,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                 // Nothing to clean up if it was never writable.
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Could not place your order.');
+            setError(err instanceof Error ? err.message : t.order.failed);
         } finally {
             setSubmitting(false);
         }
@@ -143,7 +145,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
         return (
             <div className="bg-pub-ink px-5 py-24">
                 <div className="mx-auto max-w-xl">
-                    <p className="data-label text-pub-signal">Order received</p>
+                    <p className="data-label text-pub-signal">{t.order.received}</p>
                     <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onink">
                         Keep this code.
                     </h1>
@@ -164,7 +166,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                             {copied ? 'Copied' : 'Copy code'}
                         </button>
                     </div>
-                    <p aria-live="polite" className="sr-only">{copied ? 'Tracking code copied' : ''}</p>
+                    <p aria-live="polite" className="sr-only">{copied ? t.order.codeCopied : ''}</p>
 
                     <p className="mt-4 text-sm text-pub-onink-soft">
                         Texted to {draft.customerPhone}. Write it down anyway — a text can go astray.
@@ -188,7 +190,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
     return (
         <div className="bg-pub-paper px-5 py-16 sm:py-20">
             <div className="mx-auto max-w-2xl">
-                <p className="data-label text-pub-laterite">Booking · no account needed</p>
+                <p className="data-label text-pub-laterite">{t.order.eyebrow}</p>
                 <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onpaper">
                     Where&apos;s it going?
                 </h1>
@@ -209,27 +211,27 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                     {step === 0 ? (
                         <>
                             <label className="block">
-                                <span className="data-label text-pub-onpaper-soft">Collect from</span>
-                                <input className={field} value={draft.pickupAddress} placeholder="Gikondo Industrial Zone, gate 3"
+                                <span className="data-label text-pub-onpaper-soft">{t.order.collectFrom}</span>
+                                <input className={field} value={draft.pickupAddress} placeholder={t.order.collectPlaceholder}
                                     onChange={(e) => setDraft({ ...draft, pickupAddress: e.target.value })} />
                             </label>
                             <label className="block">
-                                <span className="data-label text-pub-onpaper-soft">Deliver to</span>
-                                <input className={field} value={draft.deliveryAddress} placeholder="Kimironko Market, shop 14"
+                                <span className="data-label text-pub-onpaper-soft">{t.order.deliverTo}</span>
+                                <input className={field} value={draft.deliveryAddress} placeholder={t.order.deliverPlaceholder}
                                     onChange={(e) => setDraft({ ...draft, deliveryAddress: e.target.value })} />
                             </label>
                             <div className="grid gap-7 sm:grid-cols-2">
                                 <label className="block">
-                                    <span className="data-label text-pub-onpaper-soft">What is it</span>
+                                    <span className="data-label text-pub-onpaper-soft">{t.order.whatIsIt}</span>
                                     <select className={field} value={draft.cargoType}
                                         onChange={(e) => setDraft({ ...draft, cargoType: e.target.value })}>
-                                        <option value="">Choose…</option>
+                                        <option value="">{t.order.choose}</option>
                                         {cargoTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                                     </select>
                                 </label>
                                 <label className="block">
-                                    <span className="data-label text-pub-onpaper-soft">Weight in kg</span>
-                                    <input type="number" min="1" className={field} value={weightInput} placeholder="150"
+                                    <span className="data-label text-pub-onpaper-soft">{t.order.weight}</span>
+                                    <input type="number" min="1" className={field} value={weightInput} placeholder={t.order.weightPlaceholder}
                                         onChange={(e) => setWeightInput(e.target.value)} />
                                 </label>
                             </div>
@@ -239,7 +241,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 visible is what makes the question feel
                                 answerable rather than like more work. */}
                             <fieldset className="block">
-                                <legend className="data-label text-pub-onpaper-soft">When do you need it — optional</legend>
+                                <legend className="data-label text-pub-onpaper-soft">{t.order.neededBy}</legend>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     {NEEDED_BY.map((option) => {
                                         const chosen = draft.neededBy === option.value;
@@ -272,9 +274,9 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 </p>
                             </fieldset>
                             <label className="block">
-                                <span className="data-label text-pub-onpaper-soft">Anything the driver should know — optional</span>
+                                <span className="data-label text-pub-onpaper-soft">{t.order.instructions}</span>
                                 <textarea rows={2} className={`${field} resize-none`} value={draft.specialInstructions}
-                                    placeholder="Fragile. Ask for Claudine at the gate."
+                                    placeholder={t.order.instructionsPlaceholder}
                                     onChange={(e) => setDraft({ ...draft, specialInstructions: e.target.value })} />
                             </label>
                         </>
@@ -282,19 +284,19 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                         <>
                             <div className="grid gap-7 sm:grid-cols-2">
                                 <label className="block">
-                                    <span className="data-label text-pub-onpaper-soft">Your name</span>
-                                    <input className={field} value={draft.customerName} placeholder="Jean Mutabazi"
+                                    <span className="data-label text-pub-onpaper-soft">{t.order.yourName}</span>
+                                    <input className={field} value={draft.customerName} placeholder={t.order.namePlaceholder}
                                         onChange={(e) => setDraft({ ...draft, customerName: e.target.value })} />
                                 </label>
                                 <label className="block">
-                                    <span className="data-label text-pub-onpaper-soft">Phone</span>
-                                    <input className={field} value={draft.customerPhone} placeholder="0788 000 000"
+                                    <span className="data-label text-pub-onpaper-soft">{t.form.phone}</span>
+                                    <input className={field} value={draft.customerPhone} placeholder={t.order.phonePlaceholder}
                                         onChange={(e) => setDraft({ ...draft, customerPhone: e.target.value })} />
                                 </label>
                             </div>
                             <label className="block">
-                                <span className="data-label text-pub-onpaper-soft">Email — optional</span>
-                                <input type="email" className={field} value={draft.customerEmail} placeholder="you@company.rw"
+                                <span className="data-label text-pub-onpaper-soft">{t.form.emailOptional}</span>
+                                <input type="email" className={field} value={draft.customerEmail} placeholder={t.order.emailPlaceholder}
                                     onChange={(e) => setDraft({ ...draft, customerEmail: e.target.value })} />
                             </label>
                             <p className="border-l-2 border-pub-laterite pl-4 text-sm leading-relaxed text-pub-onpaper-soft">
@@ -345,7 +347,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                     ) : (
                         <button onClick={confirm} disabled={submitting}
                             className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
-                            {submitting ? 'Placing…' : 'Place the order'}
+                            {submitting ? t.actions.placing : t.actions.placeOrder}
                         </button>
                     )}
                 </div>

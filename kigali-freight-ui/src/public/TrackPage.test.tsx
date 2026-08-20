@@ -3,6 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TrackPage } from './TrackPage';
 import { trackShipment } from './publicApi';
+import { LanguageProvider } from './i18n';
+
+// These components read their labels from the language context and throw
+// without one, so tests supply it exactly as the app does.
+const inProvider = (ui: React.ReactElement) => <LanguageProvider>{ui}</LanguageProvider>;
 
 vi.mock('./publicApi', () => ({ trackShipment: vi.fn() }));
 const mockedTrack = vi.mocked(trackShipment);
@@ -28,7 +33,7 @@ beforeEach(() => mockedTrack.mockReset());
 afterEach(() => vi.restoreAllMocks());
 
 async function lookUp() {
-    render(<TrackPage initialCode="" onNavigate={vi.fn()} />);
+    render(inProvider(<TrackPage initialCode="" onNavigate={vi.fn()} />));
     await userEvent.type(screen.getByLabelText('Tracking code'), 'INZ-TEST1234');
     await userEvent.click(screen.getByRole('button', { name: /track/i }));
 }

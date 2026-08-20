@@ -3,6 +3,7 @@ import { HeroTerrain } from './HeroTerrain';
 import { InziraMark } from './InziraMark';
 import { sendContactMessage } from './publicApi';
 import { LAUNCH_DATE, LAUNCH_LABEL } from './launch';
+import { useLanguage } from './i18n';
 
 // The holding page shown until LAUNCH_DATE. Same ground, same type, same
 // terrain as the real site — a visitor who comes back after launch should
@@ -31,6 +32,7 @@ function Unit({ value, label }: { value: number; label: string }) {
 }
 
 function NotifyForm() {
+    const { t } = useLanguage();
     const [form, setForm] = useState({ name: '', phone: '' });
     const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
     const [error, setError] = useState<string | null>(null);
@@ -67,13 +69,13 @@ function NotifyForm() {
     return (
         <form onSubmit={submit} className="grid gap-4 text-left sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <label className="block">
-                <span className="data-label text-pub-onink-soft">Name</span>
-                <input required className={field} value={form.name} placeholder="Jean Mutabazi"
+                <span className="data-label text-pub-onink-soft">{t.form.name}</span>
+                <input required className={field} value={form.name} placeholder={t.order.namePlaceholder}
                     onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label className="block">
-                <span className="data-label text-pub-onink-soft">Phone</span>
-                <input required className={field} value={form.phone} placeholder="0788 000 000"
+                <span className="data-label text-pub-onink-soft">{t.form.phone}</span>
+                <input required className={field} value={form.phone} placeholder={t.order.phonePlaceholder}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </label>
             <button type="submit" disabled={state === 'sending'}
@@ -86,6 +88,7 @@ function NotifyForm() {
 }
 
 export function ComingSoon() {
+    const { t } = useLanguage();
     const [left, setLeft] = useState(() => remaining(LAUNCH_DATE));
 
     useEffect(() => {
@@ -101,32 +104,30 @@ export function ComingSoon() {
                 <div className="flex items-baseline gap-3">
                     <InziraMark className="h-7 w-7 translate-y-1" />
                     <span className="display-tight text-2xl text-pub-onink">Inzira</span>
-                    <span className="data-label text-pub-onink-soft/70">the way</span>
+                    <span className="data-label text-pub-onink-soft/70">{t.coming.theWay}</span>
                 </div>
 
-                <p className="data-label mt-10 text-pub-laterite-soft">Opening {LAUNCH_LABEL}</p>
+                <p className="data-label mt-10 text-pub-laterite-soft">{t.coming.openingPrefix} {LAUNCH_LABEL}</p>
                 <h1 className="display-wide mt-5 text-[clamp(2.1rem,5.5vw,3.4rem)] text-pub-onink"
                     style={{ textWrap: 'balance' } as React.CSSProperties}>
-                    Freight across Kigali,
+                    {t.coming.headlineTop}
                     <br />
-                    with nothing hidden.
+                    {t.coming.headlineBottom}
                 </h1>
                 <p className="mt-5 max-w-lg text-[17px] leading-relaxed text-pub-onink-soft">
-                    We&apos;re building a freight service where the person who sent the cargo can
-                    see exactly where it is, the whole way. Not open to the public yet — leave
-                    your number and we&apos;ll tell you the day it is.
+                    {t.coming.body}
                 </p>
 
                 {/* The numbers are decoration; the date above is the real
                     information, so a screen reader is given that and not a
                     counter that changes every second. */}
                 <div className="mt-10 flex gap-6 sm:gap-12" aria-hidden="true">
-                    <Unit value={left.days} label="Days" />
-                    <Unit value={left.hours} label="Hours" />
-                    <Unit value={left.minutes} label="Min" />
-                    <Unit value={left.seconds} label="Sec" />
+                    <Unit value={left.days} label={t.coming.days} />
+                    <Unit value={left.hours} label={t.coming.hours} />
+                    <Unit value={left.minutes} label={t.coming.minutes} />
+                    <Unit value={left.seconds} label={t.coming.seconds} />
                 </div>
-                <p className="sr-only">Inzira opens on {LAUNCH_LABEL}.</p>
+                <p className="sr-only">{t.coming.opensOn} {LAUNCH_LABEL}.</p>
 
                 <div className="mt-10 border-t border-pub-onink/15 pt-8">
                     <NotifyForm />
