@@ -1,6 +1,7 @@
 // Shared header and footer. The header sits on the dark hero and the
 // footer closes the page back into the dark, so the site opens and shuts
 // on the road with the paperwork in between.
+import { useEffect, useState } from 'react';
 import { InziraMark } from './InziraMark';
 import { restartTour } from './SiteTour';
 import { staffUrl } from '../utils/surface';
@@ -96,6 +97,19 @@ function LanguagePicker() {
 
 export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => void }) {
     const { t } = useLanguage();
+    const [menuOpen, setMenuOpen] = useState(false);
+
+    // Escape closes it, because a panel covering the page with no visible
+    // way back is the thing people actually get stuck in.
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [menuOpen]);
+
+    const go = (action: () => void) => { setMenuOpen(false); action(); };
+
     return (
         <header className="bg-pub-ink">
             <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-5">
@@ -118,6 +132,22 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                 </nav>
 
                 <div className="flex items-center gap-3">
+                    {/* Below md the nav above is display:none, and until now
+                        nothing replaced it — on a phone the four section
+                        links simply did not exist. */}
+                    <button type="button" onClick={() => setMenuOpen((open) => !open)}
+                        aria-expanded={menuOpen}
+                        aria-controls="mobile-nav"
+                        aria-label={menuOpen ? t.nav_mobile.close : t.nav_mobile.open}
+                        className="focus-ring -ml-1 p-2 text-pub-onink md:hidden">
+                        <svg viewBox="0 0 20 14" className="h-3.5 w-5" aria-hidden="true">
+                            {menuOpen ? (
+                                <path d="M2 2 18 12M18 2 2 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            ) : (
+                                <path d="M0 1h20M0 7h20M0 13h20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            )}
+                        </svg>
+                    </button>
                     <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
                         className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
@@ -125,6 +155,29 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                     </button>
                 </div>
             </div>
+
+            {/* Rendered only when open rather than hidden with a class, so
+                its links are not reachable by keyboard while invisible. */}
+            {menuOpen ? (
+                <nav id="mobile-nav" className="border-t border-pub-onink/10 px-5 pb-5 md:hidden">
+                    <ul className="flex flex-col">
+                        {SECTIONS.map((section) => (
+                            <li key={section.id}>
+                                <button onClick={() => go(() => goToSection(section.id, onNavigate))}
+                                    className="focus-ring w-full border-b border-pub-onink/10 py-3.5 text-left text-[15px] text-pub-onink-soft transition-colors hover:text-pub-onink">
+                                    {t.nav[section.key]}
+                                </button>
+                            </li>
+                        ))}
+                        <li>
+                            <button onClick={() => go(() => onNavigate('/track'))}
+                                className="focus-ring w-full py-3.5 text-left text-[15px] text-pub-onink-soft transition-colors hover:text-pub-onink">
+                                {t.actions.track}
+                            </button>
+                        </li>
+                    </ul>
+                </nav>
+            ) : null}
         </header>
     );
 }

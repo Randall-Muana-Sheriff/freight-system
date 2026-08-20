@@ -309,6 +309,20 @@ export const en = {
         trackTitle: 'Already sent something?',
         trackBody: 'Put the code from your confirmation text in here to see where your cargo has got to.',
     },
+
+    // ── Hero action cards ────────────────────────────────────────────
+    entries: {
+        bookTitle: 'Book a delivery',
+        bookBody: 'Pickup, destination, what it is. Under a minute, no account.',
+        trackTitle: 'Track a shipment',
+        trackBody: 'Your code shows where the cargo is right now.',
+        standingTitle: 'Standing routes',
+        standingBody: 'Regular lanes, priced per business rather than per drop.',
+    },
+    nav_mobile: {
+        open: 'Open menu',
+        close: 'Close menu',
+    },
     language: {
         label: 'Language',
         english: 'English',

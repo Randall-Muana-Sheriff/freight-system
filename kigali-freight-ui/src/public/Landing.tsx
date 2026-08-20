@@ -87,6 +87,50 @@ function ContactForm() {
     );
 }
 
+
+// The three ways into the service, sitting across the join between the
+// hero and the page below it.
+//
+// Borrowed in structure from how large carriers open their homepage —
+// the entry points are the first thing you meet, before any prose — but
+// not in palette. DHL floats white cards on a wall of yellow; the accent
+// here is used once and sparingly, so these are paper on ink, with
+// laterite only on the rule that marks each card.
+//
+// Overlapping is what makes it read as one composition rather than two
+// stacked bands: the cards are pulled up over the hero's lower edge, and
+// the hero carries the extra bottom padding that leaves room for them.
+function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
+
+    const cards = [
+        { title: t.entries.bookTitle, body: t.entries.bookBody, go: () => onNavigate('/order') },
+        { title: t.entries.trackTitle, body: t.entries.trackBody, go: () => onNavigate('/track') },
+        {
+            title: t.entries.standingTitle, body: t.entries.standingBody,
+            go: () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+        },
+    ];
+
+    return (
+        <section className="relative z-20 -mt-14 px-5 sm:-mt-20">
+            <div className="mx-auto grid max-w-6xl gap-px overflow-hidden rounded-sm bg-pub-onpaper/10 sm:grid-cols-3">
+                {cards.map((card) => (
+                    <button key={card.title} onClick={card.go}
+                        className="focus-ring group bg-pub-paper px-7 py-8 text-left transition-colors hover:bg-pub-paper2">
+                        {/* A short rule rather than an icon: the site has one
+                            mark and does not need a second visual language of
+                            pictograms to say "delivery" three times. */}
+                        <span className="block h-0.5 w-8 bg-pub-laterite transition-all group-hover:w-14" />
+                        <h2 className="display-tight mt-5 text-lg text-pub-onpaper">{card.title}</h2>
+                        <p className="mt-2 text-sm leading-relaxed text-pub-onpaper-soft">{card.body}</p>
+                    </button>
+                ))}
+            </div>
+        </section>
+    );
+}
+
 export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) {
     const { t } = useLanguage();
     const [code, setCode] = useState('');
@@ -94,7 +138,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
     return (
         <>
             {/* ── THE ROAD ─────────────────────────────────────────────── */}
-            <section className="relative isolate overflow-hidden bg-pub-ink px-5 pb-16 pt-14 sm:pt-20">
+            <section className="relative isolate overflow-hidden bg-pub-ink px-5 pb-28 pt-14 sm:pb-36 sm:pt-20">
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
@@ -126,6 +170,8 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                     <HeroRoute />
                 </div>
             </section>
+
+            <EntryCards onNavigate={onNavigate} />
 
             {/* ── THE PAPERWORK ────────────────────────────────────────── */}
             <section id="services" className="bg-pub-paper px-5 py-20 sm:py-28">

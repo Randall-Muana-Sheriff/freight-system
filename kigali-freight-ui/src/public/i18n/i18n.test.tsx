@@ -215,3 +215,55 @@ describe('API errors in the reader’s language', () => {
         expect(screen.getByText('Une erreur est survenue. Merci de réessayer.')).toBeInTheDocument();
     });
 });
+
+describe('the mobile menu', () => {
+    // The API-error tests above choose French and localStorage outlives a
+    // test, so without this the header renders "Ouvrir le menu" and every
+    // query here misses. Language state is global; tests that set it have
+    // to put it back.
+    beforeEach(() => window.localStorage.clear());
+
+    it('is closed to begin with, and its links are not reachable', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+
+        expect(screen.getByRole('button', { name: 'Open menu' })).toHaveAttribute('aria-expanded', 'false');
+        // Rendered, not merely hidden — a link nobody can see should not be
+        // reachable by keyboard either.
+        expect(screen.queryByRole('navigation', { name: '' })).not.toHaveAttribute('id', 'mobile-nav');
+    });
+
+    it('opens to reveal the sections the inline nav hides on a phone', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+        // Both the inline nav and the panel now hold these, so there are two.
+        expect(screen.getAllByText('What we move').length).toBe(2);
+        expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute('aria-expanded', 'true');
+    });
+
+    it('closes once a destination is chosen', async () => {
+        const onNavigate = vi.fn();
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={onNavigate} /></LanguageProvider>);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+        await userEvent.click(screen.getByRole('button', { name: 'Track a shipment' }));
+
+        expect(onNavigate).toHaveBeenCalledWith('/track');
+        // Leaving it open over the page you just asked for is the classic bug.
+        expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
+    });
+
+    it('closes on Escape', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+
+        await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+        await userEvent.keyboard('{Escape}');
+
+        expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
+    });
+});

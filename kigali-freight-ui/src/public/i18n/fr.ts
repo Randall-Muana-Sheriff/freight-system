@@ -276,6 +276,19 @@ export const fr: Strings = {
         trackTitle: 'Déjà envoyé quelque chose ?',
         trackBody: 'Saisissez ici le code reçu par SMS pour voir où votre marchandise est arrivée.',
     },
+
+    entries: {
+        bookTitle: 'Commander une livraison',
+        bookBody: 'Enlèvement, destination, nature de la marchandise. En moins d’une minute, sans compte.',
+        trackTitle: 'Suivre une expédition',
+        trackBody: 'Votre code indique où se trouve la marchandise en ce moment.',
+        standingTitle: 'Lignes régulières',
+        standingBody: 'Liaisons régulières, tarifées par entreprise plutôt qu’à la course.',
+    },
+    nav_mobile: {
+        open: 'Ouvrir le menu',
+        close: 'Fermer le menu',
+    },
     language: {
         label: 'Langue',
         english: 'Anglais',
