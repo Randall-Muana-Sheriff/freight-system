@@ -6,7 +6,7 @@ import { InziraMark } from './InziraMark';
 import { restartTour } from './SiteTour';
 import { staffUrl } from '../utils/surface';
 import { getStaffDomain } from '../utils/runtimeConfig';
-import { LANGUAGES, useLanguage, type Language } from './i18n';
+import { SELECTABLE_LANGUAGES, useLanguage, type Language } from './i18n';
 
 // The id is structural (it must match a section on the landing page); the
 // label is editorial. Keeping the label as a dictionary key rather than a
@@ -78,7 +78,7 @@ function LanguagePicker() {
                 // below can match the site; pr-7 leaves it room.
                 className="focus-ring rounded-md cursor-pointer appearance-none border border-pub-onink/20 bg-transparent py-1.5 pl-2.5 pr-7 text-sm text-pub-onink-soft transition-colors hover:border-pub-onink/40 hover:text-pub-onink"
             >
-                {(Object.entries(LANGUAGES) as [Language, string][]).map(([code, label]) => (
+                {(Object.entries(SELECTABLE_LANGUAGES) as [Language, string][]).map(([code, label]) => (
                     // The option list is drawn by the OS, which paints its
                     // own background — so these need an explicit colour
                     // rather than inheriting the header's.

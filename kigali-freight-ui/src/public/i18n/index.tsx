@@ -69,6 +69,29 @@ export function coverage(lang: Language): { translated: number; total: number } 
     };
     return { translated: written(en, TRANSLATIONS[lang]), total: count(en) };
 }
+
+// A language has to be substantially written before it is worth offering.
+//
+// Kinyarwanda went to production at 27% — 51 of 187 strings — which meant a
+// visitor choosing "Ikinyarwanda" got Kinyarwanda navigation wrapped around
+// English paragraphs. The fallback in withFallback() is what keeps that page
+// working rather than blank, and it is doing its job; the mistake was
+// treating "it degrades gracefully" as "it is ready to show". A visitor who
+// picks their own language and gets someone else's has been told the site
+// speaks to them when it does not.
+//
+// Derived from coverage rather than an exclusion list, so this needs no
+// second edit: when rw.ts is filled in, Ikinyarwanda reappears in the picker
+// on its own. 90 rather than 100 because a handful of English strings added
+// ahead of translation should not pull a finished language out of the list.
+const MIN_COVERAGE_TO_OFFER = 0.9;
+
+export const SELECTABLE_LANGUAGES = Object.fromEntries(
+    Object.entries(LANGUAGES).filter(([code]) => {
+        const { translated, total } = coverage(code as Language);
+        return translated / total >= MIN_COVERAGE_TO_OFFER;
+    })
+) as Partial<Record<Language, string>>;
 const STORAGE_KEY = 'inzira_lang';
 
 // Derived from LANGUAGES rather than listed again. The first version
@@ -80,18 +103,34 @@ export function isLanguage(value: unknown): value is Language {
     return typeof value === 'string' && Object.hasOwn(LANGUAGES, value);
 }
 
+// Is this a language we are currently willing to put someone into? Distinct
+// from isLanguage, which only asks whether the code exists at all — rw is a
+// real language with a real dictionary, it is just not written enough to
+// offer yet.
+export function isOfferedLanguage(value: unknown): value is Language {
+    return typeof value === 'string' && Object.hasOwn(SELECTABLE_LANGUAGES, value);
+}
+
 // A returning visitor's own choice first, then what their browser asks
-// for, then English. Reading navigator.language means a phone set to
-// Kinyarwanda gets Kinyarwanda on the first visit without being asked,
-// which is the whole point of bothering.
+// for, then English. Reading navigator.language means a phone set to a
+// language we speak gets it on the first visit without being asked, which
+// is the whole point of bothering.
+//
+// Both paths are gated on what is *offered*, not on what merely exists, and
+// each would otherwise strand someone in a language the picker will not
+// show. A stored choice made before a language was withdrawn would leave the
+// <select> holding a value that matches none of its options — it renders
+// blank, and the visitor cannot see what they are set to. And a browser
+// asking for Kinyarwanda would be handed a 27%-translated site nobody chose,
+// which is worse than the picker case: at least a click is a decision.
 export function preferredLanguage(
     stored: string | null,
     browserLanguages: readonly string[] = []
 ): Language {
-    if (isLanguage(stored)) return stored;
+    if (isOfferedLanguage(stored)) return stored;
     const asksForKinyarwanda = browserLanguages.some((tag) =>
         tag.toLowerCase().startsWith('rw'));
-    return asksForKinyarwanda ? 'rw' : 'en';
+    return asksForKinyarwanda && isOfferedLanguage('rw') ? 'rw' : 'en';
 }
 
 interface LanguageValue {

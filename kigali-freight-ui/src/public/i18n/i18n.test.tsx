@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { LanguageProvider, useLanguage, preferredLanguage, isLanguage, useApiError } from './index';
+import { LanguageProvider, useLanguage, preferredLanguage, isLanguage, useApiError,
+         LANGUAGES, SELECTABLE_LANGUAGES, type Language } from './index';
 import { ApiError } from '../publicApi';
 import { en } from './en';
 import { rw } from './rw';
@@ -90,13 +91,21 @@ describe('Kinyarwanda is honestly partial', () => {
 
 describe('choosing a language for a first-time visitor', () => {
     it('honours a returning visitor’s own choice above all', () => {
-        expect(preferredLanguage('rw', ['en-GB'])).toBe('rw');
-        expect(preferredLanguage('en', ['rw-RW'])).toBe('en');
+        expect(preferredLanguage('fr', ['en-GB'])).toBe('fr');
+        expect(preferredLanguage('en', ['fr-FR'])).toBe('en');
     });
 
-    it('follows a phone set to Kinyarwanda when there is no stored choice', () => {
-        expect(preferredLanguage(null, ['rw-RW', 'en'])).toBe('rw');
-        expect(preferredLanguage(null, ['rw'])).toBe('rw');
+    // Both of these used to resolve to 'rw'. Kinyarwanda is written well
+    // enough to exist and not well enough to offer, and neither route may
+    // put someone into it while that is true: a stored choice predates the
+    // withdrawal, and a browser preference was never a choice at all.
+    it('does not honour a stored language that is no longer offered', () => {
+        expect(preferredLanguage('rw', ['en-GB'])).toBe('en');
+    });
+
+    it('does not follow a phone asking for a language we cannot yet write', () => {
+        expect(preferredLanguage(null, ['rw-RW', 'en'])).toBe('en');
+        expect(preferredLanguage(null, ['rw'])).toBe('en');
     });
 
     it('falls back to English for anyone else', () => {
@@ -128,12 +137,12 @@ describe('switching language', () => {
     });
 
     it('remembers the choice and tells the document which language it is in', () => {
-        window.localStorage.setItem('inzira_lang', 'rw');
+        window.localStorage.setItem('inzira_lang', 'fr');
         render(<LanguageProvider><Probe /></LanguageProvider>);
 
-        expect(screen.getByText(/rw: Saba ubwikorezi/)).toBeInTheDocument();
+        expect(screen.getByText(/fr: /)).toBeInTheDocument();
         // Screen readers and search engines both read this attribute.
-        expect(document.documentElement.lang).toBe('rw');
+        expect(document.documentElement.lang).toBe('fr');
     });
 
     it('survives storage being refused, as in private browsing', async () => {
@@ -167,7 +176,22 @@ describe('the language picker', () => {
 
         const picker = screen.getByRole('combobox', { name: /language|ururimi|langue/i });
         const options = Array.from(picker.querySelectorAll('option')).map((o) => o.textContent);
-        expect(options).toEqual(['English', 'Ikinyarwanda', 'Français']);
+        expect(options).toEqual(['English', 'Français']);
+    });
+
+    // The guard that lets the one above stay honest. If someone finishes
+    // rw.ts, this fails and points at the assertion to update rather than
+    // leaving a finished translation quietly withheld.
+    it('offers exactly those languages that are written enough to offer', () => {
+        for (const code of Object.keys(SELECTABLE_LANGUAGES) as Language[]) {
+            const { translated, total } = coverage(code);
+            expect(translated / total).toBeGreaterThanOrEqual(0.9);
+        }
+        for (const code of Object.keys(LANGUAGES) as Language[]) {
+            if (code in SELECTABLE_LANGUAGES) continue;
+            const { translated, total } = coverage(code);
+            expect(translated / total).toBeLessThan(0.9);
+        }
     });
 
     it('changes the page when a language is chosen', async () => {
