@@ -28,10 +28,33 @@ async function purgeExpiredDriverInvites() {
     return result.rowCount;
 }
 
-const [otpCodesRemoved, driverInvitesRemoved] = await Promise.all([
+// Refresh tokens belong here for the same reason the two above do: a row
+// per sign-in, read a handful of times, then dead — and nothing was
+// removing them, so the table only ever grew (368 rows on production
+// already, from three users). A revoked or expired token is not a
+// credential any more, it is a record of when somebody signed in and from
+// what, which is worth keeping only briefly.
+//
+// The grace period is deliberate rather than deleting on expiry. Revoking a
+// token and then still finding the row is what lets a reuse attempt be
+// recognised as reuse — a stolen token replayed after rotation — instead of
+// looking like an unknown token, which is indistinguishable from noise. A
+// week is long past any legitimate use and still catches that.
+async function purgeDeadRefreshTokens() {
+    const result = await pool.query(
+        `DELETE FROM refresh_tokens
+          WHERE (expires_at < NOW() - INTERVAL '7 days')
+             OR (revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL '7 days')
+          RETURNING id;`
+    );
+    return result.rowCount;
+}
+
+const [otpCodesRemoved, driverInvitesRemoved, refreshTokensRemoved] = await Promise.all([
     purgeExpiredOtpCodes(),
     purgeExpiredDriverInvites(),
+    purgeDeadRefreshTokens(),
 ]);
 
-console.log(JSON.stringify({ otpCodesRemoved, driverInvitesRemoved }));
+console.log(JSON.stringify({ otpCodesRemoved, driverInvitesRemoved, refreshTokensRemoved }));
 await pool.end();

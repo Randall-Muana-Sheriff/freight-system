@@ -25,7 +25,8 @@
     "backup:verify": "node ops/verify-backup.js",
     "backup:prune": "node ops/prune-backups.js",
     "load:test": "node ops/load-test.js",
-    "purge:auth-codes": "node ops/purge-expired-auth-codes.js"
+    "purge:auth-codes": "node ops/purge-expired-auth-codes.js",
+    "purge:location-history": "node ops/purge-location-history.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

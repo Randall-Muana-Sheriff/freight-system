@@ -14,7 +14,29 @@
 # so a host called "dispatch" gets the board at its root and the apex gets
 # the customer site.
 
+# Sent on every HTTPS response below. Without it, a visitor who types the
+# bare hostname or follows an http:// link makes one unencrypted request
+# before the 308 redirect fires, and that first request is interceptable on
+# a shared or hostile network — a redirect cannot protect the hop that
+# triggers it. HSTS tells the browser never to make that request again.
+#
+# Deliberately no includeSubDomains and no preload. Both are effectively
+# one-way doors: preload requires a removal request and months of browser
+# release cycles to undo, and includeSubDomains would bind every future
+# subdomain — a staging or partner host on plain http would simply be
+# unreachable, with a browser-cached error and no server-side fix. The
+# apex, the API and the board are all already HTTPS-only and auto-renewing
+# here, so the narrow form buys the protection without the trap.
+#
+# To back this out, lower max-age to 0 and leave it deployed until the old
+# value has aged out of visitors' browsers. Removing the header alone does
+# nothing — browsers keep honouring the last value they saw.
+(security_headers) {
+	header Strict-Transport-Security "max-age=31536000"
+}
+
 {$API_DOMAIN} {
+	import security_headers
 	reverse_proxy router:5000
 
 	# Socket.IO's websocket upgrade needs the same proxy target — Caddy
@@ -24,6 +46,7 @@
 }
 
 {$APP_DOMAIN} {
+	import security_headers
 	reverse_proxy ui:80
 	encode gzip
 }
@@ -32,6 +55,7 @@
 # unset and Caddy skips this block rather than failing to start — the
 # customer pages stay reachable on APP_DOMAIN in the meantime.
 {$SITE_DOMAIN:localhost.invalid} {
+	import security_headers
 	reverse_proxy ui:80
 	encode gzip
 }

@@ -61,8 +61,9 @@ export const privacyFr: PrivacyDoc = {
             'Les dossiers d’expédition, photos de livraison comprises, sont conservés tant ' +
             'qu’ils peuvent servir à traiter une question ou une réclamation concernant cette ' +
             'livraison. L’historique de localisation des chauffeurs est une donnée ' +
-            'opérationnelle, conservée uniquement le temps qu’elle reste utile à la ' +
-            'coordination et à l’analyse du travail.',
+            'opérationnelle, supprimée automatiquement au bout de 90 jours — un délai ' +
+            'suffisant pour examiner une livraison contestée ou enquêter sur un incident ' +
+            'plusieurs semaines après les faits.',
     },
     rights: {
         title: 'Vos choix',

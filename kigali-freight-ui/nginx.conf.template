@@ -73,7 +73,20 @@ server {
     }
 
     location ~* \.(?:css|js|woff2?|ttf|svg|png|jpg|jpeg|gif|ico)$ {
-        expires 7d;
+        # No `expires 7d` alongside the explicit header: `expires` emits its
+        # own Cache-Control, so having both sent two Cache-Control headers on
+        # every asset. Browsers cope, but a proxy or scanner reading the
+        # first one saw a weaker directive than intended.
         add_header Cache-Control "public, max-age=604800, immutable";
+
+        # Restated because this location declares add_header at all. nginx
+        # drops the entire inherited set the moment it does, so before this
+        # every script, stylesheet and font on the site went out with no
+        # nosniff at all — verified against production, not assumed. That is
+        # the one header that matters here: it stops a browser second-
+        # guessing the Content-Type of a .js or .css response and executing
+        # something as a type it was not served as.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     }
 }

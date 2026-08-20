@@ -1,0 +1,15 @@
+[Unit]
+Description=Run kigali-purge-location-history.service daily
+
+[Timer]
+# 04:12, after the 02:17 backup and the 03:41 auth-code purge. Deliberately
+# last of the three: the night's dump is taken before anything is deleted,
+# so a backup always contains one more day of history than the live table.
+# If a retention window ever turns out to be too aggressive, that ordering
+# is what makes the mistake recoverable rather than permanent.
+OnCalendar=*-*-* 04:12:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

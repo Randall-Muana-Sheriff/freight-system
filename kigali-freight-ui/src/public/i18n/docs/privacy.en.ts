@@ -57,8 +57,9 @@ export const privacyEn = {
         body:
             'Consignment records, including delivery photographs, are kept while they may ' +
             'still be needed to settle a query or a claim about that delivery. Driver ' +
-            'location history is operational data and is kept only as long as it is useful ' +
-            'for coordinating and reviewing work.',
+            'location history is operational data and is deleted automatically after 90 ' +
+            'days, which is long enough to review a disputed delivery or investigate an ' +
+            'incident weeks after it happened.',
     },
     rights: {
         title: 'Your choices',
