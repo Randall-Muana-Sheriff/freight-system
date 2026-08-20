@@ -55,7 +55,7 @@ function readStepParam() {
 // label is looked up per language at render time.
 const NEEDED_BY = ['today', 'tomorrow', 'this_week', 'flexible'] as const;
 
-const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
+const field = 'w-full border-b border-pub-onpaper/25 bg-transparent py-2.5 text-[17px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
 export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }) {
     const { t } = useLanguage();
@@ -148,7 +148,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                     <h1 className="display-wide mt-5 text-[clamp(2.2rem,5vw,3.2rem)] text-pub-onink">
                         {t.steps.keepCode}
                     </h1>
-                    <p className="mt-5 text-[15px] leading-relaxed text-pub-onink-soft">
+                    <p className="mt-5 text-[17px] leading-relaxed text-pub-onink-soft">
                         {t.steps.keepCodeBody}
                     </p>
 
@@ -166,13 +166,13 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                     </div>
                     <p aria-live="polite" className="sr-only">{copied ? t.order.codeCopied : ''}</p>
 
-                    <p className="mt-4 text-sm text-pub-onink-soft">
+                    <p className="mt-4 text-[15px] text-pub-onink-soft">
                         Texted to {draft.customerPhone}. Write it down anyway — a text can go astray.
                     </p>
 
                     <div className="mt-10 flex flex-wrap gap-3">
                         <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
-                            className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
+                            className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-ink hover:bg-pub-laterite-soft">
                             {t.steps.trackItNow}
                         </button>
                         <button onClick={() => onNavigate('/')}
@@ -260,7 +260,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                                 onClick={() => setDraft({ ...draft, neededBy: chosen ? undefined : value })}
                                                 className={`focus-ring rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
                                                     chosen
-                                                        ? 'border-pub-laterite bg-pub-laterite text-pub-onink'
+                                                        ? 'border-pub-laterite bg-pub-laterite text-pub-ink'
                                                         : 'border-pub-onpaper/25 text-pub-onpaper-soft hover:border-pub-onpaper/50 hover:text-pub-onpaper'
                                                 }`}
                                             >
@@ -272,7 +272,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 {/* Said plainly, because "Today" on a form is
                                     easily read as a promise. A dispatcher
                                     decides what is actually possible. */}
-                                <p className="mt-3 text-sm leading-relaxed text-pub-onpaper-soft">
+                                <p className="mt-3 text-[15px] leading-relaxed text-pub-onpaper-soft">
                                     {t.steps.neededByNote}
                                 </p>
                             </fieldset>
@@ -302,7 +302,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 <input type="email" className={field} value={draft.customerEmail} placeholder={t.order.emailPlaceholder}
                                     onChange={(e) => setDraft({ ...draft, customerEmail: e.target.value })} />
                             </label>
-                            <p className="border-l-2 border-pub-laterite pl-4 text-sm leading-relaxed text-pub-onpaper-soft">
+                            <p className="border-l-2 border-pub-laterite pl-4 text-[15px] leading-relaxed text-pub-onpaper-soft">
                                 {t.steps.phoneNote}
                             </p>
                         </>
@@ -322,15 +322,15 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 ].map(([term, value]) => (
                                     <div key={term} className="grid grid-cols-[9rem_1fr] gap-4 border-b border-pub-onpaper/15 py-3.5">
                                         <dt className="data-label pt-0.5 text-pub-onpaper-soft">{term}</dt>
-                                        <dd className="text-[15px] text-pub-onpaper">{value || '—'}</dd>
+                                        <dd className="text-[17px] text-pub-onpaper">{value || '—'}</dd>
                                     </div>
                                 ))}
                             </dl>
-                            <p className="text-sm leading-relaxed text-pub-onpaper-soft">
+                            <p className="text-[15px] leading-relaxed text-pub-onpaper-soft">
                                 A dispatcher checks this before any driver is sent. You&apos;ll get a
                                 tracking code straight away.
                             </p>
-                            {error ? <p role="alert" className="text-sm font-medium text-pub-laterite">{error}</p> : null}
+                            {error ? <p role="alert" className="text-[15px] font-medium text-pub-laterite">{error}</p> : null}
                         </>
                     )}
                 </div>
@@ -348,7 +348,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                         </button>
                     ) : (
                         <button onClick={confirm} disabled={submitting}
-                            className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                            className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
                             {submitting ? t.actions.placing : t.actions.placeOrder}
                         </button>
                     )}

@@ -137,7 +137,7 @@ export function SiteTour({ onBook }: { onBook: () => void }) {
             >
                 <p className="data-label text-pub-laterite">Step {step + 1} of {STEPS.length}</p>
                 <h2 id="tour-title" className="display-tight mt-2 text-lg text-pub-onpaper">{t.tour[current.title]}</h2>
-                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{t.tour[current.body]}</p>
+                <p className="mt-2 text-[17px] leading-relaxed text-pub-onpaper-soft">{t.tour[current.body]}</p>
 
                 <div className="mt-5 flex items-center justify-between gap-3">
                     <button onClick={finish} className="text-sm font-medium text-pub-onpaper-soft hover:text-pub-onpaper">

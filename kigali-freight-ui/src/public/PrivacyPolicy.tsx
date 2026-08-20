@@ -15,7 +15,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
     return (
         <section id={id} className="scroll-mt-24">
             <h2 className="display-tight mt-12 text-xl text-pub-onpaper">{title}</h2>
-            <div className="mt-3 space-y-3 text-[0.9375rem] leading-relaxed text-pub-onpaper-soft">
+            <div className="mt-3 space-y-3 text-[1.0625rem] leading-relaxed text-pub-onpaper-soft">
                 {children}
             </div>
         </section>
@@ -29,7 +29,7 @@ function DataRow({ what, why, shared }: { what: string; why: string; shared: str
     return (
         <div className="border-t border-pub-onpaper/10 py-3 sm:grid sm:grid-cols-[10rem_1fr] sm:gap-4">
             <dt className="data-label pt-0.5 text-pub-onpaper">{what}</dt>
-            <dd className="mt-1 text-[0.9375rem] leading-relaxed text-pub-onpaper-soft sm:mt-0">
+            <dd className="mt-1 text-[1.0625rem] leading-relaxed text-pub-onpaper-soft sm:mt-0">
                 {why} <span className="text-pub-onpaper/70">Shared with: {shared}.</span>
             </dd>
         </div>
@@ -42,12 +42,12 @@ export default function PrivacyPolicy() {
         <div className="mx-auto my-3 max-w-3xl rounded-lg bg-pub-paper px-6 py-14 sm:px-12 sm:py-16">
             <p className="data-label text-pub-laterite">{d.eyebrow}</p>
             <h1 className="display-wide mt-3 text-4xl text-pub-onpaper sm:text-5xl">{d.title}</h1>
-            <p className="mt-4 text-[0.9375rem] text-pub-onpaper-soft">{d.updatedPrefix} {d.updated}</p>
+            <p className="mt-4 text-[1.0625rem] text-pub-onpaper-soft">{d.updatedPrefix} {d.updated}</p>
             {/* Present only on a translated policy: a legal document in two
                 languages has to say which one governs, or a discrepancy
                 becomes an argument rather than a typo. */}
             {d.governingNote ? (
-                <p className="mt-2 text-sm italic text-pub-onpaper-soft/80">{d.governingNote}</p>
+                <p className="mt-2 text-[15px] italic text-pub-onpaper-soft/80">{d.governingNote}</p>
             ) : null}
 
             <p className="mt-8 text-base leading-relaxed text-pub-onpaper">{d.intro}</p>

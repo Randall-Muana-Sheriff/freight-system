@@ -156,7 +156,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                 <div className="hidden items-center gap-3 lg:flex">
                     <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
-                        className="focus-ring rounded-md bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                        className="focus-ring rounded-md bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                 </div>
@@ -184,14 +184,14 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                         {SECTIONS.map((section) => (
                             <li key={section.id}>
                                 <button onClick={() => go(() => goToSection(section.id, onNavigate))}
-                                    className="focus-ring w-full border-b border-pub-onink/10 py-3.5 text-left text-[15px] text-pub-onink-soft transition-colors hover:text-pub-onink">
+                                    className="focus-ring w-full border-b border-pub-onink/10 py-3.5 text-left text-[17px] text-pub-onink-soft transition-colors hover:text-pub-onink">
                                     {t.nav[section.key]}
                                 </button>
                             </li>
                         ))}
                         <li>
                             <button onClick={() => go(() => onNavigate('/track'))}
-                                className="focus-ring w-full border-b border-pub-onink/10 py-3.5 text-left text-[15px] text-pub-onink-soft transition-colors hover:text-pub-onink">
+                                className="focus-ring w-full border-b border-pub-onink/10 py-3.5 text-left text-[17px] text-pub-onink-soft transition-colors hover:text-pub-onink">
                                 {t.actions.track}
                             </button>
                         </li>
@@ -201,7 +201,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                         call to action is full width here because on a phone
                         it is the only thing on the row. */}
                     <button onClick={() => go(() => onNavigate('/order'))}
-                        className="focus-ring rounded-md mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                        className="focus-ring rounded-md mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                     <div className="mt-4">
@@ -226,7 +226,7 @@ export function PublicFooter({ onNavigate }: { onNavigate: (path: string) => voi
                             <InziraMark className="h-8 w-8 translate-y-1" />
                             <span className="display-tight text-2xl text-pub-onink">Inzira</span>
                         </div>
-                        <p className="mt-4 max-w-xs text-sm leading-relaxed text-pub-onink-soft">{t.footer.tagline}</p>
+                        <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-pub-onink-soft">{t.footer.tagline}</p>
                     </div>
 
                     <div className="flex flex-col items-start gap-2.5">

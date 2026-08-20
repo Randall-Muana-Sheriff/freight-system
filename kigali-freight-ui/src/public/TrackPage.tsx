@@ -90,7 +90,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
 
                 {error ? (
                     <div role="alert" className="mt-10 border-l-2 border-pub-laterite pl-5">
-                        <p className="text-[15px] text-pub-onink">{error}</p>
+                        <p className="text-[17px] text-pub-onink">{error}</p>
                         <button onClick={() => onNavigate('/order')}
                             className="focus-ring data-label mt-3 text-pub-laterite-soft hover:text-pub-onink">
                             {t.actions.bookInstead}
@@ -110,26 +110,26 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                         <dl className="grid gap-x-8 gap-y-5 py-7 sm:grid-cols-2">
                             <div>
                                 <dt className="data-label text-pub-onink-soft">{t.track.collectFrom}</dt>
-                                <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.pickup || 'Being confirmed'}</dd>
+                                <dd className="mt-1.5 text-[17px] text-pub-onink">{shipment.pickup || 'Being confirmed'}</dd>
                             </div>
                             <div>
                                 <dt className="data-label text-pub-onink-soft">{t.track.deliverTo}</dt>
-                                <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.delivery || 'Being confirmed'}</dd>
+                                <dd className="mt-1.5 text-[17px] text-pub-onink">{shipment.delivery || 'Being confirmed'}</dd>
                             </div>
                             {shipment.driverFirstName ? (
                                 <div>
                                     <dt className="data-label text-pub-onink-soft">{t.track.driver}</dt>
-                                    <dd className="mt-1.5 text-[15px] text-pub-onink">{shipment.driverFirstName}</dd>
+                                    <dd className="mt-1.5 text-[17px] text-pub-onink">{shipment.driverFirstName}</dd>
                                 </div>
                             ) : null}
                             <div>
                                 <dt className="data-label text-pub-onink-soft">{t.misc.reference}</dt>
-                                <dd className="mt-1.5 font-mono text-[15px] tracking-wider text-pub-onink">{shipment.trackingToken}</dd>
+                                <dd className="mt-1.5 font-mono text-[17px] tracking-wider text-pub-onink">{shipment.trackingToken}</dd>
                             </div>
                         </dl>
 
                         {cancelled ? (
-                            <p className="border-t border-pub-onink/15 pt-7 text-[15px] text-pub-onink-soft">
+                            <p className="border-t border-pub-onink/15 pt-7 text-[17px] text-pub-onink-soft">
                                 {t.trackExtra.cancelledNote}
                             </p>
                         ) : (
@@ -147,10 +147,10 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                                     current ? 'bg-pub-signal' : done ? 'bg-pub-onink' : 'border border-pub-onink/30 bg-pub-ink'
                                                 }`} />
                                             <div className={done ? '' : 'opacity-40'}>
-                                                <p className={`text-[15px] font-semibold ${current ? 'text-pub-signal' : 'text-pub-onink'}`}>
+                                                <p className={`text-[17px] font-semibold ${current ? 'text-pub-signal' : 'text-pub-onink'}`}>
                                                     {t.track.milestones[milestone.label]}
                                                 </p>
-                                                <p className="mt-0.5 text-sm text-pub-onink-soft">{t.track.milestones[milestone.note]}</p>
+                                                <p className="mt-0.5 text-[15px] text-pub-onink-soft">{t.track.milestones[milestone.note]}</p>
                                                 <p className="data-label mt-1.5 text-pub-onink-soft/70">{done ? (at || '—') : t.track.notYet}</p>
                                             </div>
                                         </li>
@@ -179,7 +179,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                         />
                                     </a>
                                 ) : null}
-                                <p className="mt-4 text-[15px] leading-relaxed text-pub-onink-soft">
+                                <p className="mt-4 text-[17px] leading-relaxed text-pub-onink-soft">
                                     {t.trackExtra.photographedAt}
                                     {shipment.proofOfDelivery.confirmedAt
                                         ? ` ${t.trackExtra.onDate} ${formatTime(shipment.proofOfDelivery.confirmedAt)}`
@@ -187,7 +187,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                     {shipment.driverFirstName ? ` ${t.trackExtra.byDriver} ${shipment.driverFirstName}` : ''}.
                                 </p>
                                 {shipment.proofOfDelivery.notes ? (
-                                    <p className="mt-3 border-l-2 border-pub-onink/25 pl-4 text-[15px] leading-relaxed text-pub-onink">
+                                    <p className="mt-3 border-l-2 border-pub-onink/25 pl-4 text-[17px] leading-relaxed text-pub-onink">
                                         “{shipment.proofOfDelivery.notes}”
                                     </p>
                                 ) : null}

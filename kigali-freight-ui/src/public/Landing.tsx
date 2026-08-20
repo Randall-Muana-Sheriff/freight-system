@@ -44,12 +44,12 @@ function ContactForm() {
         return (
             <div className="border-l-2 border-pub-laterite bg-pub-paper2 px-8 py-10">
                 <p className="display-tight text-2xl text-pub-onpaper">{t.form.messageReceived}</p>
-                <p className="mt-2 text-sm text-pub-onpaper-soft">{t.form.weAnswer}</p>
+                <p className="mt-2 text-[15px] text-pub-onpaper-soft">{t.form.weAnswer}</p>
             </div>
         );
     }
 
-    const field = 'w-full border-b border-pub-onpaper/20 bg-transparent py-2.5 text-[15px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
+    const field = 'w-full border-b border-pub-onpaper/20 bg-transparent py-2.5 text-[17px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
 
     return (
         <form onSubmit={submit} className="grid gap-6 sm:grid-cols-2">
@@ -75,7 +75,7 @@ function ContactForm() {
                     onChange={(e) => setForm({ ...form, message: e.target.value })} />
             </label>
 
-            {error ? <p role="alert" className="text-sm text-pub-laterite sm:col-span-2">{error}</p> : null}
+            {error ? <p role="alert" className="text-[15px] text-pub-laterite sm:col-span-2">{error}</p> : null}
 
             <div className="sm:col-span-2">
                 <button type="submit" disabled={state === 'sending'}
@@ -190,7 +190,7 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
                         className={`focus-ring group bg-pub-paper px-5 py-6 text-center ${CARD} ${CARD_HOVER}`}>
                         <CardIcon shape={card.icon} />
                         <h2 className="display-tight mt-4 text-base text-pub-onpaper">{card.title}</h2>
-                        <p className="mt-1 text-[13px] leading-snug text-pub-onpaper-soft">{card.body}</p>
+                        <p className="mt-1 text-[14px] leading-snug text-pub-onpaper-soft">{card.body}</p>
                     </button>
                 ))}
             </div>
@@ -273,7 +273,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                                 placeholder={t.misc.codePlaceholder}
                                 className="focus-ring min-w-0 flex-1 rounded-md border border-pub-onink/20 bg-pub-ink2 px-4 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:text-pub-onink-soft/50 focus:border-pub-onink/50 focus:outline-none" />
                             <button type="submit"
-                                className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                                className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft">
                                 {t.actions.trackSubmit}
                             </button>
                         </form>
@@ -306,7 +306,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             <article key={service.name} className={`bg-pub-paper2 px-6 py-7 ${CARD}`}>
                                 <p className="data-label mb-3 text-pub-laterite">{service.spec}</p>
                                 <h3 className="display-tight text-xl text-pub-onpaper">{service.name}</h3>
-                                <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{service.body}</p>
+                                <p className="mt-2 text-[17px] leading-relaxed text-pub-onpaper-soft">{service.body}</p>
                             </article>
                         ))}
                     </div>
@@ -331,7 +331,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                                 <div>
                                     <p className="data-label mb-1.5 text-pub-onpaper-soft">{t.journeyExtra.stopLabel} {index + 1}</p>
                                     <h3 className="display-tight text-lg text-pub-onpaper">{stop.name}</h3>
-                                    <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-pub-onpaper-soft">{stop.body}</p>
+                                    <p className="mt-1.5 max-w-xl text-[17px] leading-relaxed text-pub-onpaper-soft">{stop.body}</p>
                                 </div>
                             </li>
                         ))}
@@ -355,12 +355,12 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         {t.about.views.map((view) => (
                             <article key={view.title} className={`bg-pub-ink2 px-6 py-7 ${CARD_DARK}`}>
                                 <h3 className="display-tight text-lg text-pub-onink">{view.title}</h3>
-                                <p className="mt-2.5 text-[15px] leading-relaxed text-pub-onink-soft">{view.body}</p>
+                                <p className="mt-2.5 text-[17px] leading-relaxed text-pub-onink-soft">{view.body}</p>
                             </article>
                         ))}
                     </div>
 
-                    <p className="mt-12 max-w-2xl border-l-2 border-pub-laterite pl-5 text-[15px] leading-relaxed text-pub-onink-soft">
+                    <p className="mt-12 max-w-2xl border-l-2 border-pub-laterite pl-5 text-[17px] leading-relaxed text-pub-onink-soft">
                         {t.about.closing}
                     </p>
                 </div>
@@ -372,7 +372,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 <div className="mx-auto grid max-w-5xl gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
                     <div>
                         <SectionHead eyebrow={t.contact.eyebrow} headline={t.contact.headline} />
-                        <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-pub-onpaper-soft">{t.contact.body}</p>
+                        <p className="mt-5 max-w-sm text-[17px] leading-relaxed text-pub-onpaper-soft">{t.contact.body}</p>
                         <p className="data-label mt-8 text-pub-onpaper-soft">{t.contact.address}</p>
                     </div>
                     <ContactForm />

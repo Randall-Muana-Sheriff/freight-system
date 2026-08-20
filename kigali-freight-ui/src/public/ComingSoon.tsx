@@ -58,13 +58,13 @@ function NotifyForm() {
 
     if (state === 'sent') {
         return (
-            <p className="border-l-2 border-pub-laterite pl-5 text-left text-[15px] leading-relaxed text-pub-onink">
+            <p className="border-l-2 border-pub-laterite pl-5 text-left text-[17px] leading-relaxed text-pub-onink">
                 {t.comingExtra.thanks}
             </p>
         );
     }
 
-    const field = 'w-full border-b border-pub-onink/25 bg-transparent py-2.5 text-[15px] text-pub-onink placeholder:text-pub-onink-soft/60 focus:border-pub-onink focus:outline-none';
+    const field = 'w-full border-b border-pub-onink/25 bg-transparent py-2.5 text-[17px] text-pub-onink placeholder:text-pub-onink-soft/60 focus:border-pub-onink focus:outline-none';
 
     return (
         <form onSubmit={submit} className="grid gap-4 text-left sm:grid-cols-[1fr_1fr_auto] sm:items-end">
@@ -79,10 +79,10 @@ function NotifyForm() {
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </label>
             <button type="submit" disabled={state === 'sending'}
-                className="rounded-md bg-pub-laterite px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                className="rounded-md bg-pub-laterite px-6 py-3 text-sm font-semibold text-pub-ink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
                 {state === 'sending' ? 'Saving…' : 'Tell me when'}
             </button>
-            {error ? <p role="alert" className="text-sm text-pub-laterite-soft sm:col-span-3">{error}</p> : null}
+            {error ? <p role="alert" className="text-[15px] text-pub-laterite-soft sm:col-span-3">{error}</p> : null}
         </form>
     );
 }

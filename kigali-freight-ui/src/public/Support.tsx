@@ -19,7 +19,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     return (
         <section>
             <h2 className="display-tight mt-12 text-xl text-pub-onpaper">{title}</h2>
-            <div className="mt-3 space-y-3 text-[0.9375rem] leading-relaxed text-pub-onpaper-soft">
+            <div className="mt-3 space-y-3 text-[1.0625rem] leading-relaxed text-pub-onpaper-soft">
                 {children}
             </div>
         </section>
@@ -32,7 +32,7 @@ function Answer({ problem, children }: { problem: string; children: React.ReactN
     return (
         <div className="border-t border-pub-onpaper/10 py-4">
             <p className="font-semibold text-pub-onpaper">{problem}</p>
-            <div className="mt-1.5 text-[0.9375rem] leading-relaxed text-pub-onpaper-soft">{children}</div>
+            <div className="mt-1.5 text-[1.0625rem] leading-relaxed text-pub-onpaper-soft">{children}</div>
         </div>
     );
 }
