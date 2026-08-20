@@ -16,6 +16,7 @@
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import { scrubTree } from './utils/redaction.js';
+import { buildInfo } from './config/buildInfo.js';
 
 const dsn = process.env.SENTRY_DSN;
 
@@ -23,11 +24,13 @@ if (dsn) {
     Sentry.init({
         dsn,
 
-        // The deploy already carries the commit SHA for /health's version
-        // stamp, so reuse it. An error is then attributable to an exact
-        // deployed commit rather than to "production sometime last week",
-        // and `git log` reaches the change that introduced it.
-        release: process.env.GIT_COMMIT || undefined,
+        // From build-info.json, the same source /health reports, so an
+        // error and a health check can never disagree about which commit is
+        // running. Not process.env.GIT_COMMIT: that is a *build* argument
+        // baked into the image, absent from the runtime environment — the
+        // first version read it and every production event was tagged
+        // "unknown", which is exactly the attribution this is for.
+        release: buildInfo.commit !== 'unknown' ? buildInfo.commit : undefined,
         environment: process.env.NODE_ENV === 'production' ? 'production' : 'development',
 
         // Off by default in the SDK, set explicitly because the default is
@@ -46,7 +49,7 @@ if (dsn) {
             return scrubTree(event);
         },
     });
-    console.log(`[sentry] initialised for release ${process.env.GIT_COMMIT?.slice(0, 7) || 'unknown'}.`);
+    console.log(`[sentry] initialised for release ${buildInfo.commit.slice(0, 7)}.`);
 } else {
     console.log('[sentry] SENTRY_DSN not set — error reporting disabled.');
 }

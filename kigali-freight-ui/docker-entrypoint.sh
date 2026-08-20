@@ -18,9 +18,11 @@ APP_DOMAIN="${APP_DOMAIN:-}"
 # which is the default and the correct state for any deployment that has not
 # been given a project of its own.
 SENTRY_DSN="${SENTRY_DSN:-}"
+# Stamped by the deploy, same value the router reports from /health.
+GIT_COMMIT="${GIT_COMMIT:-}"
 
 cat > /usr/share/nginx/html/config.js <<EOF
-window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}", SENTRY_DSN: "${SENTRY_DSN}" };
+window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}", SENTRY_DSN: "${SENTRY_DSN}", GIT_COMMIT: "${GIT_COMMIT}" };
 EOF
 
 if [ -n "$API_BASE_URL" ]; then

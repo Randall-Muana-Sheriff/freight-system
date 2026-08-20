@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react';
-import { getSentryDsn } from './runtimeConfig';
+import { getSentryDsn, getRelease } from './runtimeConfig';
 
 // Browser-side error reporting for the dispatcher board and the public site.
 //
@@ -26,7 +26,11 @@ export function initBrowserReporting() {
 
     Sentry.init({
         dsn,
-        release: (import.meta.env.VITE_GIT_COMMIT as string) || undefined,
+        // From /config.js, not import.meta.env: VITE_GIT_COMMIT was never
+        // set by anything, so this silently tagged every report with no
+        // release at all. Runtime config also means the stamp follows the
+        // deployment rather than the image.
+        release: getRelease() || undefined,
         environment: import.meta.env.PROD ? 'production' : 'development',
 
         // This board shows customer names, phone numbers and delivery

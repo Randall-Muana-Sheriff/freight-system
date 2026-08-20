@@ -198,6 +198,7 @@ services:
       # distinct outer variable is what keeps browser events out of
       # the server project.
       SENTRY_DSN: ${SENTRY_DSN_DASHBOARD:-}
+      GIT_COMMIT: ${GIT_COMMIT:-}
       SITE_URL: ${SITE_URL:-}
       PRE_LAUNCH: ${PRE_LAUNCH:-0}
       API_BASE_URL: http://localhost:5000

@@ -20,6 +20,10 @@ interface RuntimeConfig {
     // deployable anywhere, and baking a DSN would tie the artifact to a
     // single Sentry project. Absent in development, where reporting is off.
     SENTRY_DSN?: string;
+    // The commit this deployment is running, so a browser error is
+    // attributable to an exact release rather than to "production". Comes
+    // from the same GIT_COMMIT the router stamps into build-info.json.
+    GIT_COMMIT?: string;
 }
 
 declare global {
@@ -54,4 +58,11 @@ export function getStaffDomain(): string {
 export function getSentryDsn(): string {
     const runtime = readRuntimeConfig();
     return runtime.SENTRY_DSN || import.meta.env.VITE_SENTRY_DSN || '';
+}
+
+// Empty when the deployment was not stamped, in which case reports carry no
+// release rather than a made-up one.
+export function getRelease(): string {
+    const runtime = readRuntimeConfig();
+    return runtime.GIT_COMMIT || '';
 }
