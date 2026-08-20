@@ -9,7 +9,7 @@
     "start": "node --import ./instrument.js server.js",
     "lint": "eslint . --ext .js",
     "typecheck": "echo 'router: no typecheck'",
-    "test": "node --test tests/routeSequencing.test.js tests/customerNotification.test.js tests/redaction.test.js",
+    "test": "node --test tests/routeSequencing.test.js tests/customerNotification.test.js tests/redaction.test.js tests/migrationCoverage.test.js",
     "test:integration": "npm run db:migrate && node --test tests/integration.test.js",
     "docker:build": "docker build -f Dockerfile -t kigali-freight-router ..",
     "db:migrate": "node bin/migrate.js",

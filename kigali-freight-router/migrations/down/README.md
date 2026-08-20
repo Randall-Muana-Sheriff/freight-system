@@ -16,6 +16,12 @@ unreversible by design — rolling one of these back requires a manual,
 DBA-supervised procedure (and almost always rolling the *application
 code* back too, not just the schema):
 
+- **`init_spatial.sql`** — the very first migration. It enables the
+  PostGIS extension and, before creating `hubs` and `orders`, issues
+  `DROP TABLE IF EXISTS ... CASCADE` on both. Reversing it means dropping
+  the two tables the entire system is built on, and dropping the
+  extension every geometry column since depends on. There is no state
+  this rolls back *to* — anything earlier than this is an empty database.
 - **`add_full_schema.sql`** — the foundational schema migration. It both
   creates several tables and backfills real data into new columns on
   existing tables (`orders.pickup_lng`/`pickup_lat`/etc, computed from
