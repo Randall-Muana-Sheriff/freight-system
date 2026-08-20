@@ -49,6 +49,9 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      # Error reporting. instrument.js is a no-op without this, so an
+      # unset value degrades to exactly the previous behaviour.
+      SENTRY_DSN: ${SENTRY_DSN:-}
       # The base file hardcodes this as a literal (not a ${VAR}
       # interpolation at all), so there was no way to override it via any
       # env file — the router silently kept rejecting every browser
@@ -96,6 +99,11 @@ services:
       # itself there if reached via the apex's /dispatch fallback — the
       # session is a per-origin localStorage token, so two origins means a
       # sign-out that cannot clear the other one's session.
+      # The dashboard's own Sentry project, not the router's. The
+      # entrypoint reads SENTRY_DSN inside this container, so the
+      # distinct outer variable is what keeps browser events out of
+      # the server project.
+      SENTRY_DSN: ${SENTRY_DSN_DASHBOARD:-}
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.production (e.g. dispatch.yourcompany.com)}
 
   caddy:

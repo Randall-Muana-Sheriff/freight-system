@@ -15,6 +15,11 @@ interface RuntimeConfig {
     // has no staff subdomain, which is why every caller has to have a
     // path-based fallback rather than assuming a subdomain exists.
     APP_DOMAIN?: string;
+    // Sentry's ingest URL for the browser. Runtime rather than build-time
+    // for the same reason as API_BASE_URL: one built image should be
+    // deployable anywhere, and baking a DSN would tie the artifact to a
+    // single Sentry project. Absent in development, where reporting is off.
+    SENTRY_DSN?: string;
 }
 
 declare global {
@@ -42,4 +47,11 @@ export function getApiBase(): string {
 export function getStaffDomain(): string {
     const runtime = readRuntimeConfig();
     return runtime.APP_DOMAIN || import.meta.env.VITE_APP_DOMAIN || '';
+}
+
+// Empty when unset, which switches browser error reporting off entirely —
+// the normal state in development and for anyone running this from a clone.
+export function getSentryDsn(): string {
+    const runtime = readRuntimeConfig();
+    return runtime.SENTRY_DSN || import.meta.env.VITE_SENTRY_DSN || '';
 }

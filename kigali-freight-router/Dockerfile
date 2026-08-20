@@ -64,4 +64,12 @@ EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||5000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "server.js"]
+# --import runs instrument.js before server.js loads, which is the only
+# point at which Sentry can patch Express and pg — anything already
+# imported when init() runs is never instrumented. It is a no-op without
+# SENTRY_DSN, so this is safe in every environment.
+#
+# Note for anyone changing how this starts: the npm "start" script is NOT
+# what runs here, and docker-compose.yml overrides this CMD again. All
+# three have to agree or Sentry silently never initialises.
+CMD ["node", "--import", "./instrument.js", "server.js"]

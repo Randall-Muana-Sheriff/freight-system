@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
+import { reportToSentry } from '../utils/sentry';
 import { API_BASE } from '../utils/api';
 
 interface ErrorBoundaryProps {
@@ -29,6 +30,11 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
 
     componentDidCatch(error: Error, info: ErrorInfo) {
         console.error('Dashboard crashed:', error, info?.componentStack);
+        // Both destinations, deliberately. The POST below reaches a person
+        // on Telegram within seconds but carries one line and no stack;
+        // Sentry keeps the trace, the release, and how many times this has
+        // happened to how many people.
+        reportToSentry(error, info?.componentStack ?? undefined);
         // Fire-and-forget: without this a white-screened dispatcher is
         // visible only to the person looking at it. Any failure here is
         // swallowed on purpose — a broken error reporter must never throw

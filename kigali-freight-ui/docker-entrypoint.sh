@@ -14,9 +14,13 @@ API_BASE_URL="${API_BASE_URL:-}"
 # one origin ever holds a session — see src/utils/surface.ts. Left empty
 # when there is no staff subdomain, which keeps the path fallback.
 APP_DOMAIN="${APP_DOMAIN:-}"
+# Browser error reporting. Empty here means the app never initialises Sentry,
+# which is the default and the correct state for any deployment that has not
+# been given a project of its own.
+SENTRY_DSN="${SENTRY_DSN:-}"
 
 cat > /usr/share/nginx/html/config.js <<EOF
-window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}" };
+window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}", SENTRY_DSN: "${SENTRY_DSN}" };
 EOF
 
 if [ -n "$API_BASE_URL" ]; then
