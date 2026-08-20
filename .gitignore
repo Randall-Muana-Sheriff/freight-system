@@ -18,3 +18,10 @@ npm-debug.log*
 dist/
 build/
 .DS_Store
+
+# ops/backup-db.js writes here when run without an explicit target directory,
+# which is what a local restore drill does. On the real host the systemd unit
+# passes /var/backups/kigali-freight, so this only ever catches local runs —
+# but an untracked dump left here makes the tree dirty and push-to-production
+# refuses to deploy, which is a confusing way to discover you took a backup.
+kigali-freight-router/backups/
