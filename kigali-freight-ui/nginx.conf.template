@@ -40,6 +40,31 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # index.html is the one file that must never be held. Everything in the
+    # asset block below is content-hashed and immutable for a week, which is
+    # right — but that scheme only works if the document naming those hashes
+    # is always fresh. Served with no Cache-Control at all, as this was, a
+    # browser falls back to heuristic freshness and may keep an index.html
+    # from a previous deploy; it then resolves the old hashed filenames
+    # straight out of its own immutable cache and never asks the server for
+    # anything. The visitor is pinned to the last release with no signal that
+    # a new one exists, and no fix short of a hard refresh.
+    #
+    # `expires` rather than `add_header Cache-Control`, deliberately. nginx
+    # drops the entire inherited add_header set the moment a location
+    # declares one of its own — that is why the asset block below answers
+    # with no CSP, no X-Frame-Options and no nosniff at all today. Using
+    # add_header here would silently strip those four headers from the main
+    # document, which is a much worse bug than the one this fixes. `expires`
+    # is a different directive and triggers none of that, so the server-level
+    # headers still apply. `expires -1` emits Cache-Control: no-cache, which
+    # means revalidate-before-use rather than never-store: the ETag above
+    # makes that a 304 on the common path, so the cost is one conditional
+    # request per navigation, not a re-download.
+    location = /index.html {
+        expires -1;
+    }
+
     location = /config.js {
         # Generated fresh by docker-entrypoint.sh from the container's
         # actual env on every start — never cache it like the other
