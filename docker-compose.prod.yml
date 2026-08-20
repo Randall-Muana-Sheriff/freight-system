@@ -18,6 +18,16 @@
 
 services:
   postgres:
+    # Without this the container never comes back — not after a crash, and
+    # not after the host reboots. server.js's uncaughtException handler
+    # deliberately exits "so the container orchestrator restarts it
+    # cleanly", which was only ever true of caddy; the other four were
+    # restart=no, so a crash meant down until a human noticed.
+    #
+    # unless-stopped rather than always, matching caddy: a container stopped
+    # by hand stays stopped across a daemon restart, which is what you want
+    # while working on the box.
+    restart: unless-stopped
     # Loopback-only, not a public exposure: 127.0.0.1:5432 is reachable
     # only from processes already running on this host, never from the
     # internet — meaningfully different from the 0.0.0.0 binding this
@@ -30,9 +40,29 @@ services:
       - '127.0.0.1:5432:5432'
 
   redis:
+    # Without this the container never comes back — not after a crash, and
+    # not after the host reboots. server.js's uncaughtException handler
+    # deliberately exits "so the container orchestrator restarts it
+    # cleanly", which was only ever true of caddy; the other four were
+    # restart=no, so a crash meant down until a human noticed.
+    #
+    # unless-stopped rather than always, matching caddy: a container stopped
+    # by hand stays stopped across a daemon restart, which is what you want
+    # while working on the box.
+    restart: unless-stopped
     ports: !reset []
 
   router:
+    # Without this the container never comes back — not after a crash, and
+    # not after the host reboots. server.js's uncaughtException handler
+    # deliberately exits "so the container orchestrator restarts it
+    # cleanly", which was only ever true of caddy; the other four were
+    # restart=no, so a crash meant down until a human noticed.
+    #
+    # unless-stopped rather than always, matching caddy: a container stopped
+    # by hand stays stopped across a daemon restart, which is what you want
+    # while working on the box.
+    restart: unless-stopped
     ports: !reset []
     # The base file makes minio-init a hard dependency (needed in dev so
     # the bucket exists before the router starts). In production, without
@@ -88,6 +118,16 @@ services:
       - ./secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
 
   ui:
+    # Without this the container never comes back — not after a crash, and
+    # not after the host reboots. server.js's uncaughtException handler
+    # deliberately exits "so the container orchestrator restarts it
+    # cleanly", which was only ever true of caddy; the other four were
+    # restart=no, so a crash meant down until a human noticed.
+    #
+    # unless-stopped rather than always, matching caddy: a container stopped
+    # by hand stays stopped across a daemon restart, which is what you want
+    # while working on the box.
+    restart: unless-stopped
     ports: !reset []
     environment:
       # Must be the real public HTTPS URL Caddy terminates — not

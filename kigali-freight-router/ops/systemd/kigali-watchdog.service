@@ -1,0 +1,13 @@
+[Unit]
+Description=Check container health, crash loops and disk, and alert on change
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+# Adjust to wherever the router is actually deployed on the real host.
+WorkingDirectory=/opt/kigali-freight/kigali-freight-router
+EnvironmentFile=/opt/kigali-freight/kigali-freight-router/.env
+ExecStart=/usr/bin/npm run watchdog
+
+[Install]
+WantedBy=multi-user.target

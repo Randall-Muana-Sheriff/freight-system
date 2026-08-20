@@ -1,0 +1,16 @@
+[Unit]
+Description=Run kigali-watchdog.service every 5 minutes
+
+[Timer]
+# Five minutes is a deliberate floor. The check itself is cheap, but it
+# alerts to a phone, and anything faster turns a flapping healthcheck into a
+# notification storm that gets the channel muted — at which point the
+# monitor is worse than none.
+OnBootSec=3min
+OnUnitActiveSec=5min
+# No Persistent=true here, unlike the backup and purge timers. A missed
+# health check has no value once the moment has passed; replaying yesterday's
+# on boot would just alert about a state that no longer exists.
+
+[Install]
+WantedBy=timers.target
