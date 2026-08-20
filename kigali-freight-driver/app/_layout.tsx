@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { Outfit_900Black } from '@expo-google-fonts/outfit';
-import { DMSans_400Regular, DMSans_500Medium, DMSans_600SemiBold } from '@expo-google-fonts/dm-sans';
-import { DMMono_400Regular, DMMono_500Medium } from '@expo-google-fonts/dm-mono';
+import { Archivo_900Black } from '@expo-google-fonts/archivo';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from '@expo-google-fonts/inter';
+import { IBMPlexMono_400Regular, IBMPlexMono_500Medium } from '@expo-google-fonts/ibm-plex-mono';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -15,7 +15,7 @@ import { initCrashReporting } from '../lib/crashReporting';
 import ErrorBoundary from '../components/ErrorBoundary';
 import BrandEntry from '../components/BrandEntry';
 
-// Held visible until the design system's real fonts (Outfit/DM Sans/DM
+// Held visible until the design system's real fonts (Archivo/Inter/IBM Plex
 // Mono) are loaded — without this, the very first frame would flash in the
 // OS default font before swapping, which reads as a glitch on a screen this
 // typography-led.
@@ -36,12 +36,12 @@ let entryPlayed = false;
 export default function RootLayout() {
   const [entryDone, setEntryDone] = useState(entryPlayed);
   const [fontsLoaded] = useFonts({
-    Outfit_900Black,
-    DMSans_400Regular,
-    DMSans_500Medium,
-    DMSans_600SemiBold,
-    DMMono_400Regular,
-    DMMono_500Medium,
+    Archivo_900Black,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
   });
 
   // Android edge-to-edge draws app content over/under the system bars —

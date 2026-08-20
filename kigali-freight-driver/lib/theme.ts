@@ -62,15 +62,26 @@ export const theme = {
     ink: '#060d0b',
   },
   fonts: {
-    // One Outfit weight, not two. 800 and 900 were both loaded but are
-    // near-indistinguishable at the sizes this app actually renders, so the
-    // second file bought an extra download and no visible hierarchy —
-    // hierarchy comes from the size scale and colour instead.
-    headingBlack: 'Outfit_900Black',
-    body: 'DMSans_400Regular',
-    bodyMedium: 'DMSans_500Medium',
-    bodySemiBold: 'DMSans_600SemiBold',
-    mono: 'DMMono_500Medium',
+    // The same three families the website and the dispatcher board use —
+    // Archivo for display, Inter for body, IBM Plex Mono for figures — so a
+    // driver and a customer are reading the same typography rather than two
+    // unrelated systems. Weight-for-weight with what they replace
+    // (Outfit/DM Sans/DM Mono), so nothing in the size scale moves.
+    //
+    // Archivo is a variable font on the web, where the hero leans on its
+    // width axis. React Native gets static instances only, so this is
+    // Archivo at its normal width — which is all the app needs, since
+    // nothing here is set at signage size.
+    //
+    // One Archivo weight, not two. 800 and 900 were both loaded under the
+    // old family and are near-indistinguishable at the sizes this app
+    // actually renders, so the second file bought an extra download and no
+    // visible hierarchy — hierarchy comes from the size scale and colour.
+    headingBlack: 'Archivo_900Black',
+    body: 'Inter_400Regular',
+    bodyMedium: 'Inter_500Medium',
+    bodySemiBold: 'Inter_600SemiBold',
+    mono: 'IBMPlexMono_500Medium',
   },
   // A closed set of seven steps, replacing the 144 inline font sizes that
   // had accumulated across 17 distinct values (including 11.5, 17, 19 and
