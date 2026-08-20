@@ -96,8 +96,15 @@ fi
 # far side to derive it from. This is the one case where carrying the SHA
 # across is correct instead of hardcoding it — it still comes from
 # `git rev-parse`, just on this side of the connection.
+#
+# `export`, not a `VAR=x cmd` prefix. A prefix applies to exactly the one
+# command it precedes, so with `VAR=x build && up` the variable reached the
+# build and not the `up` — which is invisible for anything baked in at build
+# time, and silently empty for anything read from the runtime environment.
+# The dashboard shipped with GIT_COMMIT="" in its /config.js that way, and
+# every browser error it reported carried no release.
 ssh -i "$KEY" "$USER@$HOST" \
-    "cd $REMOTE_PATH && GIT_COMMIT=$SHA GIT_BRANCH=$BRANCH docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml build router ui && docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d router ui"
+    "cd $REMOTE_PATH && export GIT_COMMIT=$SHA GIT_BRANCH=$BRANCH && docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml build router ui && docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d router ui"
 
 echo
 echo "⏳ Waiting for the router to come back..."
