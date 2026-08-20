@@ -146,7 +146,7 @@ const ICONS = {
 function CardIcon({ shape }: { shape: keyof typeof ICONS }) {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true"
-            className="h-6 w-6 text-pub-laterite transition-transform duration-200 group-hover:-translate-y-0.5"
+            className="mx-auto h-6 w-6 text-pub-laterite transition-transform duration-200 group-hover:-translate-y-0.5"
             fill="none" stroke="currentColor" strokeWidth={1.6}
             strokeLinecap="round" strokeLinejoin="round">
             {ICONS[shape]}
@@ -187,7 +187,7 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
             <div className="mx-auto grid max-w-4xl gap-1.5 sm:grid-cols-3 sm:gap-2">
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
-                        className={`focus-ring group bg-pub-paper px-5 py-5 text-left ${CARD} ${CARD_HOVER}`}>
+                        className={`focus-ring group bg-pub-paper px-5 py-6 text-center ${CARD} ${CARD_HOVER}`}>
                         <CardIcon shape={card.icon} />
                         <h2 className="display-tight mt-3 text-base text-pub-onpaper">{card.title}</h2>
                         <p className="mt-1 text-[13px] leading-snug text-pub-onpaper-soft">{card.body}</p>
