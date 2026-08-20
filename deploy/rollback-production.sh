@@ -27,6 +27,17 @@
 # rollback. Last night's dump is in /var/backups/kigali-freight and every
 # one is verified by a real restore, so that path works — but it costs
 # whatever has happened since.
+# Verified, 2026-08-20: --list; the ancestor guard refusing a commit HEAD
+# cannot reach; the migration-crossing warning, against a range that crosses
+# seven of them; worktree creation leaving the operator's checkout untouched,
+# and its cleanup; and an rsync --dry-run against the real host confirming
+# .env, .env.production, .env.local and secrets/ are all untouched.
+#
+# NOT verified end to end: the ssh build/up and the health check that follows
+# it, because testing those means deliberately regressing production. That
+# block is byte-identical to push-to-production.sh, which runs constantly, so
+# the risk sits in this script's own arithmetic — which is what the list
+# above covers — rather than in the deploy itself.
 set -euo pipefail
 
 HOST="api.inzira.systems"
