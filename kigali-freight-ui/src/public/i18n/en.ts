@@ -79,11 +79,7 @@ export const en = {
     // list of services would read as an error, and "all six or none" is
     // also the natural unit for whoever is doing the writing.
     hero: {
-        eyebrow: 'Freight across Kigali',
-        headline: 'Know where your cargo is.',
-        body:
-            'Most freight goes quiet the moment it leaves your gate. Ours doesn\u2019t \u2014 every ' +
-            'consignment carries a code that shows you its position until somebody signs for it.',
+        trackPrompt: 'Track your cargo',
     },
     services: {
         eyebrow: 'What we move',

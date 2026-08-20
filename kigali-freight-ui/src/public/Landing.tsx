@@ -225,60 +225,46 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         it can sit beside the copy, it should. At lg the gap
                         between them was leaving a band of widths with a
                         half-empty hero and no diagram in it. */}
-                    <div className="relative z-10">
-                    <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
-                    {/* Across the whole block rather than inside a column, so
-                        it can hold one line. In half the width it could not:
-                        twenty-five characters at this size need the full
-                        measure, and the earlier version bought the fit with a
-                        hard <br /> that broke the sentence in a place no
-                        other language would break it.
-
-                        It still wraps where it must — a phone, or a French
-                        rendering half again as long — which is why the break
-                        is left to the browser and balanced rather than
-                        forced. */}
-                    <h1 className="display-hero text-[clamp(1.9rem,4.4vw,3.1rem)] text-pub-onink"
-                        style={{ textWrap: 'balance' } as React.CSSProperties}>
-                        {t.hero.headline}
-                    </h1>
-
-                    <div className="mt-8 grid gap-8 md:grid-cols-[1.05fr_1fr] md:items-center md:gap-10 lg:gap-14">
+                    <div className="relative z-10 grid gap-10 md:grid-cols-[1fr_1fr] md:items-center md:gap-12">
                     <div>
-                        <p className="max-w-md text-[17px] leading-relaxed text-pub-onink-soft">{t.hero.body}</p>
+                        {/* One thing to do, said once. The hero previously
+                            carried an eyebrow, a headline and a paragraph
+                            above these controls, which meant three pieces of
+                            copy competing with the only two actions on the
+                            page. */}
+                        <h1 className="display-hero text-[clamp(1.9rem,4.4vw,3.1rem)] text-pub-onink">
+                            {t.hero.trackPrompt}
+                        </h1>
 
-                        {/* Stacked on a phone. Side by side these two were sharing a
-                            row that fits one of them, which squeezed the code
-                            field down to a few characters — the one control on
-                            this page a returning customer came to use. */}
-                        <div className="mt-7 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-                            <button data-tour="book" onClick={() => onNavigate('/order')}
-                                className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
-                                {t.actions.book}
+                        <form data-tour="track"
+                            onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
+                            className="mt-6 flex flex-col gap-2 sm:flex-row">
+                            <label htmlFor="hero-track" className="sr-only">{t.track.codeLabel}</label>
+                            {/* A filled field rather than the underline used
+                                elsewhere on the site: this is the hero's
+                                subject now, not one control among several. */}
+                            <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)}
+                                placeholder={t.misc.codePlaceholder}
+                                className="focus-ring min-w-0 flex-1 rounded-md border border-pub-onink/20 bg-pub-ink2 px-4 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:text-pub-onink-soft/50 focus:border-pub-onink/50 focus:outline-none" />
+                            <button type="submit"
+                                className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                                {t.actions.trackSubmit}
                             </button>
-                            <form data-tour="track"
-                                onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
-                                className="flex flex-1 items-center border-b border-pub-onink/25 focus-within:border-pub-onink sm:flex-none">
-                                <label htmlFor="hero-track" className="sr-only">{t.track.codeLabel}</label>
-                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t.misc.haveACode}
-                                    className="w-full min-w-0 flex-1 bg-transparent px-1 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:normal-case placeholder:text-pub-onink-soft/70 focus:outline-none sm:w-40 sm:flex-none" />
-                                <button type="submit" className="focus-ring px-2 py-3.5 text-sm font-semibold text-pub-onink hover:text-pub-signal">{t.actions.trackSubmit} →</button>
-                            </form>
-                        </div>
+                        </form>
+
+                        {/* Secondary to tracking: someone arriving with a code
+                            in hand outnumbers someone arriving to book, and
+                            the card below repeats this anyway. */}
+                        <button data-tour="book" onClick={() => onNavigate('/order')}
+                            className="focus-ring mt-4 rounded-md border border-pub-onink/25 px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:border-pub-onink hover:bg-pub-onink/5">
+                            {t.actions.book}
+                        </button>
                     </div>
 
-                    {/* Only where it sits beside the copy. Stacked under
-                        it on a phone the diagram ran to nearly 300px and
-                        pushed the three entry cards clean off the screen —
-                        a decorative element burying the actual ways into
-                        the service. Photographic heroes crop; a wide route
-                        diagram does not, so below lg it is dropped rather
-                        than squeezed. */}
                     <div className="hidden md:block">
                         <HeroRoute />
                     </div>
                     </div>
-                </div>
                 </div>
             </section>
 

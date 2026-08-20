@@ -74,11 +74,7 @@ export const fr: Strings = {
         tagline: 'Du fret dans tout Kigali, avec la position de chaque expédition visible par celui qui l’a envoyée.',
     },
     hero: {
-        eyebrow: 'Du fret dans tout Kigali',
-        headline: 'Sachez où se trouve votre chargement.',
-        body:
-            'La plupart des transporteurs deviennent muets dès que la marchandise quitte votre portail. ' +
-            'Pas nous : chaque expédition porte un code qui vous montre sa position jusqu’à la signature.',
+        trackPrompt: 'Suivez votre marchandise',
     },
     services: {
         eyebrow: 'Ce que nous transportons',
