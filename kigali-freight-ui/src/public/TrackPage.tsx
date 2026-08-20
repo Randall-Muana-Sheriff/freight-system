@@ -170,7 +170,7 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                 {shipment.proofOfDelivery.photoUrl ? (
                                     <a href={shipment.proofOfDelivery.photoUrl}
                                         target="_blank" rel="noopener noreferrer"
-                                        className="focus-ring mt-4 block overflow-hidden rounded-sm border border-pub-onink/15">
+                                        className="focus-ring rounded-md mt-4 block overflow-hidden border border-pub-onink/15">
                                         <img
                                             src={shipment.proofOfDelivery.photoUrl}
                                             alt={`Photograph taken at handover of ${shipment.cargo}`}

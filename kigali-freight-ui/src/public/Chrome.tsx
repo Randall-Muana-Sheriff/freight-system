@@ -76,7 +76,7 @@ function LanguagePicker() {
                 onChange={(e) => setLang(e.target.value as Language)}
                 // appearance-none removes the platform arrow so the chevron
                 // below can match the site; pr-7 leaves it room.
-                className="focus-ring cursor-pointer appearance-none rounded-sm border border-pub-onink/20 bg-transparent py-1.5 pl-2.5 pr-7 text-sm text-pub-onink-soft transition-colors hover:border-pub-onink/40 hover:text-pub-onink"
+                className="focus-ring rounded-md cursor-pointer appearance-none border border-pub-onink/20 bg-transparent py-1.5 pl-2.5 pr-7 text-sm text-pub-onink-soft transition-colors hover:border-pub-onink/40 hover:text-pub-onink"
             >
                 {(Object.entries(LANGUAGES) as [Language, string][]).map(([code, label]) => (
                     // The option list is drawn by the OS, which paints its
@@ -140,7 +140,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                 <div className="hidden items-center gap-3 md:flex">
                     <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
-                        className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                        className="focus-ring rounded-md bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                 </div>
@@ -185,7 +185,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                         call to action is full width here because on a phone
                         it is the only thing on the row. */}
                     <button onClick={() => go(() => onNavigate('/order'))}
-                        className="focus-ring mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                        className="focus-ring rounded-md mt-5 w-full bg-pub-laterite px-5 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}
                     </button>
                     <div className="mt-4">

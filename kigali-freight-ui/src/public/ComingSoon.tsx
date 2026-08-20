@@ -79,7 +79,7 @@ function NotifyForm() {
                     onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </label>
             <button type="submit" disabled={state === 'sending'}
-                className="bg-pub-laterite px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                className="rounded-md bg-pub-laterite px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
                 {state === 'sending' ? 'Saving…' : 'Tell me when'}
             </button>
             {error ? <p role="alert" className="text-sm text-pub-laterite-soft sm:col-span-3">{error}</p> : null}

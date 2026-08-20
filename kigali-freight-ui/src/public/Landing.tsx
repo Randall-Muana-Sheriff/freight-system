@@ -79,7 +79,7 @@ function ContactForm() {
 
             <div className="sm:col-span-2">
                 <button type="submit" disabled={state === 'sending'}
-                    className="focus-ring bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
+                    className="focus-ring rounded-md bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
                     {state === 'sending' ? t.buttons.sending : t.buttons.send}
                 </button>
             </div>
@@ -234,7 +234,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             this page a returning customer came to use. */}
                         <div className="mt-9 flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                             <button data-tour="book" onClick={() => onNavigate('/order')}
-                                className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                                className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                                 {t.actions.book}
                             </button>
                             <form data-tour="track"

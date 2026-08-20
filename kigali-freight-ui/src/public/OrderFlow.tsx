@@ -172,11 +172,11 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
 
                     <div className="mt-10 flex flex-wrap gap-3">
                         <button onClick={() => onNavigate(`/track?code=${encodeURIComponent(token)}`)}
-                            className="focus-ring bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
+                            className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink hover:bg-pub-laterite-soft">
                             {t.steps.trackItNow}
                         </button>
                         <button onClick={() => onNavigate('/')}
-                            className="focus-ring border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">{t.steps.done}</button>
+                            className="focus-ring rounded-md border border-pub-onink/25 px-7 py-3.5 text-sm font-semibold text-pub-onink hover:border-pub-onink">{t.steps.done}</button>
                     </div>
                 </div>
             </div>
@@ -258,7 +258,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                                 // an optional question stays optional once
                                                 // it has been answered by accident.
                                                 onClick={() => setDraft({ ...draft, neededBy: chosen ? undefined : value })}
-                                                className={`focus-ring border px-4 py-2 text-sm font-medium transition-colors ${
+                                                className={`focus-ring rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
                                                     chosen
                                                         ? 'border-pub-laterite bg-pub-laterite text-pub-onink'
                                                         : 'border-pub-onpaper/25 text-pub-onpaper-soft hover:border-pub-onpaper/50 hover:text-pub-onpaper'
@@ -343,12 +343,12 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
 
                     {step < 2 ? (
                         <button onClick={() => advance(step + 1)} disabled={step === 0 ? !cargoValid : !contactValid}
-                            className="focus-ring bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:cursor-not-allowed disabled:opacity-30">
+                            className="focus-ring rounded-md bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:cursor-not-allowed disabled:opacity-30">
                             {t.steps.continue}
                         </button>
                     ) : (
                         <button onClick={confirm} disabled={submitting}
-                            className="focus-ring bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
+                            className="focus-ring rounded-md bg-pub-laterite px-8 py-4 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft disabled:opacity-60">
                             {submitting ? t.actions.placing : t.actions.placeOrder}
                         </button>
                     )}

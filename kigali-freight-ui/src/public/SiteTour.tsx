@@ -157,7 +157,7 @@ export function SiteTour({ onBook }: { onBook: () => void }) {
                                 if (!isLast) { setStep(step + 1); return; }
                                 finish();
                             }}
-                            className="bg-pub-onpaper px-5 py-2.5 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite"
+                            className="rounded-md bg-pub-onpaper px-5 py-2.5 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite"
                         >
                             {isLast ? t.buttons.gotIt : t.buttons.next}
                         </button>
