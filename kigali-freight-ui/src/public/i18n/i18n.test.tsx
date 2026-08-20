@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LanguageProvider, useLanguage, preferredLanguage, isLanguage, useApiError } from './index';
 import { ApiError } from '../publicApi';
@@ -325,5 +325,71 @@ describe('the hero entry cards', () => {
         const cards = screen.getAllByRole('button', { name: /Track a shipment/ });
         await userEvent.click(cards[cards.length - 1]);
         expect(onNavigate).toHaveBeenCalledWith('/track');
+    });
+});
+
+describe('back to top', () => {
+    beforeEach(() => {
+        window.localStorage.clear();
+        window.scrollY = 0;
+    });
+
+    it('stays out of the way until there is page behind you', async () => {
+        const { BackToTop } = await import('../BackToTop');
+        const { container } = render(<LanguageProvider><BackToTop /></LanguageProvider>);
+
+        // Queried by attribute, not by role: aria-hidden takes the element
+        // out of the accessibility tree entirely, so it has no role or
+        // name to find it by — which is the point of setting it.
+        const button = container.querySelector('[aria-label="Back to top"]')!;
+        // Present so it can fade in, but not reachable: a control nobody
+        // can see should not be the next thing a keyboard lands on.
+        expect(button).toHaveAttribute('aria-hidden', 'true');
+        expect(button).toHaveAttribute('tabindex', '-1');
+        expect(button.className).toContain('pointer-events-none');
+    });
+
+    it('appears once you have scrolled past a screenful', async () => {
+        const { BackToTop } = await import('../BackToTop');
+        render(<LanguageProvider><BackToTop /></LanguageProvider>);
+
+        window.scrollY = 900;
+        await act(async () => { window.dispatchEvent(new Event('scroll')); });
+
+        const button = screen.getByRole('button', { name: 'Back to top' });
+        expect(button).toHaveAttribute('aria-hidden', 'false');
+        expect(button).toHaveAttribute('tabindex', '0');
+    });
+
+    it('goes back to the top when pressed', async () => {
+        const scrollTo = vi.fn();
+        window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+        const { BackToTop } = await import('../BackToTop');
+        render(<LanguageProvider><BackToTop /></LanguageProvider>);
+
+        window.scrollY = 900;
+        await act(async () => { window.dispatchEvent(new Event('scroll')); });
+        await userEvent.click(screen.getByRole('button', { name: 'Back to top' }));
+
+        expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+
+    it('jumps rather than glides for anyone who asked for less motion', async () => {
+        const scrollTo = vi.fn();
+        window.scrollTo = scrollTo as unknown as typeof window.scrollTo;
+        window.matchMedia = ((q: string) => ({
+            matches: q.includes('prefers-reduced-motion'),
+            media: q, addEventListener() {}, removeEventListener() {},
+            addListener() {}, removeListener() {}, onchange: null, dispatchEvent: () => false,
+        })) as unknown as typeof window.matchMedia;
+
+        const { BackToTop } = await import('../BackToTop');
+        render(<LanguageProvider><BackToTop /></LanguageProvider>);
+        window.scrollY = 900;
+        await act(async () => { window.dispatchEvent(new Event('scroll')); });
+        await userEvent.click(screen.getByRole('button', { name: 'Back to top' }));
+
+        // A full-page glide is exactly the movement that setting exists to stop.
+        expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
     });
 });

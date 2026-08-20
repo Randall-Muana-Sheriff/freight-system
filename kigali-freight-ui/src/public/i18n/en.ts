@@ -326,6 +326,9 @@ export const en = {
     journeyExtra: {
         stopLabel: 'Stop',
     },
+    backToTop: {
+        label: 'Back to top',
+    },
     language: {
         label: 'Language',
         english: 'English',

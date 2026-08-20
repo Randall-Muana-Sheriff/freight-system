@@ -292,6 +292,9 @@ export const fr: Strings = {
     journeyExtra: {
         stopLabel: 'Étape',
     },
+    backToTop: {
+        label: 'Haut de page',
+    },
     language: {
         label: 'Langue',
         english: 'Anglais',

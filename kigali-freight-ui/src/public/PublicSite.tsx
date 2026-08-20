@@ -11,6 +11,7 @@ import { setCanonical, setDescription } from '../utils/seo';
 import { ComingSoon } from './ComingSoon';
 import { isPreLaunch, LAUNCH_LABEL } from './launch';
 import { LanguageProvider, useLanguage } from './i18n';
+import { BackToTop } from './BackToTop';
 
 // Still no router dependency — App.tsx already branches on pathname for
 // /kiosk and adding one library to serve three static paths would be more
@@ -165,6 +166,12 @@ export default function PublicSite() {
                 knows what they came for, and someone mid-booking should
                 not be interrupted by a tour of the page they left. */}
             {route.path === '/' || route.path === '/preview' ? <SiteTour onBook={() => navigate('/order')} /> : null}
+
+            {/* On every page rather than the landing one alone: the privacy
+                policy and the support page are the longest things here, and
+                the reader most likely to want a way back is the one who has
+                just read to the bottom of one of them. */}
+            <BackToTop />
         </div>
         </LanguageProvider>
     );
