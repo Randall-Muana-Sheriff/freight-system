@@ -19,9 +19,16 @@
 const API = process.env.API || 'http://localhost:5000';
 const ADMIN_USER = process.env.ADMIN_USERNAME;
 const ADMIN_PASS = process.env.ADMIN_PASSWORD;
-const DRIVER_PHONE = process.env.APP_REVIEW_DEMO_PHONE || '+250780000000';
-const DRIVER_OTP = process.env.APP_REVIEW_DEMO_OTP || '211000';
-const DRIVER_PIN = process.env.REVIEW_DRIVER_PIN || '4819';
+// No defaults. These three are a complete sign-in for a real driver account
+// — phone, the demo OTP that skips the SMS, and the PIN — and this
+// repository is public, so a fallback literal here would publish a working
+// production credential. The driver journeys below skip themselves when the
+// values are absent rather than failing the run, so `node ops/e2e-check.js`
+// with no environment still checks everything else.
+const DRIVER_PHONE = process.env.APP_REVIEW_DEMO_PHONE;
+const DRIVER_OTP = process.env.APP_REVIEW_DEMO_OTP;
+const DRIVER_PIN = process.env.REVIEW_DRIVER_PIN;
+const DRIVER_CREDS = Boolean(DRIVER_PHONE && DRIVER_OTP && DRIVER_PIN);
 
 const TAG = '[e2e]';
 const results = [];
@@ -210,16 +217,26 @@ async function main() {
 
     // ── Journey C: the driver's phone ───────────────────────────────
     journey('C. Driver signs in and works the job');
-    const otpReq = await api('/api/auth/driver/otp/request', { method: 'POST', body: { phoneNumber: DRIVER_PHONE } });
-    check('a verification code can be requested', otpReq.ok,
-        otpReq.status === 429
-            ? 'rate limited — the limiter allows 8 requests per 10 minutes per number, so back-to-back runs of this check will trip it. Wait, or use a different demo number.'
-            : JSON.stringify(otpReq.error));
-    const otp = await api('/api/auth/driver/otp/verify', {
-        method: 'POST', body: { phoneNumber: DRIVER_PHONE, code: DRIVER_OTP },
-    });
-    const otpToken = otp.data?.otpSessionToken;
-    check('verification code accepted', Boolean(otpToken), JSON.stringify(otp.error));
+    // Signing in as a driver needs a real account's phone, its demo OTP and
+    // its PIN, and those are supplied by environment rather than committed —
+    // see the note at the top of this file. Without them this is skipped
+    // rather than failed, so a run with no environment set still exercises
+    // every journey that does not need a driver on the phone.
+    let otpToken = null;
+    if (!DRIVER_CREDS) {
+        record(true, 'driver sign-in skipped — set APP_REVIEW_DEMO_PHONE, APP_REVIEW_DEMO_OTP and REVIEW_DRIVER_PIN to include it', '');
+    } else {
+        const otpReq = await api('/api/auth/driver/otp/request', { method: 'POST', body: { phoneNumber: DRIVER_PHONE } });
+        check('a verification code can be requested', otpReq.ok,
+            otpReq.status === 429
+                ? 'rate limited — the limiter allows 8 requests per 10 minutes per number, so back-to-back runs of this check will trip it. Wait, or use a different demo number.'
+                : JSON.stringify(otpReq.error));
+        const otp = await api('/api/auth/driver/otp/verify', {
+            method: 'POST', body: { phoneNumber: DRIVER_PHONE, code: DRIVER_OTP },
+        });
+        otpToken = otp.data?.otpSessionToken;
+        check('verification code accepted', Boolean(otpToken), JSON.stringify(otp.error));
+    }
 
     let driverToken = null;
     if (otpToken) {

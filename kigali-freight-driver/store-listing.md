@@ -126,8 +126,15 @@ username and password because most apps use those; ours does not, so the
 demo phone number and PIN go in and the Notes field explains the code step
 in between.
 
-- **User name:** `+250780000000`
-- **Password:** `4819`
+- **User name:** the demo driver's phone number
+- **Password:** the demo driver's 4-digit PIN
+
+The actual values are deliberately not written down here. This file is in a
+public repository, and together with the verification code below they are a
+complete, working sign-in to a real account on production. Keep them in
+App Store Connect — which is where Apple wants them, and which is not
+public — and in your password manager. `npm run review:driver` prints all
+three when it provisions the account.
 
 ## Contact Information
 
@@ -151,7 +158,9 @@ been through this once.
 
 ## Review notes
 
-Paste this into "Notes" in App Store Connect. The demo account matters more
+Paste this into "Notes" in App Store Connect, substituting the three
+angle-bracketed values with the real ones — they are not committed here,
+for the reason given under Sign-In Information above. The demo account matters more
 than anything else on this page: sign-in is phone number → SMS code → PIN,
 and a reviewer cannot receive a Rwandan text message, so without the fixed
 code below they cannot open the app at all.
@@ -162,14 +171,14 @@ in Kigali, Rwanda. Accounts are created by our dispatch team, so there is no
 public sign-up.
 
 DEMO ACCOUNT
-  Phone number: +250780000000
-  Verification code: 211000
-  PIN: 4819
+  Phone number: <REVIEW_DRIVER_PHONE>
+  Verification code: <APP_REVIEW_DEMO_OTP>
+  PIN: <REVIEW_DRIVER_PIN>
 
 Sign-in is normally phone number -> SMS code -> PIN. No SMS is sent to the
-demo number above; its verification code is fixed to 211000 so it can be
-used from anywhere. Enter the phone number, tap continue, enter 211000, then
-enter the PIN 4819.
+demo number above; its verification code is fixed so it can be used from
+anywhere. Enter the phone number, tap continue, enter the verification
+code, then enter the PIN.
 
 The account has two sample consignments assigned so the job list is
 populated.

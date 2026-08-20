@@ -15,8 +15,16 @@
 //   node ops/create-review-driver.js
 //   node ops/create-review-driver.js --remove     # after review passes
 //
-// Configure via environment (defaults shown in REVIEW below):
-//   REVIEW_DRIVER_PHONE, REVIEW_DRIVER_PIN, REVIEW_DRIVER_NAME
+// Configure via environment. Phone and PIN are required and have no
+// defaults on purpose — this repository is public, and a default here is a
+// working credential for a real account on production published to the
+// world. They are passed in at run time and live in App Store Connect's
+// review-notes field, which is where Apple wants them anyway:
+//
+//   REVIEW_DRIVER_PHONE=+250... REVIEW_DRIVER_PIN=1234 \
+//     node ops/create-review-driver.js
+//
+// REVIEW_DRIVER_NAME is cosmetic and may be omitted.
 //
 // The rows it creates are labelled visibly so the dispatch team can tell at
 // a glance that they are not real work. On production they WILL appear on
@@ -28,12 +36,31 @@ import crypto from 'crypto';
 import pool from '../config/db.js';
 import { DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
+// Required, not defaulted. See the note at the top of the file: a literal
+// here would be a live production credential in a public repository.
+function required(name) {
+    const value = process.env[name];
+    if (!value) {
+        throw new Error(
+            `${name} must be set. Phone and PIN are deliberately not defaulted — ` +
+            'this repo is public and a default would be a working credential for a ' +
+            'real account. Pass them on the command line.'
+        );
+    }
+    return value;
+}
+
 const REVIEW = {
-    phone: process.env.REVIEW_DRIVER_PHONE || '+250780000000',
+    phone: required('REVIEW_DRIVER_PHONE'),
+    // Not read through required() at load, because --remove needs only the
+    // phone to find the rows and demanding a PIN to delete an account would
+    // make cleanup fail for someone who no longer has it. create() asks for
+    // it instead.
+    //
     // Four digits, not six: the app's PIN is 4-digit (driverAuthController
     // rejects anything else), while the OTP is 6. Easy to conflate, and the
     // failure is a reviewer typing a PIN that cannot be right.
-    pin: process.env.REVIEW_DRIVER_PIN || '4819',
+    get pin() { return required('REVIEW_DRIVER_PIN'); },
     name: process.env.REVIEW_DRIVER_NAME || 'App Review Driver',
     plate: 'RAR 001 R',
     vehicleType: 'Medium Truck',
