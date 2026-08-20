@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     // impossible to judge at a glance — the caption underneath was doing
     // all the work. A translucent light overlay separates from any
     // surface it is placed on.
-    backgroundColor: 'rgba(242, 246, 251, 0.12)',
+    backgroundColor: 'rgba(241, 239, 232, 0.12)',
     marginTop: 10,
     overflow: 'hidden',
   },

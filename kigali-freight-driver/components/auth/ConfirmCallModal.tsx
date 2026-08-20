@@ -47,7 +47,7 @@ const ICON_SIZE = 52;
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(5,12,24,0.82)',
+    backgroundColor: 'rgba(6,13,11,0.82)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
