@@ -117,6 +117,37 @@
   line-height: 0.92;
 }
 
+/* The hero headline, pushed further than display-wide goes.
+   Archivo carries a width axis to 125 and weight to 900, and neither was
+   being used to its end. Taken there, it lands close to the squarish,
+   heavy signage look of the carrier faces this is being measured
+   against — without swapping typeface, which would cost the whole
+   self-hosted latin-ext setup that renders Kinyarwanda and French
+   accents correctly.
+
+   Deliberately its own utility rather than a change to display-wide.
+   Section headings at this weight would flatten the hierarchy: the point
+   of pushing the hero is that it is louder than everything under it, and
+   making everything louder achieves nothing. */
+@utility display-hero {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-variation-settings: 'wdth' 125;
+  letter-spacing: -0.035em;
+  line-height: 0.88;
+
+  /* The widest instance is the wrong one on the narrowest screen. At
+     125 the headline is around 6% wider than at 118, and "your cargo
+     is." on a 360px phone has no 6% to give — it would either overflow
+     or force the type down a size, losing more than the width gains.
+     Backed off below 30rem, where horizontal room is the scarce thing
+     rather than presence. */
+  @media (width < 30rem) {
+    font-variation-settings: 'wdth' 112;
+    letter-spacing: -0.02em;
+  }
+}
+
 @utility display-tight {
   font-family: var(--font-display);
   font-weight: 700;

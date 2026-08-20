@@ -222,7 +222,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 <div className="relative z-10 grid gap-8 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-14">
                     <div>
                         <p className="data-label mb-5 text-pub-laterite-soft">{t.hero.eyebrow}</p>
-                        <h1 className="display-wide text-[clamp(2.5rem,5.6vw,3.9rem)] text-pub-onink"
+                        <h1 className="display-hero text-[clamp(2.5rem,5.6vw,3.9rem)] text-pub-onink"
                             style={{ textWrap: 'balance' } as React.CSSProperties}>
                             {t.hero.headlineTop}<br />{t.hero.headlineBottom}
                         </h1>
