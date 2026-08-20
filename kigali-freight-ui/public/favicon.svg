@@ -39,14 +39,25 @@
        the tile. That reads as a road continuing beyond frame, and it buys
        the weight the mark needs to hold up small.
 
-       Scale raised from 1.25x to 1.5x. At 1.25 the mark still sat inside a
-       visible margin and read small against other tabs; at 1.5 the stroke
-       lands at ~104 and the pin at r201 in source space, filling the tile
-       properly. The translate is recomputed rather than nudged: tx keeps
-       the pin's right edge at the same inset it had before (it reaches
-       x=1036 in source space and would otherwise clip), and ty centres the
-       mark's real bounding box — curve plus stroke half-width, plus the
-       pin — on the tile. -->
+       Scale is 1.7x, and there is a ceiling on it worth knowing about
+       before anyone raises it again. The mark's bounds — the curve plus
+       half its stroke, unioned with the pin — span 396.5 units of the
+       source's 1024 vertically but 928 horizontally. That 2.3:1 artwork in
+       a 1:1 tile means growing it crops the left of the curve: at 1.5x the
+       route enters the frame at source x=385, at 1.7x at x=462, at 1.85x
+       at x=509. Past roughly 1.7 what survives the crop is the last
+       segment alone, which is very nearly a straight diagonal — the mark
+       grows but stops reading as a route and becomes a line and a dot.
+       1.7x covers 68% of the tile, just under the 70-85% favicons
+       conventionally sit at, and that shortfall is the price of keeping
+       the curve. Take size over the curve only deliberately.
+
+       The translate is derived, not nudged. tx holds the pin's right edge
+       at the same inset it has always had (it reaches x=1036 in source
+       space and would otherwise clip off the tile), and ty centres that
+       measured bounding box. Change the scale and both must be recomputed
+       from those two constraints or the pin clips and the mark drifts
+       low. -->
   <defs>
     <linearGradient id="ground" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#10231a"/>
@@ -56,7 +67,7 @@
 
   <rect width="32" height="32" rx="7" fill="url(#ground)"/>
 
-  <g transform="scale(0.03125) translate(-578 -472) scale(1.5)">
+  <g transform="scale(0.03125) translate(-785 -604) scale(1.7)">
     <path d="M108 788C160 812 210 820 260 818C340 814 420 760 494 699C570 636 700 575 800 522"
           stroke="#f1efe8" stroke-width="69" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <circle cx="902" cy="592" r="134" fill="#bf4e26"/>
