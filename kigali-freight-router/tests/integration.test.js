@@ -337,7 +337,7 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         // Approving onto a date already gone would clear a driver on a
         // lapsed document, which is the exact failure expiry exists to stop.
         assert.equal(backdated.statusCode, 400, JSON.stringify(backdated.body));
-        assert.equal(backdated.body.code, 'DRIVER_DOCUMENT_EXPIRY_PAST');
+        assert.equal(backdated.body.error.code, 'DRIVER_DOCUMENT_EXPIRY_PAST');
     });
 
     test('fleet compliance: reports documents inside the warning window', async () => {

@@ -2,12 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LanguageProvider, useLanguage, preferredLanguage, isLanguage, useApiError,
-         LANGUAGES, SELECTABLE_LANGUAGES, type Language } from './index';
+         LANGUAGES, SELECTABLE_LANGUAGES, coverage, type Language } from './index';
 import { ApiError } from '../publicApi';
 import { en } from './en';
 import { rw } from './rw';
 import { fr } from './fr';
-import { coverage } from './index';
 
 // Walks both dictionaries together so a key present in one and missing in
 // the other is caught even where TypeScript cannot see it — a value typed

@@ -13,8 +13,6 @@ import { useLanguage } from './i18n';
 
 const STORAGE_KEY = 'inzira.tour.seen.v1';
 
-type Step = { target: string; title: string; body: string };
-
 // Targets and dictionary keys; the words come from the active language.
 const STEPS = [
     { target: 'book', title: 'bookTitle', body: 'bookBody' },
