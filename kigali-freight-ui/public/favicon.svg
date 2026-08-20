@@ -1,6 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
-  <!-- The driver app's launcher icon (kigali-freight-driver/assets/icon.png),
-       redrawn as vector so it stays crisp in a browser tab.
+  <!-- The route mark, in the website's palette.
+       Geometry from the driver app's launcher icon
+       (kigali-freight-driver/assets/icon.png), redrawn as vector so it
+       stays crisp in a browser tab.
+
+       Colours are the public site's tokens, not the app's: --color-pub-ink
+       and --color-pub-ink2 for the ground, --color-pub-laterite for the
+       destination, --color-pub-onink for the route. This is deliberately a
+       divergence from the phone icon, which stays on the app's navy — a
+       favicon belongs to the website it sits in front of, and a green-black
+       tile with a laterite dot is what a visitor has just been looking at.
+
+       The route uses --color-pub-onink rather than the -soft variant the
+       site's own InziraMark uses. At 16px the soft grey-green sits too
+       close to the ground to read as a line at all; the full-strength
+       value is the same hue doing a job the small size demands.
 
        Geometry is traced from that PNG rather than re-invented: the curve's
        centreline was sampled across its full width and the pin measured at
@@ -20,25 +34,31 @@
        upper-left empty — fine at launcher size, but at 16px it wasted
        most of the tile and the curve nearly vanished.
 
-       So it is centred and scaled 1.25x, which zooms past the left end of
-       the curve: the route now runs off the left edge instead of starting
-       inside the tile. That reads as a road continuing beyond frame, and
-       it buys the weight the mark needs to hold up small — at 1.25x the
-       stroke lands at ~86 and the pin at r168, which is about where the
-       previous hand-drawn favicon sat (83 and 160). Traced at 1:1 the
-       same mark came out visibly lighter than the icon it replaced. -->
+       So it is centred and scaled, which zooms past the left end of the
+       curve: the route runs off the left edge instead of starting inside
+       the tile. That reads as a road continuing beyond frame, and it buys
+       the weight the mark needs to hold up small.
+
+       Scale raised from 1.25x to 1.5x. At 1.25 the mark still sat inside a
+       visible margin and read small against other tabs; at 1.5 the stroke
+       lands at ~104 and the pin at r201 in source space, filling the tile
+       properly. The translate is recomputed rather than nudged: tx keeps
+       the pin's right edge at the same inset it had before (it reaches
+       x=1036 in source space and would otherwise clip), and ty centres the
+       mark's real bounding box — curve plus stroke half-width, plus the
+       pin — on the tile. -->
   <defs>
     <linearGradient id="ground" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#0F1E35"/>
-      <stop offset="1" stop-color="#050C18"/>
+      <stop offset="0" stop-color="#10231a"/>
+      <stop offset="1" stop-color="#0a1712"/>
     </linearGradient>
   </defs>
 
   <rect width="32" height="32" rx="7" fill="url(#ground)"/>
 
-  <g transform="scale(0.03125) translate(-319 -308) scale(1.25)">
+  <g transform="scale(0.03125) translate(-578 -472) scale(1.5)">
     <path d="M108 788C160 812 210 820 260 818C340 814 420 760 494 699C570 636 700 575 800 522"
-          stroke="#DADFE5" stroke-width="69" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <circle cx="902" cy="592" r="134" fill="#00D97C"/>
+          stroke="#f1efe8" stroke-width="69" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="902" cy="592" r="134" fill="#bf4e26"/>
   </g>
 </svg>
