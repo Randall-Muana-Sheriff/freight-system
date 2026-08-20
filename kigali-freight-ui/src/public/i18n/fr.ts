@@ -289,6 +289,9 @@ export const fr: Strings = {
         open: 'Ouvrir le menu',
         close: 'Fermer le menu',
     },
+    journeyExtra: {
+        stopLabel: 'Étape',
+    },
     language: {
         label: 'Langue',
         english: 'Anglais',

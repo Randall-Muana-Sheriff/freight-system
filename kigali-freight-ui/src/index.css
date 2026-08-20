@@ -308,3 +308,42 @@ body, html, #root {
     display: none;
   }
 }
+
+/* ── Floating cards ──────────────────────────────────────────────────
+   Defined here rather than as an arbitrary Tailwind value. shadow-[…]
+   with two shadows in it silently failed to compile: the commas inside
+   rgba() are ambiguous at the top level of a bracket, so the class was
+   emitted with no rule behind it and the cards rendered flat. Nothing
+   errored — the page simply did not float.
+
+   Two shadows rather than one: a tight contact shadow that says the card
+   is resting on something, and a wide soft one that gives it height. A
+   single blurred shadow reads as a glow.
+
+   Kept low and soft on purpose. This page is quiet, and a dramatic drop
+   shadow on it looks like a component pasted in from another site. */
+@utility card-float {
+  box-shadow:
+    0 1px 2px rgba(16, 31, 24, 0.06),
+    0 6px 16px -6px rgba(16, 31, 24, 0.14);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+@utility card-float-lift {
+  &:hover {
+    box-shadow:
+      0 2px 4px rgba(16, 31, 24, 0.08),
+      0 14px 28px -10px rgba(16, 31, 24, 0.2);
+    transform: translateY(-2px);
+  }
+}
+
+/* A dark card on a dark ground cannot cast a visible shadow, so it is
+   lifted the other way — a hairline of light along its own edge, which is
+   how elevation reads on a dark surface. */
+@utility card-float-dark {
+  box-shadow:
+    inset 0 1px 0 rgba(241, 239, 232, 0.06),
+    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}

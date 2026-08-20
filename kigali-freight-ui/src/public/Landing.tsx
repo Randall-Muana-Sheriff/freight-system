@@ -100,6 +100,18 @@ function ContactForm() {
 // gaps between them are even. A section that set its own would be the one
 // that quietly drifts out of line.
 const SECTION = 'px-4 py-3 sm:px-6 sm:py-4';
+
+// A card that sits above the surface rather than being ruled off from it.
+// Defined once because there are four groups of them and a shadow that
+// differs by two pixels between groups is the sort of thing nobody can
+// name but everybody sees.
+//
+// The shadow is soft and low rather than dramatic: these are meant to
+// look like paper resting on paper, and a heavy drop shadow on a page
+// this quiet reads as a different site's component pasted in.
+const CARD = 'rounded-md card-float';
+const CARD_HOVER = 'card-float-lift';
+const CARD_DARK = 'rounded-md card-float-dark';
 const BLOCK = 'mx-auto max-w-6xl overflow-hidden rounded-lg';
 
 const ICONS = {
@@ -172,10 +184,10 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
     // sitting on the hero.
     return (
         <section className="relative z-20 -mt-16 px-8 sm:-mt-20 sm:px-12">
-            <div className="mx-auto grid max-w-5xl gap-px overflow-hidden rounded-md bg-pub-onpaper/10 shadow-sm sm:grid-cols-3">
+            <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-3 sm:gap-5">
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
-                        className="focus-ring group bg-pub-paper px-7 py-8 text-left transition-colors hover:bg-pub-paper2">
+                        className={`focus-ring group bg-pub-paper px-7 py-8 text-left ${CARD} ${CARD_HOVER}`}>
                         <CardIcon shape={card.icon} />
                         <h2 className="display-tight mt-4 text-lg text-pub-onpaper">{card.title}</h2>
                         <p className="mt-2 text-sm leading-relaxed text-pub-onpaper-soft">{card.body}</p>
@@ -248,9 +260,9 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-6xl">
                     <SectionHead eyebrow={t.services.eyebrow} headline={t.services.headline} className="mb-14 max-w-2xl" />
-                    <div className="grid gap-x-14 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         {t.services.items.map((service) => (
-                            <article key={service.name} className="border-t border-pub-onpaper/15 pt-5">
+                            <article key={service.name} className={`bg-pub-paper2 px-6 py-7 ${CARD}`}>
                                 <p className="data-label mb-3 text-pub-laterite">{service.spec}</p>
                                 <h3 className="display-tight text-xl text-pub-onpaper">{service.name}</h3>
                                 <p className="mt-2 text-[15px] leading-relaxed text-pub-onpaper-soft">{service.body}</p>
@@ -276,7 +288,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                                         index === 0 ? 'border-pub-laterite bg-pub-laterite' : 'border-pub-onpaper/40 bg-pub-paper2'
                                     }`} />
                                 <div>
-                                    <p className="data-label mb-1.5 text-pub-onpaper-soft">Stop {index + 1}</p>
+                                    <p className="data-label mb-1.5 text-pub-onpaper-soft">{t.journeyExtra.stopLabel} {index + 1}</p>
                                     <h3 className="display-tight text-lg text-pub-onpaper">{stop.name}</h3>
                                     <p className="mt-1.5 max-w-xl text-[15px] leading-relaxed text-pub-onpaper-soft">{stop.body}</p>
                                 </div>
@@ -298,9 +310,9 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{t.about.intro}</p>
                     </div>
 
-                    <div className="grid gap-x-14 gap-y-10 md:grid-cols-3">
+                    <div className="grid gap-5 md:grid-cols-3">
                         {t.about.views.map((view) => (
-                            <article key={view.title} className="border-t border-pub-onink/15 pt-5">
+                            <article key={view.title} className={`bg-pub-ink2 px-6 py-7 ${CARD_DARK}`}>
                                 <h3 className="display-tight text-lg text-pub-onink">{view.title}</h3>
                                 <p className="mt-2.5 text-[15px] leading-relaxed text-pub-onink-soft">{view.body}</p>
                             </article>
