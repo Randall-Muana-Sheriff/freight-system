@@ -75,7 +75,7 @@
 
   /* Archivo is used on its width axis, not only weight — see index.html. */
   --font-display: 'Archivo', system-ui, sans-serif;
-  --font-body: 'Instrument Sans', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   /* The dispatcher board asks for `font-sans` at its root (Dashboard.tsx).
@@ -84,7 +84,7 @@
      system's UI font — while three faces we self-host were used only by
      the marketing site. Pointing --font-sans at the body face is the whole
      fix: every dispatcher screen inherits it from that one root class. */
-  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
 
   /* A type scale with real steps, for the board.
 
@@ -183,13 +183,14 @@
 
 /* The board's own root settings.
 
-   Instrument Sans ships 400/500/600 and no 700, and the dispatcher asks for
-   font-bold (700) in a great many places. Left alone the browser fakes it by
-   smearing the 600, which is exactly the muddiness that makes small dense
-   text hard to read. Turning synthesis off makes those requests resolve to
-   the real 600 face instead — no faux bold, and no need to rewrite hundreds
-   of call sites. Anything that genuinely needs to be heavier than 600 uses
-   Archivo, which carries weights to 900. */
+   font-synthesis-weight is off as a standing rule rather than a fix. It was
+   a fix: Instrument Sans shipped 400/500/600 and no 700, so the dispatcher's
+   many font-bold calls were faked by smearing the 600 — exactly the
+   muddiness that makes small dense text hard to read — and disabling
+   synthesis made them resolve to the real 600 instead. Inter replaced it
+   with a genuine 100-900 axis, so 700 is now a real weight and there is
+   nothing left to synthesise. Kept anyway: it costs nothing, and it means
+   the next face swapped in cannot quietly reintroduce faux bold. */
 @utility ops-surface {
   --focus-ring-color: var(--color-route);
   font-synthesis-weight: none;

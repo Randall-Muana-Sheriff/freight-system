@@ -60,7 +60,7 @@ function AppShell() {
     // ops-surface sits here rather than on Dashboard because the sign-in
     // screen, the control centre and the board are three siblings, not a
     // hierarchy — putting it on one of them left the other two with faux
-    // bold (Instrument Sans has no 700) and with the public site's laterite
+    // bold (the board disables weight synthesis) and with the public site's laterite
     // focus ring instead of the board's orange. Everything staff-facing
     // shares one set of root type settings; the customer site has its own.
     <div className="ops-surface contents">

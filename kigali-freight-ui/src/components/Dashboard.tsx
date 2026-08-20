@@ -77,7 +77,7 @@ function BoardLayout() {
 export default function Dashboard() {
     return (
         <MapInteractionProvider>
-            {/* font-sans now resolves to Instrument Sans rather than the OS UI
+            {/* font-sans now resolves to Inter rather than the OS UI
                 font; the focus-ring colour and the faux-bold guard come from
                 ops-surface, which App.tsx puts above all three staff screens. */}
             <div className="flex flex-col h-screen w-screen bg-ink text-paper overflow-hidden font-sans">
