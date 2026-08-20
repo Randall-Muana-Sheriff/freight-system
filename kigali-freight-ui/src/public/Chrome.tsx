@@ -53,24 +53,43 @@ function goToSection(id: string, onNavigate: (to: string) => void) {
     requestAnimationFrame(scrollWhenReady);
 }
 
-// Two languages, so a dropdown would be a menu with one alternative in it.
-// A pair of buttons shows both at once and takes one tap either way.
-function LanguageToggle() {
+// A native <select>, not a custom menu.
+//
+// Three languages is past the point where side-by-side buttons stay
+// readable, and a hand-built dropdown would mean rebuilding focus
+// trapping, Escape, click-outside, arrow-key movement and screen-reader
+// semantics that the platform already gets right. On a phone this also
+// opens the OS language picker rather than a cramped list rendered into
+// a dark header — which is where most of these visitors are.
+//
+// Each option is written in its own language: somebody looking for
+// Kinyarwanda scans for "Ikinyarwanda", not for the English word for it.
+function LanguagePicker() {
     const { lang, setLang, t } = useLanguage();
     return (
-        <div className="flex items-center gap-1" role="group" aria-label={t.language.label}>
-            {(Object.keys(LANGUAGES) as Language[]).map((code) => (
-                <button key={code} onClick={() => setLang(code)}
-                    // aria-pressed rather than a visual-only highlight: a
-                    // screen reader user needs to know which is active too.
-                    aria-pressed={lang === code}
-                    lang={code}
-                    className={`focus-ring px-1.5 py-1 text-xs uppercase tracking-wider transition-colors ${
-                        lang === code ? 'text-pub-onink' : 'text-pub-onink-soft/60 hover:text-pub-onink-soft'
-                    }`}>
-                    {code}
-                </button>
-            ))}
+        <div className="relative">
+            <label htmlFor="language-picker" className="sr-only">{t.language.label}</label>
+            <select
+                id="language-picker"
+                value={lang}
+                onChange={(e) => setLang(e.target.value as Language)}
+                // appearance-none removes the platform arrow so the chevron
+                // below can match the site; pr-7 leaves it room.
+                className="focus-ring cursor-pointer appearance-none rounded-sm border border-pub-onink/20 bg-transparent py-1.5 pl-2.5 pr-7 text-sm text-pub-onink-soft transition-colors hover:border-pub-onink/40 hover:text-pub-onink"
+            >
+                {(Object.entries(LANGUAGES) as [Language, string][]).map(([code, label]) => (
+                    // The option list is drawn by the OS, which paints its
+                    // own background — so these need an explicit colour
+                    // rather than inheriting the header's.
+                    <option key={code} value={code} lang={code} className="bg-pub-ink text-pub-onink">
+                        {label}
+                    </option>
+                ))}
+            </select>
+            <svg aria-hidden="true" viewBox="0 0 12 8"
+                className="pointer-events-none absolute right-2 top-1/2 h-2 w-3 -translate-y-1/2 text-pub-onink-soft">
+                <path d="M1 1.5 6 6.5 11 1.5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
         </div>
     );
 }
@@ -99,7 +118,7 @@ export function PublicHeader({ onNavigate }: { onNavigate: (path: string) => voi
                 </nav>
 
                 <div className="flex items-center gap-3">
-                    <LanguageToggle />
+                    <LanguagePicker />
                     <button onClick={() => onNavigate('/order')}
                         className="focus-ring bg-pub-laterite px-5 py-2.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                         {t.actions.book}

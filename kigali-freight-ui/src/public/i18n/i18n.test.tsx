@@ -139,3 +139,35 @@ describe('switching language', () => {
         expect(() => render(<Probe />)).toThrow(/LanguageProvider/);
     });
 });
+
+describe('the language picker', () => {
+    beforeEach(() => window.localStorage.clear());
+
+    it('offers every language, each written in its own language', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+
+        const picker = screen.getByRole('combobox', { name: /language|ururimi|langue/i });
+        const options = Array.from(picker.querySelectorAll('option')).map((o) => o.textContent);
+        expect(options).toEqual(['English', 'Ikinyarwanda', 'Français']);
+    });
+
+    it('changes the page when a language is chosen', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+
+        expect(screen.getByText('Book a delivery')).toBeInTheDocument();
+        await userEvent.selectOptions(screen.getByRole('combobox'), 'fr');
+
+        expect(screen.getByText('Commander une livraison')).toBeInTheDocument();
+        expect(document.documentElement.lang).toBe('fr');
+    });
+
+    it('has a label a screen reader can announce', async () => {
+        const { PublicHeader } = await import('../Chrome');
+        render(<LanguageProvider><PublicHeader onNavigate={() => {}} /></LanguageProvider>);
+        // Visually hidden, but present — a bare select with a flag icon is
+        // an unlabelled control to anyone not looking at it.
+        expect(screen.getByLabelText('Language')).toBeInTheDocument();
+    });
+});
