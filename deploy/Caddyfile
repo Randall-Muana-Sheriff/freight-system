@@ -36,7 +36,11 @@
 }
 
 {$API_DOMAIN} {
-	import security_headers
+	# No `import security_headers` here on purpose. The router sets HSTS
+	# itself via helmet, with includeSubDomains, and adding Caddy's on top
+	# sent two Strict-Transport-Security headers with different values —
+	# legal, but a browser takes the first and a reader cannot tell which
+	# one is in force. The API is the one host that already covers itself.
 	reverse_proxy router:5000
 
 	# Socket.IO's websocket upgrade needs the same proxy target — Caddy

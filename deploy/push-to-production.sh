@@ -61,6 +61,37 @@ rsync -az --delete \
 echo "✅ Files synced. Building..."
 echo
 
+# Caddy's config is bind-mounted as a single FILE, and rsync replaces files
+# by writing a temporary and renaming it — which allocates a new inode. A
+# file bind-mount follows the inode, not the path, so the running container
+# goes on reading the version it started with. Every Caddyfile change
+# deployed this way was invisible, and `caddy reload` cheerfully reported
+# "config is unchanged" and "load complete" while serving the old config —
+# which is how HSTS appeared to deploy three times without ever arriving.
+#
+# Recreating the container is what re-resolves the path. Only done when the
+# file actually changed, since it briefly drops the edge that fronts every
+# host, and validated first: an invalid Caddyfile here takes the whole site
+# down rather than one service.
+CADDY_LOCAL_SUM="$(sha256sum deploy/Caddyfile | cut -d' ' -f1)"
+CADDY_REMOTE_SUM="$(ssh -i "$KEY" "$USER@$HOST" \
+    "docker exec inzira-caddy sha256sum /etc/caddy/Caddyfile 2>/dev/null | cut -d' ' -f1" || true)"
+
+if [ "$CADDY_LOCAL_SUM" != "$CADDY_REMOTE_SUM" ]; then
+    echo "🔁 Caddyfile changed — validating before recreating the edge..."
+    ssh -i "$KEY" "$USER@$HOST" \
+        "cd $REMOTE_PATH && set -a && . ./.env.production && set +a && \
+         docker run --rm -v \$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro \
+           -e API_DOMAIN -e APP_DOMAIN -e SITE_DOMAIN \
+           caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile" \
+      >/dev/null 2>&1 || { echo "❌ New Caddyfile is invalid — refusing to recreate the edge."; exit 1; }
+    ssh -i "$KEY" "$USER@$HOST" \
+        "cd $REMOTE_PATH && docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate caddy" \
+      >/dev/null
+    echo "✅ Edge recreated with the new config."
+    echo
+fi
+
 # GIT_COMMIT is passed rather than derived because there is no git on the
 # far side to derive it from. This is the one case where carrying the SHA
 # across is correct instead of hardcoding it — it still comes from
