@@ -279,11 +279,11 @@ export const fr: Strings = {
 
     entries: {
         bookTitle: 'Commander une livraison',
-        bookBody: 'Enlèvement, destination, nature de la marchandise. En moins d’une minute, sans compte.',
+        bookBody: 'En moins d’une minute, sans compte.',
         trackTitle: 'Suivre une expédition',
-        trackBody: 'Votre code indique où se trouve la marchandise en ce moment.',
+        trackBody: 'Voyez où est votre marchandise.',
         standingTitle: 'Lignes régulières',
-        standingBody: 'Liaisons régulières, tarifées par entreprise plutôt qu’à la course.',
+        standingBody: 'Liaisons régulières, tarifées par entreprise.',
     },
     nav_mobile: {
         open: 'Ouvrir le menu',

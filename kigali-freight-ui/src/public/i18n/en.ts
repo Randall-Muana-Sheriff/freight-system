@@ -313,11 +313,11 @@ export const en = {
     // ── Hero action cards ────────────────────────────────────────────
     entries: {
         bookTitle: 'Book a delivery',
-        bookBody: 'Pickup, destination, what it is. Under a minute, no account.',
+        bookBody: 'Under a minute, no account.',
         trackTitle: 'Track a shipment',
-        trackBody: 'Your code shows where the cargo is right now.',
+        trackBody: 'See where your cargo is.',
         standingTitle: 'Standing routes',
-        standingBody: 'Regular lanes, priced per business rather than per drop.',
+        standingBody: 'Regular lanes, priced per business.',
     },
     nav_mobile: {
         open: 'Open menu',

@@ -146,7 +146,7 @@ const ICONS = {
 function CardIcon({ shape }: { shape: keyof typeof ICONS }) {
     return (
         <svg viewBox="0 0 24 24" aria-hidden="true"
-            className="h-7 w-7 text-pub-laterite transition-transform duration-200 group-hover:-translate-y-0.5"
+            className="h-6 w-6 text-pub-laterite transition-transform duration-200 group-hover:-translate-y-0.5"
             fill="none" stroke="currentColor" strokeWidth={1.6}
             strokeLinecap="round" strokeLinejoin="round">
             {ICONS[shape]}
@@ -183,14 +183,14 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
     // would make them look like a fourth band rather than something
     // sitting on the hero.
     return (
-        <section className="relative z-20 -mt-16 px-8 sm:-mt-20 sm:px-12">
-            <div className="mx-auto grid max-w-5xl gap-2 sm:grid-cols-3 sm:gap-2.5">
+        <section className="relative z-20 -mt-12 px-8 sm:-mt-14 sm:px-12">
+            <div className="mx-auto grid max-w-4xl gap-1.5 sm:grid-cols-3 sm:gap-2">
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
-                        className={`focus-ring group bg-pub-paper px-7 py-8 text-left ${CARD} ${CARD_HOVER}`}>
+                        className={`focus-ring group bg-pub-paper px-5 py-5 text-left ${CARD} ${CARD_HOVER}`}>
                         <CardIcon shape={card.icon} />
-                        <h2 className="display-tight mt-4 text-lg text-pub-onpaper">{card.title}</h2>
-                        <p className="mt-2 text-sm leading-relaxed text-pub-onpaper-soft">{card.body}</p>
+                        <h2 className="display-tight mt-3 text-base text-pub-onpaper">{card.title}</h2>
+                        <p className="mt-1 text-[13px] leading-snug text-pub-onpaper-soft">{card.body}</p>
                     </button>
                 ))}
             </div>
@@ -215,7 +215,7 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                 width and the gap are stated once; a section that sets its
                 own would be the one that quietly drifts. */}
             <section className={SECTION}>
-                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-24 pt-10 sm:px-12 sm:pb-28 sm:pt-14`}>
+                <div className={`${BLOCK} relative isolate overflow-hidden bg-pub-ink px-6 pb-20 pt-10 sm:px-12 sm:pb-24 sm:pt-14`}>
                 <HeroTerrain />
                 {/* Sits above the terrain, and re-enables pointer events the
                     canvas turns off so the buttons underneath still work. */}
