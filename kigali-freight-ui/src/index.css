@@ -329,12 +329,31 @@ body, html, #root {
   transition: box-shadow 200ms ease, transform 200ms ease;
 }
 
+/* Lifts the hovered card clear of the ones beside it.
+   The shadow alone cannot do this: with the cards sitting close together,
+   a stronger shadow is drawn *underneath* its neighbours and the card
+   still looks flush with them. Raising the stacking order is what puts it
+   in front, and the scale is what makes it read as coming toward you
+   rather than merely getting darker. */
 @utility card-float-lift {
+  position: relative;
+  z-index: 0;
+
   &:hover {
+    z-index: 20;
+    transform: translateY(-4px) scale(1.025);
     box-shadow:
-      0 2px 4px rgba(16, 31, 24, 0.08),
-      0 14px 28px -10px rgba(16, 31, 24, 0.2);
-    transform: translateY(-2px);
+      0 4px 8px rgba(16, 31, 24, 0.1),
+      0 20px 40px -12px rgba(16, 31, 24, 0.28);
+  }
+
+  /* The lift is motion, and someone who has asked for less of it should
+     still get the depth cue — so the shadow and the stacking stay and
+     only the movement goes. */
+  @media (prefers-reduced-motion: reduce) {
+    &:hover {
+      transform: none;
+    }
   }
 }
 

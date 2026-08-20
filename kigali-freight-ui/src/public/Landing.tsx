@@ -184,7 +184,7 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
     // sitting on the hero.
     return (
         <section className="relative z-20 -mt-16 px-8 sm:-mt-20 sm:px-12">
-            <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-3 sm:gap-5">
+            <div className="mx-auto grid max-w-5xl gap-2 sm:grid-cols-3 sm:gap-2.5">
                 {cards.map((card) => (
                     <button key={card.title} onClick={card.go}
                         className={`focus-ring group bg-pub-paper px-7 py-8 text-left ${CARD} ${CARD_HOVER}`}>
