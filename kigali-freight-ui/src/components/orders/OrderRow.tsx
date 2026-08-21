@@ -246,6 +246,23 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                                     {Number(order.price_distance_km).toFixed(1)} km
                                 </span>
                             ) : null}
+                            {/* Both are already inside the total above. Shown
+                                because a figure that moved after the job closed
+                                needs a reason next to it, and "the warehouse
+                                held the driver" is a different conversation
+                                from "we charged you more". */}
+                            {Number(order.detention_rwf) > 0 ? (
+                                <span className="font-mono tabular-nums text-hazard">
+                                    +{Number(order.detention_rwf).toLocaleString()} waiting
+                                    {order.detention_minutes != null ? ` (${order.detention_minutes}m)` : ''}
+                                </span>
+                            ) : null}
+                            {Number(order.backfill_credit_rwf) > 0 ? (
+                                <span className="font-mono tabular-nums text-signal">
+                                    −{Number(order.backfill_credit_rwf).toLocaleString()} return filled
+                                    {order.backfilled_by_order_id ? ` by #${order.backfilled_by_order_id}` : ''}
+                                </span>
+                            ) : null}
                         </div>
                     ) : null}
 

@@ -68,6 +68,9 @@ export type DriverAssignment = {
   // pinned it to the map. The pay is provisional until that happens and the
   // app has to say so rather than quote a figure that can still move.
   price_is_estimate?: boolean;
+  // Already inside driver_net_rwf. Sent separately so the app can say why
+  // that figure moved rather than leaving the driver to guess.
+  detention_rwf?: string | number | null;
 };
 
 // The rate-limit middleware already computes the exact remaining wait as

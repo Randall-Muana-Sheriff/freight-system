@@ -32,6 +32,27 @@ export const VEHICLE_DOCUMENT_TYPES = [
 // — the driver app's checklist, for instance.
 export const REQUIRED_DOCUMENT_TYPES = [...DRIVER_DOCUMENT_TYPES, ...VEHICLE_DOCUMENT_TYPES];
 
+// Accepted, reviewed, expiry-tracked -- but not part of the gate above.
+//
+// RURA licenses goods transport, and its wording covers "companies and
+// cooperatives as well as individual operators". Which of those applies here
+// depends on whose truck it is: for a vehicle this business runs, the
+// business is the operator and holds the licence; for an independent driver
+// brought onto the platform, the driver is the operator and needs their own.
+//
+// So it cannot simply join REQUIRED_DOCUMENT_TYPES. That list is both the
+// upload allowlist and the verification gate, and adding to it would
+// un-verify every driver already on the system at once -- twenty-one of them
+// here -- and stop dispatch assigning any of them until each produced a
+// document most of them do not need. It becomes required for a driver flagged
+// as an independent operator, which is a distinction the schema does not draw
+// yet.
+export const OPERATOR_DOCUMENT_TYPES = ['operator_licence'];
+
+// What may be uploaded and reviewed at all, as opposed to what a driver must
+// have before they can be given work.
+export const ACCEPTED_DOCUMENT_TYPES = [...REQUIRED_DOCUMENT_TYPES, ...OPERATOR_DOCUMENT_TYPES];
+
 // How long before a document lapses a dispatcher should be told about it.
 // Three weeks is enough to get an insurance renewal or an inspection booked
 // in Kigali without the driver dropping out of the assignable list first,

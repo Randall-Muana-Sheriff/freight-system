@@ -328,6 +328,15 @@ export default function TripDetailScreen() {
                   Confirmed once dispatch sets the pickup and drop-off points.
                 </Text>
               ) : null}
+              {/* Already inside the figure above. Named because a number that
+                  went up after the job closed should say why -- otherwise the
+                  driver is left working out whether they were paid for the
+                  hour they spent at the gate. */}
+              {Number(order.detention_rwf) > 0 ? (
+                <Text style={styles.payNote}>
+                  Includes {Number(order.detention_rwf).toLocaleString()} RWF for waiting.
+                </Text>
+              ) : null}
             </View>
           ) : null}
 

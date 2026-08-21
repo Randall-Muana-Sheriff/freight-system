@@ -835,6 +835,53 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(Number(row.return_leg_rwf), 0, 'nothing inside Kigali runs home empty');
     });
 
+    // The licence that makes carrying goods for money legal. RURA issues it to
+    // operators, and for an independent driver that is the driver themselves.
+    test('an operator licence can be uploaded and reviewed', async () => {
+        const upload = await request(app)
+            .post('/api/driver-documents')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .field('documentType', 'operator_licence')
+            .field('expiresAt', '2027-12-31')
+            // A real-sized file: uploads below MIN_DOCUMENT_FILE_SIZE_BYTES are
+            // refused as an empty or unreadable photo, which an 11-byte header is.
+            .attach('document', Buffer.concat([
+                Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]),
+                Buffer.alloc(40_000, 0x20),
+                Buffer.from([0xff, 0xd9]),
+            ]), { filename: 'licence.jpg', contentType: 'image/jpeg' });
+        assert.equal(upload.statusCode, 201, JSON.stringify(upload.body));
+
+        const stored = await pool.query(
+            `SELECT document_type, status FROM driver_documents WHERE username = $1 AND document_type = 'operator_licence'`,
+            [driverPhone]
+        );
+        assert.equal(stored.rows.length, 1, 'it must land with the person, not the vehicle');
+        assert.equal(stored.rows[0].status, 'pending');
+    });
+
+    // The trap this avoids. REQUIRED_DOCUMENT_TYPES is both the upload
+    // allowlist and the verification gate, so adding the licence to it would
+    // have un-verified every driver already on the system and stopped
+    // dispatch assigning any of them until each produced a document most of
+    // them do not need -- their employer holds the operator licence, not them.
+    test('adding the operator licence does not un-verify drivers who already passed', async () => {
+        const before = await request(app)
+            .get('/api/driver-documents/mine')
+            .set('Authorization', `Bearer ${driverToken}`);
+        assert.equal(before.statusCode, 200, JSON.stringify(before.body));
+
+        const checklist = before.body.data.checklist || before.body.data.documents || [];
+        const types = checklist.map((d) => d.documentType || d.document_type);
+        assert.ok(!types.includes('operator_licence'), 'the licence must not appear on the gate checklist');
+
+        const assignable = await request(app)
+            .post('/api/orders/assign')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [], driverName: driverPhone });
+        assert.notEqual(assignable.statusCode, 403, 'a verified driver must stay assignable');
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.

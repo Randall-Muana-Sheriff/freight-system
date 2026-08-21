@@ -241,7 +241,9 @@ export const OrderController = {
                     driver_net_rwf,
                     price_distance_km,
                     detention_minutes,
-                    detention_rwf
+                    detention_rwf,
+                    backfill_credit_rwf,
+                    backfilled_by_order_id
                 FROM orders
                 WHERE status = 'PENDING'
                 ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;

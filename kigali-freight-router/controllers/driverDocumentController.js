@@ -5,7 +5,7 @@ import { uploadDriverDocument, toSignedUrl, assertRealFileType } from '../config
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { analyzeDriverDocument } from '../services/documentAnalysisService.js';
-import { REQUIRED_DOCUMENT_TYPES, DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { REQUIRED_DOCUMENT_TYPES, ACCEPTED_DOCUMENT_TYPES, DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
 
 // Three of the five documents describe the truck, not the person, and now
@@ -216,11 +216,15 @@ export const DriverDocumentController = {
             const username = req.user?.username;
             const { documentType } = req.body || {};
 
-            if (!REQUIRED_DOCUMENT_TYPES.includes(documentType)) {
+            // Accepted rather than required: an operator licence can be
+            // uploaded and reviewed without being one of the documents that
+            // gates assignment. See driverVerificationService for why those
+            // are different lists.
+            if (!ACCEPTED_DOCUMENT_TYPES.includes(documentType)) {
                 return fail(res, {
                     status: 400,
                     code: 'DRIVER_DOCUMENT_INVALID_TYPE',
-                    message: `documentType must be one of: ${REQUIRED_DOCUMENT_TYPES.join(', ')}.`,
+                    message: `documentType must be one of: ${ACCEPTED_DOCUMENT_TYPES.join(', ')}.`,
                 });
             }
 

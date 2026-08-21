@@ -116,6 +116,12 @@ export interface Order {
     // coordinates until it is placed, so its price is not real until then —
     // which makes this the dispatcher's cue that the row still needs placing.
     price_is_estimate?: boolean;
+    // Both are already folded into price_total_rwf. Kept separate so a total
+    // that changed after delivery carries its reason.
+    detention_minutes?: number | null;
+    detention_rwf?: string | number | null;
+    backfill_credit_rwf?: string | number | null;
+    backfilled_by_order_id?: number | null;
 }
 
 export interface OrderActivityEvent {
