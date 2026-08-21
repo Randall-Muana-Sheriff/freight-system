@@ -13,13 +13,19 @@ const config: ExpoConfig = {
   name: IS_DEV_CLIENT ? 'Inzira Driver (Dev)' : 'Inzira Driver',
   slug: 'kigali-freight-driver',
   scheme: 'kigali-freight-driver',
-  // Bumped for the Expo SDK 54→57 upgrade (React Native 0.81→0.86 and
-  // every native module along with it) — required so this build gets a
+  // 1.1.0 was the Expo SDK 54→57 upgrade (React Native 0.81→0.86 and
+  // every native module along with it) — bumped so that build got a
   // genuinely different runtimeVersion (policy: 'appVersion', see below)
   // than the old SDK-54 build. Sharing a runtimeVersion across two
   // natively-incompatible builds would let EAS Update think a JS-only
   // update from one is safe to serve to the other.
-  version: '1.1.0',
+  //
+  // 1.2.0 adds vehicle defect reporting. Nothing native changed, so the
+  // policy below did not force this bump — but 1.1.0 (build 6) is with
+  // Apple for review, and leaving this at 1.1.0 would put both builds on
+  // the same runtimeVersion, where an `eas update` meant for testers
+  // would also be served to the copy a reviewer is running.
+  version: '1.2.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
