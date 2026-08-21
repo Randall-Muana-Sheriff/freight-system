@@ -71,10 +71,12 @@ function formatReportDate(value: string) {
   return new Date(value).toLocaleDateString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
-// A "high" severity result gets distinctly different framing (matches
-// what the AI is actually flagging) plus nearest-hub guidance whenever
-// it's available — the immediate, real-time payoff of this feature, not
-// something a driver has to wait for a dispatcher to relay back.
+// Nearest-hub guidance whenever it's available. The severity branch below
+// no longer fires on a fresh report: the backend stopped waiting on the AI
+// before answering (it measured 3.3-4.2s, all of it spent watching the Send
+// button), so severity arrives as null here and an urgent result reaches
+// the driver as a push a few seconds later instead. Kept because a report
+// replayed from the offline queue can still carry one.
 function buildSuccessToast(result: IncidentReportResult): Toast {
   // The nearest-hub distance is supplementary guidance, not the pass/fail
   // verdict on the report itself — kept as a separate `note` (rendered in

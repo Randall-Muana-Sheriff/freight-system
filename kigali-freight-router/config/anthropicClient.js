@@ -19,7 +19,18 @@ export function getAnthropicClient() {
         return null;
     }
 
-    client = new Anthropic({ apiKey: appConfig.anthropicApiKey });
+    // The SDK's own defaults are a 10-minute timeout and 2 retries, which
+    // together can hold a request open for half an hour. That is survivable
+    // for document review (fire-and-forget, nobody is waiting) but not for
+    // incident reporting, where a driver watches the submit button until
+    // this returns. Bounded here so no AI feature can ever inherit the
+    // unbounded default; the driver-facing path narrows it further still
+    // (ANALYSIS_DRIVER_DEADLINE_MS in incidentController).
+    client = new Anthropic({
+        apiKey: appConfig.anthropicApiKey,
+        timeout: 30_000,
+        maxRetries: 1,
+    });
     console.log('🤖 Anthropic client initialized — AI-assisted features enabled.');
     return client;
 }

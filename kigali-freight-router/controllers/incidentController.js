@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import pool from '../config/db.js';
 import { io } from '../server.js';
 import { ok, fail } from '../utils/httpResponse.js';
@@ -10,6 +11,89 @@ import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { dispatchExternalAlert, getAssetLabelForDriver, ALERT_CATEGORY } from '../services/alertDispatchService.js';
 
 const SEVERITY_EMOJI = { high: '🚨', medium: '⚠️', low: 'ℹ️' };
+
+// Sent when the analysis comes back urgent. The driver has already had
+// their "report sent" confirmation by then; this is the follow-up that
+// tells them it was escalated, which used to be a variant of the original
+// toast back when the response waited for the AI to decide.
+const URGENT_PUSH = {
+    title: 'Your report was marked urgent',
+    body: (label) => `"${label}" was escalated — dispatch has been alerted.`,
+};
+
+// Every column the dashboard's incident list renders. Shared by all three
+// writes below because the dashboard's socket handler REPLACES the whole
+// incident object by id — a RETURNING clause that omits a column silently
+// blanks it in the UI. That is exactly how acknowledging an urgent report
+// used to drop its severity badge and its photo until a page reload.
+const INCIDENT_COLUMNS = `id, order_id, driver_name, event_type, description, status,
+                 resolved_by, resolved_at, created_at, photo_url, lat, lng, severity,
+                 ai_analysis AS "aiAnalysis"`;
+
+// Completes an incident once its analysis lands, entirely off the driver's
+// critical path. Fills in what only the AI can supply — severity, the stored
+// analysis, and for a photo-only report the drafted title and summary — then
+// re-emits the finished row so an open dashboard updates in place, alerts
+// dispatch with the real severity, and tells the driver if it came back
+// urgent (the one thing they used to learn from the submit response itself).
+async function finalizeIncidentAnalysis({
+    analysisPromise,
+    incidentId,
+    driverName,
+    ownTitle,
+    ownDescription,
+    fallbackTitle,
+    fallbackDescription,
+}) {
+    const late = await analysisPromise.catch(() => null);
+
+    // The driver's own words still win, exactly as on the fast path — the
+    // AI only fills a title or description they left blank.
+    const title = (ownTitle && ownTitle.trim()) || late?.suggestedTitle || fallbackTitle;
+    const description = (ownDescription && ownDescription.trim()) || late?.summary || fallbackDescription;
+
+    if (late) {
+        const patched = await pool.query(
+            `UPDATE geofence_alerts
+                SET description = $1, severity = $2, ai_analysis = $3
+              WHERE id = $4 AND event_type = 'MANUAL_INCIDENT'
+              RETURNING ${INCIDENT_COLUMNS};`,
+            [`${title}\n\n${description}`, late.severity || null, JSON.stringify(late), incidentId]
+        );
+        if (patched.rows[0]) await emitIncident('incident:status-updated', patched.rows[0]);
+    }
+
+    await alertDispatchOfIncident({ driverName, severity: late?.severity, title, description });
+
+    if (late?.severity === 'high') {
+        sendPushToUser(driverName, {
+            title: URGENT_PUSH.title,
+            body: URGENT_PUSH.body(title),
+            data: { type: 'incident-status', incidentId: String(incidentId) },
+        });
+    }
+}
+
+async function emitIncident(event, row) {
+    io.emit(event, { ...row, photo_url: await toSignedUrl(row.photo_url) });
+}
+
+// Fire-and-forget, same as the geofence/stale-signal alerts — never delay
+// the driver's own response waiting on Telegram. Unlike those two, this is
+// driver-initiated rather than automatic, so it's the one alert category
+// dispatch has no other way to learn about except by watching the dashboard.
+function alertDispatchOfIncident({ driverName, severity, title, description }) {
+    const tone = (severity || 'medium').toLowerCase();
+    const emoji = SEVERITY_EMOJI[tone] || 'ℹ️';
+    return getAssetLabelForDriver(driverName)
+        .catch(() => driverName)
+        .then((assetLabel) => {
+            dispatchExternalAlert(
+                `${emoji} *DRIVER REPORTED INCIDENT* ${emoji}\n\n*Asset:* ${assetLabel}\n*Severity:* ${tone}\n*Report:* ${title}\n${description}\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                ALERT_CATEGORY.INCIDENT
+            );
+        });
+}
 
 const STATUS_PUSH_COPY = {
     ACKNOWLEDGED: { title: 'Report seen by dispatch', body: (label) => `Dispatch is looking into "${label}".` },
@@ -103,10 +187,11 @@ export const IncidentController = {
     // present, is the whole point of "photo-first" reporting: a driver who
     // just had something go wrong can submit with a photo alone and let
     // the AI draft the report, rather than composing a paragraph first).
-    // Unlike document review's fire-and-forget analysis, this AWAITS the
-    // AI call — the driver's own response needs real-time guidance
-    // (nearest hub) and dispatch needs the severity signal immediately,
-    // neither of which can happen after the response already went out.
+    // The AI call is started but never awaited. It measures 3.3-4.2s on a
+    // text-only report and more with a photo, which a driver would otherwise
+    // spend watching the submit button. The report saves and confirms without
+    // it; severity, the stored analysis and a drafted title for a photo-only
+    // report are written in afterwards by finalizeIncidentAnalysis.
     createIncident: async (req, res) => {
         try {
             const { orderId, title, description, lat: latRaw, lng: lngRaw } = req.body || {};
@@ -158,20 +243,27 @@ export const IncidentController = {
                 }
             }
 
-            const analysis = await analyzeIncident({
+            // Started but deliberately not awaited. Measured on this prompt,
+            // the model takes 3.3-4.2s for a text-only report and longer with
+            // a photo, so awaiting it here is the whole of the delay a driver
+            // feels between tapping Send and being told it sent. Nothing the
+            // response needs comes from it — see finalizeIncidentAnalysis.
+            const analysisPromise = analyzeIncident({
                 buffer: hasPhoto ? req.file.buffer : null,
                 mimeType: realType,
                 title,
                 description,
                 orderContext,
             });
-
             // The driver's own words always win when they gave any — the AI
             // only fills in for a title/description the driver skipped
             // (the photo-only path), never overwrites what they actually
             // wrote.
-            const finalTitle = (title && title.trim()) || analysis?.suggestedTitle || 'Incident report';
-            const finalDescription = (description && description.trim()) || analysis?.summary || '(No description provided — see attached photo.)';
+            // The AI's drafted title/summary can only fill these in later, so
+            // a photo-only report is stored with placeholders and rewritten by
+            // finalizeIncidentAnalysis once the analysis lands.
+            const finalTitle = (title && title.trim()) || 'Incident report';
+            const finalDescription = (description && description.trim()) || '(No description provided — see attached photo.)';
             const payload = `${finalTitle}\n\n${finalDescription}`;
 
             const nearestHub = lat !== null && lng !== null ? await findNearestHub(lat, lng) : null;
@@ -179,27 +271,29 @@ export const IncidentController = {
             const result = await pool.query(
                 `INSERT INTO geofence_alerts (order_id, driver_name, event_type, distance_meters, description, photo_url, lat, lng, severity, ai_analysis)
                  VALUES ($1, $2, 'MANUAL_INCIDENT', 0, $3, $4, $5, $6, $7, $8)
-                 RETURNING id, order_id, driver_name, event_type, description, status, resolved_by, resolved_at, created_at, photo_url, lat, lng, severity, ai_analysis AS "aiAnalysis";`,
-                [verifiedOrderId, driverName, payload, photoKey, lat, lng, analysis?.severity || null, analysis ? JSON.stringify(analysis) : null]
+                 RETURNING ${INCIDENT_COLUMNS};`,
+                [verifiedOrderId, driverName, payload, photoKey, lat, lng, null, null]
             );
 
             const incident = result.rows[0];
-            io.emit('incident:reported', { ...incident, photo_url: await toSignedUrl(incident.photo_url) });
+            await emitIncident('incident:reported', incident);
 
-            // Fire-and-forget, same as the geofence/stale-signal alerts —
-            // never delay the driver's own response waiting on Telegram.
-            // Unlike those two, this is driver-initiated rather than
-            // automatic, so it's the one alert category dispatch has no
-            // other way to learn about except by having the dashboard open.
-            const severity = (analysis?.severity || 'medium').toLowerCase();
-            getAssetLabelForDriver(driverName)
-                .catch(() => driverName)
-                .then((assetLabel) => {
-                    dispatchExternalAlert(
-                        `${SEVERITY_EMOJI[severity] || 'ℹ️'} *DRIVER REPORTED INCIDENT* ${SEVERITY_EMOJI[severity] || 'ℹ️'}\n\n*Asset:* ${assetLabel}\n*Severity:* ${severity}\n*Report:* ${finalTitle}\n${finalDescription}\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
-                        ALERT_CATEGORY.INCIDENT
-                    );
-                });
+            // Everything the AI contributes happens from here on, after the
+            // driver already has their confirmation: the severity, the stored
+            // analysis, a drafted title for a photo-only report, dispatch's
+            // Telegram alert, and an urgent push back to the driver.
+            finalizeIncidentAnalysis({
+                analysisPromise,
+                incidentId: incident.id,
+                driverName,
+                ownTitle: title,
+                ownDescription: description,
+                fallbackTitle: finalTitle,
+                fallbackDescription: finalDescription,
+            }).catch((err) => {
+                console.error(`❌ Incident analysis failed for #${incident.id}:`, err.message);
+                Sentry.captureException(err, { tags: { incidentId: String(incident.id) } });
+            });
 
             return ok(
                 res,
@@ -246,7 +340,7 @@ export const IncidentController = {
                      resolved_by = CASE WHEN $2 THEN $3 ELSE resolved_by END,
                      resolved_at = CASE WHEN $2 THEN NOW() ELSE resolved_at END
                  WHERE id = $4 AND event_type = 'MANUAL_INCIDENT'
-                 RETURNING id, order_id, driver_name, description, status, resolved_by, resolved_at, created_at;`,
+                 RETURNING ${INCIDENT_COLUMNS};`,
                 [normalizedStatus, isResolved, req.user?.username || 'System', id]
             );
 
@@ -273,7 +367,7 @@ export const IncidentController = {
                 });
             }
 
-            io.emit('incident:status-updated', incident);
+            await emitIncident('incident:status-updated', incident);
 
             return ok(res, incident);
         } catch (error) {

@@ -40,11 +40,11 @@ const ANALYSIS_TOOL = {
     },
 };
 
-// Awaited synchronously by the controller (unlike document review's
-// fire-and-forget analysis) — the whole point here is real-time guidance
-// in the driver's own submit response (nearest hub, "help is on the way")
-// and an immediate dispatcher-side severity signal, neither of which can
-// happen after the response has already gone out. Returns null on any
+// The controller races this against a short deadline rather than awaiting
+// it outright: a result that arrives in time reaches the driver's own submit
+// response (a 'high' severity changes the toast they see), and a late one is
+// written to the incident row afterwards. Callers must therefore keep the
+// promise rather than abandoning it on timeout. Returns null on any
 // failure (missing API key, API error) so a safety report can never be
 // blocked by an AI outage — the report itself always saves regardless.
 export async function analyzeIncident({ buffer, mimeType, title, description, orderContext }) {

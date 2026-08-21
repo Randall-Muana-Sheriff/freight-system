@@ -557,6 +557,63 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(read.body.data.items.tyres, false);
     });
 
+    // The dashboard's socket handler REPLACES an incident object by id
+    // (socketEventHandlers.ts), so every write to the table has to return
+    // the whole row. While the acknowledge query returned only a subset,
+    // marking an urgent report as seen blanked its severity and photo in
+    // the UI — isUrgentIncident() reads severity === 'high', so the urgent
+    // badge disappeared at exactly the moment a dispatcher picked it up,
+    // and stayed gone until someone reloaded the page.
+    //
+    // The row is planted directly rather than posted through /api/incidents
+    // because creating one kicks off a real AI analysis that rewrites
+    // severity a few seconds later — this test is about the RETURNING
+    // clause, and should not be racing that.
+    test('acknowledging an incident keeps its severity and photo', async () => {
+        const planted = await pool.query(
+            `INSERT INTO geofence_alerts
+                 (order_id, driver_name, event_type, distance_meters, description,
+                  photo_url, lat, lng, severity)
+             VALUES (NULL, $1, 'MANUAL_INCIDENT', 0, $2, 'incidents/test-key.jpg', -1.9501, 30.0588, 'high')
+             RETURNING id;`,
+            [driverPhone, 'Brake fade on the hill\n\nPedal went soft coming down from Kimironko.']
+        );
+        const incidentId = planted.rows[0].id;
+
+        const acked = await request(app)
+            .patch(`/api/incidents/${incidentId}/status`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ status: 'ACKNOWLEDGED' });
+
+        assert.equal(acked.statusCode, 200, JSON.stringify(acked.body));
+        assert.equal(acked.body.data.status, 'ACKNOWLEDGED');
+        assert.equal(acked.body.data.severity, 'high', 'severity dropped — the urgent badge would vanish on acknowledge');
+        assert.equal(acked.body.data.photo_url, 'incidents/test-key.jpg', 'photo dropped from the acknowledge payload');
+        assert.equal(Number(acked.body.data.lat), -1.9501, 'coordinates dropped from the acknowledge payload');
+    });
+
+    // The driver's submit response must not carry AI-derived fields: the
+    // analysis now runs after the response, so a report comes back with
+    // severity still null and is filled in moments later. Guards against
+    // anyone re-introducing an await on that call, which is what used to
+    // put 3-4 seconds between tapping Send and seeing it confirmed.
+    test('reporting an incident returns before the AI analysis does', async () => {
+        const started = Date.now();
+        const created = await request(app)
+            .post('/api/incidents')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .field('description', 'Windscreen cracked by a stone thrown up on RN1')
+            .field('lat', '-1.9501')
+            .field('lng', '30.0588');
+
+        assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+        assert.equal(created.body.data.severity, null, 'severity in the response means the AI is back on the critical path');
+        assert.ok(
+            Date.now() - started < 2_000,
+            `submit took ${Date.now() - started}ms — the measured analysis time is 3.3-4.2s, so this is waiting on it`
+        );
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.
