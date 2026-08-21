@@ -20,12 +20,18 @@ const config: ExpoConfig = {
   // natively-incompatible builds would let EAS Update think a JS-only
   // update from one is safe to serve to the other.
   //
-  // 1.2.0 adds vehicle defect reporting. Nothing native changed, so the
-  // policy below did not force this bump — but 1.1.0 (build 6) is with
-  // Apple for review, and leaving this at 1.1.0 would put both builds on
+  // 1.2.0 added vehicle defect reporting. Nothing native changed, so the
+  // policy below did not force that bump — but 1.1.0 (build 6) was with
+  // Apple for review, and leaving it at 1.1.0 would have put both builds on
   // the same runtimeVersion, where an `eas update` meant for testers
-  // would also be served to the copy a reviewer is running.
-  version: '1.2.0',
+  // would also be served to the copy a reviewer was running.
+  //
+  // 1.3.0 adds what a job pays and a control for saying you are waiting at a
+  // pickup. A minor rather than a patch because it changes what a driver has
+  // to do, not just what they see: the server charges for time held at a
+  // pickup, and the only thing that can report it is the button in this
+  // build. Until it ships, that half of the feature is unreachable.
+  version: '1.3.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
