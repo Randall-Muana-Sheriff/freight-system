@@ -132,6 +132,10 @@ export const en = {
 
     // ── Booking form ─────────────────────────────────────────────────
     order: {
+        price: 'Price',
+        priceEstimate: 'Estimated price',
+        estimateNote: 'An estimate from the weight alone. We confirm it once we have the pickup and drop-off pinned.',
+        priceQuoting: 'Working it out…',
         eyebrow: 'Booking · no account needed',
         received: 'Order received',
         collectFrom: 'Collect from',

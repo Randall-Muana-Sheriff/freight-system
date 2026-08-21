@@ -122,6 +122,16 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                                     <dd className="mt-1.5 text-[17px] text-pub-onink">{shipment.driverFirstName}</dd>
                                 </div>
                             ) : null}
+                            {shipment.priceRwf !== null ? (
+                                <div>
+                                    <dt className="data-label text-pub-onink-soft">
+                                        {shipment.priceIsEstimate ? t.order.priceEstimate : t.order.price}
+                                    </dt>
+                                    <dd className="mt-1.5 text-[17px] tabular-nums text-pub-onink">
+                                        {shipment.priceRwf.toLocaleString()} RWF
+                                    </dd>
+                                </div>
+                            ) : null}
                             <div>
                                 <dt className="data-label text-pub-onink-soft">{t.misc.reference}</dt>
                                 <dd className="mt-1.5 font-mono text-[17px] tracking-wider text-pub-onink">{shipment.trackingToken}</dd>

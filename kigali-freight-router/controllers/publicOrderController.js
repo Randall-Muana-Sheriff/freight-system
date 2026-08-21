@@ -8,8 +8,8 @@ import { appendAuditLog } from '../services/auditLogService.js';
 import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../services/alertDispatchService.js';
 import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
-import { quote, PricingError } from '../services/pricingService.js';
-import { currentRateFor, listCurrentRates, priceJob } from '../services/pricingRepository.js';
+import { PricingError } from '../services/pricingService.js';
+import { priceJob } from '../services/pricingRepository.js';
 import { normalizePhone } from '../utils/phone.js';
 import { isValidWeightKg } from '../utils/validators.js';
 import { toSignedUrl } from '../config/r2Client.js';
@@ -51,7 +51,7 @@ function cleanText(value, max) {
 }
 
 export const PublicOrderController = {
-    // GET /api/public/quote?vehicleClass=&weightKg=&distanceKm=
+    // GET /api/public/quote?weightKg=&distanceKm=
     //
     // Read-only and side-effect free, so the booking form can price a job
     // while the customer is still typing. distanceKm is optional and usually
@@ -59,24 +59,22 @@ export const PublicOrderController = {
     // no distance until a dispatcher places the order. The response says
     // which it gave with `isEstimate`, and the site must show an estimate as
     // an estimate rather than as a price the customer has been promised.
+    //
+    // The class is not a parameter. It comes from the weight, the same way
+    // order creation derives it, so what this quotes and what the order
+    // stores cannot diverge.
     async getQuote(req, res) {
         try {
-            const vehicleClass = typeof req.query.vehicleClass === 'string' ? req.query.vehicleClass.trim() : '';
-            const rate = vehicleClass ? await currentRateFor(vehicleClass) : null;
-            if (!rate) {
-                const available = (await listCurrentRates()).map((r) => r.vehicle_class);
-                return fail(res, {
-                    status: 400,
-                    code: 'PRICING_UNKNOWN_VEHICLE_CLASS',
-                    message: `Choose a vehicle class: ${available.join(', ')}.`,
-                });
-            }
-
             const weightKg = Number(req.query.weightKg);
             const hasDistance = req.query.distanceKm !== undefined && req.query.distanceKm !== '';
             const distanceKm = hasDistance ? Number(req.query.distanceKm) : null;
 
-            const priced = quote(rate, { weightKg, distanceKm });
+            // Goes through priceJob, the same function order creation uses,
+            // rather than picking a rate card here. The booking form has no
+            // vehicle-class selector -- the class is derived from weight -- so
+            // choosing a card any other way would let the site show a price
+            // that the order then stores differently.
+            const priced = await priceJob({ weightKg, distanceKm });
 
             // The customer is told the total and nothing else. What the
             // platform keeps and what the driver nets are on the same

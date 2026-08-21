@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderFlow } from './OrderFlow';
-import { fetchCargoTypes, submitOrder } from './publicApi';
+import { fetchCargoTypes, submitOrder, fetchQuote } from './publicApi';
 import { LanguageProvider } from './i18n';
 
 // These components read their labels from the language context and throw
@@ -12,10 +12,12 @@ const inProvider = (ui: React.ReactElement) => <LanguageProvider>{ui}</LanguageP
 vi.mock('./publicApi', () => ({
     fetchCargoTypes: vi.fn(),
     submitOrder: vi.fn(),
+    fetchQuote: vi.fn(),
 }));
 
 const mockedFetchCargoTypes = vi.mocked(fetchCargoTypes);
 const mockedSubmitOrder = vi.mocked(submitOrder);
+const mockedFetchQuote = vi.mocked(fetchQuote);
 
 // The bug this file exists for: "when do you need it" had a constant, a
 // row on the review step and a field on the API, but the control itself
@@ -41,6 +43,42 @@ describe('OrderFlow — when do you need it', () => {
         window.history.replaceState(null, '', '/order');
         mockedFetchCargoTypes.mockReset().mockResolvedValue(['General goods', 'Perishables']);
         mockedSubmitOrder.mockReset().mockResolvedValue('INZ-ABCD2345');
+        mockedFetchQuote.mockReset().mockResolvedValue({
+            currency: 'RWF', vehicleClass: 'Light Van', totalRwf: 11000,
+            isEstimate: true, distanceKm: null, minimumFareApplied: false,
+        });
+    });
+
+    // A customer should know what it costs before handing over a name and a
+    // phone number, and should not be shown an estimate as though it were a
+    // settled price -- a public booking has no pickup or drop-off point yet,
+    // so nothing has been priced against a real distance.
+    it('quotes a price from the weight, labelled as an estimate', async () => {
+        const user = userEvent.setup();
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+        await screen.findByPlaceholderText('150');
+
+        await user.type(screen.getByPlaceholderText('150'), '400');
+
+        expect(await screen.findByText('11,000 RWF')).toBeInTheDocument();
+        expect(screen.getByText(/Estimated price/i)).toBeInTheDocument();
+        expect(screen.getByText(/We confirm it once we have the pickup/i)).toBeInTheDocument();
+        expect(mockedFetchQuote).toHaveBeenCalledWith(400);
+    });
+
+    // The price is a convenience, not a precondition. If quoting fails the
+    // customer must still be able to book -- the order is priced server-side
+    // on submit regardless.
+    it('a failed quote leaves the form usable and says nothing', async () => {
+        mockedFetchQuote.mockRejectedValue(new Error('offline'));
+        const user = userEvent.setup();
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+        await screen.findByPlaceholderText('150');
+
+        await user.type(screen.getByPlaceholderText('150'), '400');
+
+        expect(screen.queryByText(/RWF/)).not.toBeInTheDocument();
+        expect(screen.getByPlaceholderText('150')).toHaveValue(400);
     });
 
     it('asks the question on the first step, with every option reachable', async () => {

@@ -105,6 +105,17 @@ export interface Order {
     // What the customer said about timing. Informs the dispatcher's
     // priority decision rather than setting it — see the migration.
     needed_by?: 'today' | 'tomorrow' | 'this_week' | 'flexible' | null;
+    // Money. Dispatch sees the whole breakdown; the public tracking page is
+    // deliberately given the total alone, so these have no equivalent there.
+    priced_vehicle_class?: string | null;
+    price_total_rwf?: string | number | null;
+    platform_fee_rwf?: string | number | null;
+    driver_net_rwf?: string | number | null;
+    price_distance_km?: string | number | null;
+    // True while the price came from weight alone. A public order carries no
+    // coordinates until it is placed, so its price is not real until then —
+    // which makes this the dispatcher's cue that the row still needs placing.
+    price_is_estimate?: boolean;
 }
 
 export interface OrderActivityEvent {

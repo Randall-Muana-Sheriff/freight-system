@@ -14,6 +14,15 @@ export interface TrackedShipment {
     driverFirstName: string | null;
     placedAt: string;
     updatedAt: string;
+    /** What this consignment costs, in RWF. The server sends the total and
+     *  nothing else — what the platform keeps and what the driver is paid
+     *  are not on this endpoint and are not the customer's business. */
+    priceRwf: number | null;
+    /** True while the price was worked out from cargo and weight alone. A
+     *  public booking has no coordinates, so a real distance only exists
+     *  once dispatch places it — until then this must be shown as an
+     *  estimate, never as a settled figure. */
+    priceIsEstimate: boolean;
     timeline: { status: string; at: string }[];
     /** Only present once the consignment is DELIVERED — the server
      *  withholds it entirely before that. photoUrl is a short-lived signed
@@ -87,6 +96,24 @@ export async function fetchCargoTypes(): Promise<string[]> {
     const response = await fetch(`${base()}/cargo-types`);
     const data = await parse<{ cargoTypes: string[] }>(response);
     return data.cargoTypes;
+}
+
+export interface Quote {
+    currency: string;
+    vehicleClass: string;
+    totalRwf: number;
+    isEstimate: boolean;
+    distanceKm: number | null;
+    minimumFareApplied: boolean;
+}
+
+// Prices a job before it is placed. Read-only, so the form can call it while
+// someone is still typing. Weight alone: the vehicle class comes from it
+// server-side, the same way the order itself is priced, so what is shown
+// here and what is stored on submit cannot drift apart.
+export async function fetchQuote(weightKg: number): Promise<Quote> {
+    const response = await fetch(`${base()}/quote?weightKg=${encodeURIComponent(weightKg)}`);
+    return parse<Quote>(response);
 }
 
 export async function submitOrder(draft: OrderDraft): Promise<string> {

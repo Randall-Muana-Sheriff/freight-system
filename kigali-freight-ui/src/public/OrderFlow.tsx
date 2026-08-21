@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchCargoTypes, submitOrder, type OrderDraft } from './publicApi';
+import { fetchCargoTypes, submitOrder, fetchQuote, type OrderDraft, type Quote } from './publicApi';
 import { useLanguage, useApiError } from './i18n';
 
 // Booking is paperwork, so it is styled as paperwork: daylight, ruled
@@ -69,6 +69,40 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
     const [error, setError] = useState<string | null>(null);
     const [token, setToken] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [quote, setQuote] = useState<Quote | null>(null);
+    const [quoting, setQuoting] = useState(false);
+
+    // Priced from the weight as it is typed, debounced so a three-digit
+    // number is one request rather than three. Deliberately quiet about
+    // failure: a price nobody can fetch should leave the form exactly as it
+    // was before this feature existed, not put an error in front of someone
+    // halfway through booking. The order still prices server-side on submit.
+    useEffect(() => {
+        const weight = Number(weightInput);
+        if (!Number.isFinite(weight) || weight <= 0) {
+            setQuote(null);
+            setQuoting(false);
+            return;
+        }
+        setQuoting(true);
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            fetchQuote(weight)
+                .then((result) => {
+                    if (!cancelled) setQuote(result);
+                })
+                .catch(() => {
+                    if (!cancelled) setQuote(null);
+                })
+                .finally(() => {
+                    if (!cancelled) setQuoting(false);
+                });
+        }, 400);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [weightInput]);
 
     useEffect(() => {
         fetchCargoTypes().then(setCargoTypes).catch(() => setCargoTypes([]));
@@ -239,6 +273,31 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                         onChange={(e) => setWeightInput(e.target.value)} />
                                 </label>
                             </div>
+                            {/* The number a customer actually wants, shown
+                                before they have handed over a name or a
+                                phone number. Labelled as an estimate because
+                                that is what it is: no pickup or drop-off
+                                point exists yet, so nothing here has been
+                                priced against a real distance. */}
+                            {(quote || quoting) && (
+                                <div aria-live="polite" className="rounded-lg border border-pub-rule bg-pub-paper-soft px-4 py-3">
+                                    <span className="data-label text-pub-onpaper-soft">
+                                        {quote?.isEstimate === false ? t.order.price : t.order.priceEstimate}
+                                    </span>
+                                    {quote ? (
+                                        <>
+                                            <p className="mt-1 font-display text-2xl text-pub-onpaper tabular-nums">
+                                                {quote.totalRwf.toLocaleString()} RWF
+                                            </p>
+                                            {quote.isEstimate && (
+                                                <p className="mt-1 text-sm text-pub-onpaper-soft">{t.order.estimateNote}</p>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <p className="mt-1 text-sm text-pub-onpaper-soft">{t.order.priceQuoting}</p>
+                                    )}
+                                </div>
+                            )}
                             {/* Buttons rather than a select: four short
                                 answers are quicker to tap than to open,
                                 and on a form this size the options being

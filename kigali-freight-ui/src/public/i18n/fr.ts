@@ -126,6 +126,10 @@ export const fr: Strings = {
     },
 
     order: {
+        price: 'Prix',
+        priceEstimate: 'Prix estimé',
+        estimateNote: 'Une estimation basée sur le poids seul. Nous la confirmons dès que l\'enlèvement et la livraison sont localisés.',
+        priceQuoting: 'Calcul en cours…',
         eyebrow: 'Commande · sans compte',
         received: 'Commande reçue',
         collectFrom: 'Enlèvement à',

@@ -192,6 +192,44 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                         </div>
                     ) : null}
 
+                    {/* The money, which only this side of the app sees. The
+                        fee is the figure that decides whether the work is
+                        worth running, so it is shown next to the total rather
+                        than left to be worked out. An estimate is called one:
+                        it means the row has not been placed yet and its price
+                        is not yet real. */}
+                    {order.price_total_rwf != null ? (
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-micro">
+                            <span className="text-steel">Price</span>
+                            <span className="font-mono tabular-nums text-carbon">
+                                {Number(order.price_total_rwf).toLocaleString()} RWF
+                            </span>
+                            {order.platform_fee_rwf != null ? (
+                                <>
+                                    <span className="text-steel">Fee</span>
+                                    <span className="font-mono tabular-nums text-carbon">
+                                        {Number(order.platform_fee_rwf).toLocaleString()}
+                                    </span>
+                                </>
+                            ) : null}
+                            {order.driver_net_rwf != null ? (
+                                <>
+                                    <span className="text-steel">Driver</span>
+                                    <span className="font-mono tabular-nums text-carbon">
+                                        {Number(order.driver_net_rwf).toLocaleString()}
+                                    </span>
+                                </>
+                            ) : null}
+                            {order.price_is_estimate ? (
+                                <span className="font-mono uppercase tracking-wider text-hazard">estimate</span>
+                            ) : order.price_distance_km != null ? (
+                                <span className="font-mono tabular-nums text-steel">
+                                    {Number(order.price_distance_km).toFixed(1)} km
+                                </span>
+                            ) : null}
+                        </div>
+                    ) : null}
+
                     {needsPlacing ? (
                         isThisOrder && placementStep ? (
                             <div className="flex items-center justify-between gap-2 pt-1">
