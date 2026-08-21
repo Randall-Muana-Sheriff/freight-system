@@ -22,6 +22,10 @@ const publicTrackLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, keyPref
 const publicContactLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, keyPrefix: 'public-contact' });
 
 router.get('/cargo-types', publicTrackLimit, PublicOrderController.getCargoTypes);
+// Read-only pricing. Shares the tracking limiter rather than the far
+// stricter order limiter: quoting is something a visitor does repeatedly
+// while adjusting weight or vehicle, and it writes nothing.
+router.get('/quote', publicTrackLimit, PublicOrderController.getQuote);
 router.post('/orders', publicOrderLimit, PublicOrderController.createOrder);
 router.get('/track/:token', publicTrackLimit, PublicOrderController.trackOrder);
 router.post('/contact', publicContactLimit, PublicOrderController.submitContact);

@@ -7,6 +7,9 @@ import { sendSms } from '../services/smsService.js';
 import { appendAuditLog } from '../services/auditLogService.js';
 import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../services/alertDispatchService.js';
 import { ok, fail } from '../utils/httpResponse.js';
+import { logError } from '../utils/logger.js';
+import { quote, PricingError } from '../services/pricingService.js';
+import { currentRateFor, listCurrentRates } from '../services/pricingRepository.js';
 import { normalizePhone } from '../utils/phone.js';
 import { isValidWeightKg } from '../utils/validators.js';
 import { toSignedUrl } from '../config/r2Client.js';
@@ -48,6 +51,53 @@ function cleanText(value, max) {
 }
 
 export const PublicOrderController = {
+    // GET /api/public/quote?vehicleClass=&weightKg=&distanceKm=
+    //
+    // Read-only and side-effect free, so the booking form can price a job
+    // while the customer is still typing. distanceKm is optional and usually
+    // absent: a public booking captures addresses as free text, so there is
+    // no distance until a dispatcher places the order. The response says
+    // which it gave with `isEstimate`, and the site must show an estimate as
+    // an estimate rather than as a price the customer has been promised.
+    async getQuote(req, res) {
+        try {
+            const vehicleClass = typeof req.query.vehicleClass === 'string' ? req.query.vehicleClass.trim() : '';
+            const rate = vehicleClass ? await currentRateFor(vehicleClass) : null;
+            if (!rate) {
+                const available = (await listCurrentRates()).map((r) => r.vehicle_class);
+                return fail(res, {
+                    status: 400,
+                    code: 'PRICING_UNKNOWN_VEHICLE_CLASS',
+                    message: `Choose a vehicle class: ${available.join(', ')}.`,
+                });
+            }
+
+            const weightKg = Number(req.query.weightKg);
+            const hasDistance = req.query.distanceKm !== undefined && req.query.distanceKm !== '';
+            const distanceKm = hasDistance ? Number(req.query.distanceKm) : null;
+
+            const priced = quote(rate, { weightKg, distanceKm });
+
+            // The customer is told the total and nothing else. What the
+            // platform keeps and what the driver nets are on the same
+            // breakdown internally, and neither is the customer's business.
+            return ok(res, {
+                currency: priced.currency,
+                vehicleClass: priced.vehicleClass,
+                totalRwf: priced.totalRwf,
+                isEstimate: priced.isEstimate,
+                distanceKm: priced.distanceKm,
+                minimumFareApplied: priced.minimumFareApplied,
+            });
+        } catch (error) {
+            if (error instanceof PricingError) {
+                return fail(res, { status: 400, code: 'PRICING_INVALID_INPUT', message: error.message });
+            }
+            logError(req, 'Quote failed', error);
+            return fail(res, { status: 500, code: 'PRICING_QUOTE_FAILED', message: 'Could not price that job.' });
+        }
+    },
+
     // GET /api/public/cargo-types — the form's dropdown reads this so the
     // options and the validation below cannot drift apart.
     getCargoTypes(_req, res) {
