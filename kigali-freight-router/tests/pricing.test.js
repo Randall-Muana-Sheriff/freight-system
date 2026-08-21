@@ -238,3 +238,44 @@ test('detention refuses nonsense and costs nothing without a rate', () => {
     assert.throws(() => detentionCharge(TRUCK, 'ages'), PricingError);
     assert.equal(detentionCharge({}, 300).detentionRwf, 0, 'a card with no detention rate charges none');
 });
+
+// ── Corridors ────────────────────────────────────────────────────────────
+
+test('a corridor overrides the card, so the eastern plain pays no mountain fuel', () => {
+    // Same trip, same distance, different direction out of Kigali. Rwamagana
+    // is 91 degrees onto the Akagera plain; Musanze is 316 and climbs.
+    const east = quote(TRUCK, { weightKg: 4000, distanceKm: 98.125, terrainFactor: 1.0 });
+    const north = quote(TRUCK, { weightKg: 4000, distanceKm: 98.125 });
+
+    assert.equal(east.terrainFactor, 1.0);
+    assert.equal(north.terrainFactor, 1.2);
+    assert.ok(east.fuelRwf < north.fuelRwf, 'a flat run must burn less than a climb');
+    assert.ok(east.totalRwf < north.totalRwf, 'and must cost the customer less');
+
+    // The whole difference reaches the driver: fuel sits outside the
+    // commission base, so a flatter route does not change what the platform
+    // takes -- it just stops overcharging for hills that are not there.
+    assert.equal(east.platformFeeRwf, north.platformFeeRwf);
+});
+
+test('a corridor cannot make a city job cheaper, because terrain never applied there', () => {
+    const flat = quote(TRUCK, { weightKg: 3000, distanceKm: 10, terrainFactor: 1.0 });
+    const hilly = quote(TRUCK, { weightKg: 3000, distanceKm: 10 });
+    assert.equal(flat.totalRwf, hilly.totalRwf, 'nothing beyond the city means nothing to adjust');
+});
+
+test('an unknown corridor climbs, which is the safe default here', () => {
+    // corridorFor returns null when nothing matches, and null must mean "use
+    // the card" rather than "no terrain" -- most of Rwanda is hills, so
+    // guessing flat would undercharge and the driver would absorb it.
+    const unknown = quote(TRUCK, { weightKg: 4000, distanceKm: 98.125, terrainFactor: null });
+    const carded = quote(TRUCK, { weightKg: 4000, distanceKm: 98.125 });
+    assert.equal(unknown.totalRwf, carded.totalRwf);
+    assert.equal(unknown.terrainFactor, 1.2);
+});
+
+test('a nonsense terrain factor is refused rather than priced', () => {
+    assert.throws(() => quote(TRUCK, { weightKg: 100, distanceKm: 50, terrainFactor: 0 }), PricingError);
+    assert.throws(() => quote(TRUCK, { weightKg: 100, distanceKm: 50, terrainFactor: -1 }), PricingError);
+    assert.throws(() => quote(TRUCK, { weightKg: 100, distanceKm: 50, terrainFactor: 'steep' }), PricingError);
+});

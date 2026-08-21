@@ -303,11 +303,13 @@ export const OrderController = {
             // start, and never carries an estimate.
             let priced;
             try {
-                const distanceKm = await distanceKmBetween(
-                    { lat: hub.lat, lng: hub.lng },
-                    { lat: delivery_lat, lng: delivery_lng }
-                );
-                priced = await priceJob({ weightKg: weight_kg, distanceKm });
+                const pickup = { lat: hub.lat, lng: hub.lng };
+                const dropoff = { lat: delivery_lat, lng: delivery_lng };
+                const distanceKm = await distanceKmBetween(pickup, dropoff);
+                // The points as well as the distance: which way the route runs
+                // decides whether it climbs, and an eastbound run onto the
+                // Akagera plain must not be charged for mountains.
+                priced = await priceJob({ weightKg: weight_kg, distanceKm, pickup, delivery: dropoff });
             } catch (err) {
                 if (err instanceof PricingError) {
                     return fail(res, { status: 400, code: 'PRICING_INVALID_INPUT', message: err.message });
@@ -1180,11 +1182,15 @@ export const OrderController = {
             // the only record of what they agreed to.
             let repriced = null;
             try {
-                const distanceKm = await distanceKmBetween(
-                    { lat: pickupLat, lng: pickupLng },
-                    { lat: deliveryLat, lng: deliveryLng }
-                );
-                repriced = await priceJob({ weightKg: result.rows[0].weight_kg, distanceKm });
+                const pickup = { lat: pickupLat, lng: pickupLng };
+                const dropoff = { lat: deliveryLat, lng: deliveryLng };
+                const distanceKm = await distanceKmBetween(pickup, dropoff);
+                repriced = await priceJob({
+                    weightKg: result.rows[0].weight_kg,
+                    distanceKm,
+                    pickup,
+                    delivery: dropoff,
+                });
 
                 await pool.query(
                     `UPDATE orders SET

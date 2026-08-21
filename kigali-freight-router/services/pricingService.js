@@ -75,7 +75,7 @@ function requireFiniteNumber(value, label) {
  * @param {object} job   { weightKg, distanceKm }  distanceKm null => estimate
  * @returns {object} a full breakdown, every figure in whole RWF
  */
-export function quote(rate, { weightKg, distanceKm = null }) {
+export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null }) {
     if (!rate) throw new PricingError('No rate card supplied.');
 
     const baseFare = requireFiniteNumber(rate.base_fare_rwf, 'base_fare_rwf');
@@ -121,10 +121,17 @@ export function quote(rate, { weightKg, distanceKm = null }) {
 
     // Fuel on the open road carries the terrain penalty; the flat run across
     // Kigali should not be charged for hills it never climbs.
-    const terrainFactor = optionalNumber(rate.terrain_fuel_factor, 'terrain_fuel_factor', 1);
+    // The corridor wins over the rate card when one is known. The card assumes
+    // any run leaving Kigali is climbing, which is true of most of Rwanda and
+    // wrong for the eastern plain -- charging those runs a mountain penalty
+    // overcharges the customer for hills that are not there.
+    const effectiveTerrain = terrainFactor == null
+        ? optionalNumber(rate.terrain_fuel_factor, 'terrain_fuel_factor', 1)
+        : requireFiniteNumber(terrainFactor, 'terrainFactor');
+    if (effectiveTerrain <= 0) throw new PricingError('terrainFactor must be positive.');
     const litrePerKm = litresPer100 / 100;
     const fuelOut = (cityKm * litrePerKm * dieselPrice)
-        + (openRoadKm * litrePerKm * dieselPrice * terrainFactor);
+        + (openRoadKm * litrePerKm * dieselPrice * effectiveTerrain);
 
     // Past the city the driver comes back with nothing to carry, and that
     // fuel is as real as the fuel going out. Inside it they pick up the next
@@ -170,6 +177,7 @@ export function quote(rate, { weightKg, distanceKm = null }) {
         returnLegRwf: round(fuelReturn),
         returnsEmpty,
         openRoadKm: Number(openRoadKm.toFixed(3)),
+        terrainFactor: effectiveTerrain,
         serviceRwf: round(service),
         totalRwf: round(total),
         platformFeeRwf: round(cappedFee),
