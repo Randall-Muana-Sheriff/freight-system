@@ -72,6 +72,31 @@ server {
         add_header Cache-Control "no-store" always;
     }
 
+    # The icons are the one group of static files that live at a stable path
+    # and still change. Everything the block below covers is content-hashed by
+    # the build, so `immutable` is right for it — but /favicon.svg is always
+    # /favicon.svg, and marking it immutable for a week tells every cache the
+    # bytes will never change when replacing them is exactly what a rebrand
+    # does. The ?v= in index.html only helps clients that read the document;
+    # anything fetching the bare path — Google's favicon crawler among them —
+    # gets told to hold the old icon for seven days.
+    #
+    # A day, revalidating rather than immutable. The ETag makes the steady
+    # state a 304, so this costs one conditional request a day per client, and
+    # a changed icon is picked up within a day instead of a week.
+    #
+    # Placed above the general asset block because nginx tries regex locations
+    # in the order they are written and takes the first that matches.
+    location ~* ^/(?:favicon\.(?:ico|svg)|favicon-\d+\.png|apple-touch-icon\.png)$ {
+        add_header Cache-Control "public, max-age=86400";
+
+        # Restated for the same reason the block below restates them: nginx
+        # drops the whole inherited add_header set the moment a location
+        # declares one of its own.
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+
     location ~* \.(?:css|js|woff2?|ttf|svg|png|jpg|jpeg|gif|ico)$ {
         # No `expires 7d` alongside the explicit header: `expires` emits its
         # own Cache-Control, so having both sent two Cache-Control headers on
