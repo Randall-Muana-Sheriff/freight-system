@@ -95,7 +95,13 @@ export async function corridorFor(pickup, delivery, roadDistanceKm) {
     return row ? { name: row.name, terrainFactor: Number(row.terrain_fuel_factor), bearingDeg: Number(row.bearing) } : null;
 }
 
-// How long a driver was held at the drop, and what that is worth.
+// How long a driver was held at one end of the job, and what that is worth.
+//
+// Both ends work the same way once the arrival event exists: the wait is the
+// gap between the arrival status and now. ARRIVED-to-DELIVERED needed nothing
+// new because both statuses already existed; AT_PICKUP had to be added,
+// because ASSIGNED-to-PICKED_UP contains the drive to the pickup as well as
+// the wait there and no arithmetic separates the two.
 //
 // The wait is the gap between the ARRIVED and DELIVERED entries in
 // order_status_logs, which has stamped every transition since the original
@@ -105,17 +111,17 @@ export async function corridorFor(pickup, delivery, roadDistanceKm) {
 //
 // Priced against the same rate card the job was quoted on, not today's, so a
 // card superseded mid-shift cannot change what a completed job pays.
-export async function detentionForOrder(client, orderId) {
+export async function detentionForOrder(client, orderId, { arrivalStatus = 'ARRIVED' } = {}) {
     const { rows } = await client.query(
         `WITH arrived AS (
              SELECT MAX(changed_at) AS at FROM order_status_logs
-              WHERE order_id = $1 AND new_status = 'ARRIVED'
+              WHERE order_id = $1 AND new_status = $2
          )
          SELECT EXTRACT(EPOCH FROM (NOW() - arrived.at)) / 60 AS waited_minutes,
                 o.pricing_rate_id
            FROM orders o, arrived
           WHERE o.id = $1 AND arrived.at IS NOT NULL`,
-        [orderId]
+        [orderId, arrivalStatus]
     );
 
     const row = rows[0];

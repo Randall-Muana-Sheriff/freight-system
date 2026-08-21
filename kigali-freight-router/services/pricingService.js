@@ -191,6 +191,11 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
         driverNetRwf: totalRounded - feeRounded,
         minimumFareApplied: subtotal < minimumFare,
         minimumFeeApplied: service * (commissionPct / 100) < minimumFee,
+        // Not charged here -- detention is worked out at delivery, once the
+        // wait is known. Carried on the quote so a customer can be told the
+        // terms before they book rather than discovering them on the bill.
+        freeWaitingMinutes: optionalNumber(rate.detention_free_minutes, 'detention_free_minutes', 60),
+        detentionPerHourRwf: round(optionalNumber(rate.detention_per_hour_rwf, 'detention_per_hour_rwf', 0)),
     };
 }
 

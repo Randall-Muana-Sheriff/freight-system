@@ -27,11 +27,14 @@ const TIMELINE_STEPS = ['Accepted', 'Picked up', 'In transit', 'Delivered'];
 // Also doubles as the forward-progression order for deciding which single
 // action button is next — a driver can only ever be shown the one status
 // ahead of where they currently are, never a status they've already passed.
-const STATUS_ORDER = ['ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
+const STATUS_ORDER = ['ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
 
 function stepIndexForStatus(status?: string): number {
   switch ((status || '').toUpperCase()) {
     case 'ASSIGNED':
+    // Waiting at the pickup is still the pickup stage as far as the progress
+    // dots go -- it is a state within collecting the load, not a step past it.
+    case 'AT_PICKUP':
       return 0;
     case 'PICKED_UP':
       return 1;
@@ -50,9 +53,18 @@ function statusOrderIndex(status?: string): number {
   return index === -1 ? 0 : index;
 }
 
-type ActionStatus = 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED';
+type ActionStatus = 'AT_PICKUP' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED';
 
 const ACTION_STEPS: Record<ActionStatus, { icon: keyof typeof Ionicons.glyphMap; label: string; helper: string }> = {
+  // The button that makes waiting at a pickup payable. Nothing else in the
+  // app can produce this event, and without it the wait at that end is
+  // indistinguishable from the drive there -- so a driver held two hours at a
+  // warehouse gate simply was not paid for it.
+  AT_PICKUP: {
+    icon: 'time-outline',
+    label: "I'm at the pickup",
+    helper: 'Tap when you arrive, so waiting to be loaded is paid for.',
+  },
   IN_TRANSIT: {
     icon: 'navigate-outline',
     label: 'Start transit',
@@ -255,7 +267,11 @@ export default function TripDetailScreen() {
   // The one status ahead of where this job actually is right now — once
   // that action is taken, the job's status moves forward and this recomputes
   // to the next one, so a completed step's button can never show again.
-  const nextAction = (['IN_TRANSIT', 'ARRIVED', 'DELIVERED'] as ActionStatus[]).find(
+  // AT_PICKUP leads, so a driver sitting at a gate can say so before they
+  // have anything to transit with. PICKED_UP is deliberately not here: this
+  // app has never sent it, and adding a step nobody asked for to a flow
+  // drivers already know is a worse trade than leaving one status unused.
+  const nextAction = (['AT_PICKUP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'] as ActionStatus[]).find(
     (status) => STATUS_ORDER.indexOf(status) > currentStatusIndex
   );
 

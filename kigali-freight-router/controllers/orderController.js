@@ -15,7 +15,7 @@ import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js'
 import { priceJob, distanceKmBetween, detentionForOrder } from '../services/pricingRepository.js';
 import { PricingError } from '../services/pricingService.js';
 
-const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
+const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
 const ALLOWED_ORDER_PRIORITIES = ['high', 'normal', 'low'];
 
 // Matches the staleness threshold fleetController.js already uses to mark
@@ -49,7 +49,17 @@ function computeRouteProgress({ driver_lat, telemetry_age_seconds, distance_rema
 // order is a dispatch decision — a driver who can't complete a job reports
 // it through the incident-report flow instead, and a dispatcher/admin
 // decides from there whether to cancel or reassign it.
-const DRIVER_ALLOWED_STATUSES = ['PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
+const DRIVER_ALLOWED_STATUSES = ['AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
+
+// The two statuses that start a detention clock, and so the two that are now
+// worth money. Only the person standing at the gate knows they are standing at
+// it, and since detention began being charged, anyone else setting these is
+// either inflating a customer's bill or shorting a driver's pay. Restricted to
+// drivers for that reason rather than any general principle about status.
+//
+// Nothing loses a capability it was using: the dispatch board only ever
+// displays these, and trip stops move through their own endpoint.
+const ARRIVAL_STATUSES = ['AT_PICKUP', 'ARRIVED'];
 
 // Soft-flag threshold: a delivery confirmed more than this far from the
 // order's recorded delivery point gets flagged for dispatcher review, but
@@ -806,6 +816,47 @@ export const OrderController = {
 
             // Log changes
             const logQuery = `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by) VALUES ($1, $2, $3, $4);`;
+            // Leaving the pickup is the moment the wait there ends, so it is
+            // worked out here for the same reason the drop's is worked out
+            // before DELIVERED is written.
+            if (ARRIVAL_STATUSES.includes(normalizedStatus) && req.user?.role !== 'driver') {
+                return fail(res, {
+                    status: 403,
+                    code: 'ORDERS_ARRIVAL_DRIVER_ONLY',
+                    message: 'Only the driver can record arriving at the pickup or the drop.',
+                });
+            }
+
+            // Keyed on leaving AT_PICKUP rather than on reaching any
+            // particular next status. The driver app never sends PICKED_UP --
+            // its flow runs ASSIGNED, IN_TRANSIT, ARRIVED, DELIVERED, and
+            // PICKED_UP survives only in the status list -- so keying on it
+            // would have been waiting for an event that never comes. What
+            // ends the wait is leaving the gate, whatever the driver calls it.
+            if (previousStatus === 'AT_PICKUP' && normalizedStatus !== 'AT_PICKUP') {
+                try {
+                    const waited = await detentionForOrder(client, id, { arrivalStatus: 'AT_PICKUP' });
+                    if (waited) {
+                        await client.query(
+                            `UPDATE orders SET
+                                pickup_detention_minutes = $2,
+                                pickup_detention_rwf = $3,
+                                detention_minutes = COALESCE(detention_minutes, 0) + $2,
+                                detention_rwf = COALESCE(detention_rwf, 0) + $3,
+                                price_total_rwf = COALESCE(price_total_rwf, 0) + $3,
+                                driver_net_rwf = COALESCE(driver_net_rwf, 0) + $3
+                              WHERE id = $1`,
+                            [id, waited.waitedMinutes, waited.detentionRwf]
+                        );
+                    }
+                } catch (err) {
+                    // Same rule as the drop: a driver must be able to move a
+                    // job on whatever the pricing does. The wait stays in the
+                    // status log and can be recovered.
+                    logError(req, `Pickup detention for order #${id} could not be worked out`, err);
+                }
+            }
+
             await client.query(logQuery, [id, previousStatus, normalizedStatus, userEmail]);
 
             await client.query('COMMIT');
@@ -944,8 +995,10 @@ export const OrderController = {
             const updateResult = await client.query(
                 `UPDATE orders SET
                     status = 'DELIVERED',
-                    detention_minutes = COALESCE($2, detention_minutes),
-                    detention_rwf = COALESCE($3, detention_rwf),
+                    dropoff_detention_minutes = COALESCE($2, dropoff_detention_minutes),
+                    dropoff_detention_rwf = COALESCE($3, dropoff_detention_rwf),
+                    detention_minutes = COALESCE(detention_minutes, 0) + COALESCE($2, 0),
+                    detention_rwf = COALESCE(detention_rwf, 0) + COALESCE($3, 0),
                     -- Added to the customer's total and passed to the driver
                     -- whole. No commission: this reimburses a driver's stolen
                     -- hour, it is not service the platform brokered, which is

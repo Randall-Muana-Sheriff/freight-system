@@ -22,6 +22,7 @@ const base = {
     placedAt: '2026-08-03T08:00:00.000Z',
     priceRwf: 16803,
     priceIsEstimate: false,
+    detentionRwf: null,
     updatedAt: '2026-08-03T11:02:12.000Z',
     timeline: [],
     proofOfDelivery: {

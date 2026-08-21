@@ -126,6 +126,8 @@ export const fr: Strings = {
     },
 
     order: {
+        waitingNotice: 'Si le chargement ou le déchargement retient le chauffeur plus de {minutes} minutes, le temps supplémentaire est facturé {rate} RWF de l\'heure. Rien n\'est ajouté pour une remise normale.',
+        detention: 'Temps d\'attente',
         price: 'Prix',
         priceEstimate: 'Prix estimé',
         estimateNote: 'Une estimation basée sur le poids seul. Nous la confirmons dès que l\'enlèvement et la livraison sont localisés.',

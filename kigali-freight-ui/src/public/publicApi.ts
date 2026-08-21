@@ -23,6 +23,10 @@ export interface TrackedShipment {
      *  once dispatch places it — until then this must be shown as an
      *  estimate, never as a settled figure. */
     priceIsEstimate: boolean;
+    /** Charged at delivery when the driver was held beyond the free
+     *  allowance. Null on a job that has not been delivered, or where the
+     *  handover was normal. */
+    detentionRwf: number | null;
     timeline: { status: string; at: string }[];
     /** Only present once the consignment is DELIVERED — the server
      *  withholds it entirely before that. photoUrl is a short-lived signed
@@ -105,6 +109,11 @@ export interface Quote {
     isEstimate: boolean;
     distanceKm: number | null;
     minimumFareApplied: boolean;
+    /** Free loading/unloading allowance. Read from the rate card rather than
+     *  written into the copy, so editing the card cannot leave the site
+     *  promising terms the system no longer applies. */
+    freeWaitingMinutes: number;
+    detentionPerHourRwf: number;
 }
 
 // Prices a job before it is placed. Read-only, so the form can call it while

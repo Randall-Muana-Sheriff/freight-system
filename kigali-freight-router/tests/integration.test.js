@@ -677,6 +677,79 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(Number(row.platform_fee_rwf), quotedTotal - quotedNet);
     });
 
+    // The pickup end, which needed an event the system did not have.
+    // ASSIGNED to PICKED_UP contains the drive to the pickup as well as the
+    // wait once there, so a driver forty minutes away and a driver held forty
+    // minutes at the gate looked identical. AT_PICKUP separates them.
+    test('a driver held at the pickup is paid for that wait too', async () => {
+        const created = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Pickup detention probe',
+                weight_kg: 3000,
+                origin_hub_id: hubId,
+                delivery_lng: 30.1186,
+                delivery_lat: -1.9536,
+            });
+        assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+        const orderId = created.body.data.order.id;
+        const quotedNet = Number(created.body.data.order.driver_net_rwf);
+
+        await pool.query(`UPDATE orders SET status = 'ASSIGNED', assigned_to = $2 WHERE id = $1`, [orderId, driverPhone]);
+
+        // The driver says they are at the gate.
+        const atPickup = await request(app)
+            .patch(`/api/orders/${orderId}/status`)
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ status: 'AT_PICKUP' });
+        assert.equal(atPickup.statusCode, 200, JSON.stringify(atPickup.body));
+
+        // Backdate it two hours; a test cannot stand at a warehouse.
+        await pool.query(
+            `UPDATE order_status_logs SET changed_at = NOW() - INTERVAL '120 minutes'
+              WHERE order_id = $1 AND new_status = 'AT_PICKUP'`,
+            [orderId]
+        );
+
+        // Leaving the gate. IN_TRANSIT rather than PICKED_UP because that is
+        // what the driver app actually sends -- keying the charge on a status
+        // no client emits would have made this whole feature dead code.
+        const leaving = await request(app)
+            .patch(`/api/orders/${orderId}/status`)
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ status: 'IN_TRANSIT' });
+        assert.equal(leaving.statusCode, 200, JSON.stringify(leaving.body));
+
+        const row = (await pool.query(
+            `SELECT pickup_detention_minutes, pickup_detention_rwf, detention_rwf, driver_net_rwf, platform_fee_rwf
+               FROM orders WHERE id = $1`, [orderId]
+        )).rows[0];
+
+        assert.ok(Number(row.pickup_detention_minutes) >= 119, `recorded ${row.pickup_detention_minutes} minutes for a two hour wait`);
+        // An hour free, so sixty chargeable minutes at the truck rate.
+        assert.equal(Number(row.pickup_detention_rwf), 8500);
+        assert.equal(Number(row.detention_rwf), 8500, 'the total carries the pickup end');
+        assert.equal(Number(row.driver_net_rwf), quotedNet + 8500, 'and the driver keeps all of it');
+    });
+
+    // The status is the driver's alone: only the person at the gate knows
+    // they are standing at it.
+    test('a dispatcher cannot mark a driver as waiting at the pickup', async () => {
+        const created = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Pickup status guard', weight_kg: 500,
+                origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536,
+            });
+        const res = await request(app)
+            .patch(`/api/orders/${created.body.data.order.id}/status`)
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ status: 'AT_PICKUP' });
+        assert.notEqual(res.statusCode, 200, 'a dispatcher must not be able to claim a driver is waiting');
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.

@@ -132,6 +132,8 @@ export const en = {
 
     // ── Booking form ─────────────────────────────────────────────────
     order: {
+        waitingNotice: 'If loading or unloading keeps the driver longer than {minutes} minutes, the extra time is charged at {rate} RWF an hour. Nothing is added for a normal handover.',
+        detention: 'Waiting time',
         price: 'Price',
         priceEstimate: 'Estimated price',
         estimateNote: 'An estimate from the weight alone. We confirm it once we have the pickup and drop-off pinned.',

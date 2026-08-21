@@ -46,6 +46,7 @@ describe('OrderFlow — when do you need it', () => {
         mockedFetchQuote.mockReset().mockResolvedValue({
             currency: 'RWF', vehicleClass: 'Light Van', totalRwf: 11000,
             isEstimate: true, distanceKm: null, minimumFareApplied: false,
+            freeWaitingMinutes: 60, detentionPerHourRwf: 3800,
         });
     });
 

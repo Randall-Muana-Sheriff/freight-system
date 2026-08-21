@@ -292,6 +292,21 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                             {quote.isEstimate && (
                                                 <p className="mt-1 text-sm text-pub-onpaper-soft">{t.order.estimateNote}</p>
                                             )}
+                                            {/* Said before they book, not
+                                                discovered on the bill. The
+                                                allowance and the rate come
+                                                from the quote rather than the
+                                                copy, so editing the rate card
+                                                cannot leave this promising
+                                                terms the system no longer
+                                                applies. */}
+                                            {quote.detentionPerHourRwf > 0 && (
+                                                <p className="mt-2 text-sm text-pub-onpaper-soft">
+                                                    {t.order.waitingNotice
+                                                        .replace('{minutes}', String(quote.freeWaitingMinutes))
+                                                        .replace('{rate}', quote.detentionPerHourRwf.toLocaleString())}
+                                                </p>
+                                            )}
                                         </>
                                     ) : (
                                         <p className="mt-1 text-sm text-pub-onpaper-soft">{t.order.priceQuoting}</p>

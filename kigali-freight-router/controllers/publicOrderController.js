@@ -86,6 +86,11 @@ export const PublicOrderController = {
                 isEstimate: priced.isEstimate,
                 distanceKm: priced.distanceKm,
                 minimumFareApplied: priced.minimumFareApplied,
+                // So the site can warn about waiting in the rate card's own
+                // terms. Hardcoding "an hour" in the copy would quietly become
+                // a lie the day somebody edits the card.
+                freeWaitingMinutes: priced.freeWaitingMinutes,
+                detentionPerHourRwf: priced.detentionPerHourRwf,
             });
         } catch (error) {
             if (error instanceof PricingError) {
