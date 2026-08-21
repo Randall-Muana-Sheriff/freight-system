@@ -3,6 +3,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { ScreenShell } from '../../components/ScreenShell';
+import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
+import { captureException } from '../../lib/crashReporting';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { fetchDriverAssignments, fetchMyCompletedDeliveries, fetchMyDocuments, fetchMyProfile, fetchMyVehicle, type CompletedDelivery, type MyVehicle } from '../../lib/api';
@@ -49,6 +51,7 @@ export default function DashboardScreen() {
   const [fullName, setFullName] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<DriverAssignmentCard[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [completedDeliveries, setCompletedDeliveries] = useState<CompletedDelivery[]>([]);
   // null = not checked yet. A driver can log in the moment their account is
   // approved, but dispatch separately withholds jobs until all 5 compliance
@@ -160,8 +163,21 @@ export default function DashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadProfile(), loadAssignments(), checkShift(), checkVerification(), checkVehicle(), loadDeliveries()]);
-    setRefreshing(false);
+    try {
+      // Promise.all rejects as soon as any one of these does, so a single
+      // failing loader used to skip setRefreshing(false) entirely and leave
+      // the pull-to-refresh spinner turning forever with no way back.
+      await Promise.all([loadProfile(), loadAssignments(), checkShift(), checkVerification(), checkVehicle(), loadDeliveries()]);
+    } catch (err) {
+      captureException(err, { screen: 'home', action: 'refresh' });
+      setToast({
+        icon: 'cloud-offline-outline',
+        tone: 'warning',
+        message: 'Could not refresh everything. Pull down to try again.',
+      });
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const onToggleShift = async () => {
@@ -172,6 +188,20 @@ export default function DashboardScreen() {
       } else {
         await startBackgroundLocationTracking();
       }
+    } catch (err) {
+      // There was a finally but no catch, and this is fired from onPress
+      // without being awaited — so a failure to start tracking cleared the
+      // spinner, left the driver off shift, and explained nothing. Starting a
+      // shift is the one action the whole app hangs off: if it fails silently
+      // the driver believes they are working and dispatch sees nobody.
+      captureException(err, { screen: 'home', action: onShift ? 'end-shift' : 'start-shift' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: onShift
+          ? 'Could not end your shift. Check your connection and try again.'
+          : 'Could not start your shift — location may be off or permission denied.',
+      });
     } finally {
       await checkShift();
       setShiftBusy(false);
@@ -298,6 +328,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         ))}
       </View>
+      <ToastOverlay toast={toast} onHide={() => setToast(null)} />
     </ScreenShell>
   );
 }

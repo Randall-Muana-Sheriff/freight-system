@@ -21,6 +21,7 @@ import {
 } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { enqueueOfflineAction, persistIncidentPhotoForQueue } from '../../lib/offlineQueue';
+import { captureException } from '../../lib/crashReporting';
 
 // Picked from the Incident title field itself (tapping it opens this list)
 // so a driver in a stressful moment (right after an accident, standing next
@@ -188,35 +189,53 @@ export default function IncidentsScreen() {
   };
 
   const onTakePhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      setToast({ icon: 'camera-outline', message: 'Allow camera access to attach a photo.', tone: 'warning' });
-      return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setToast({ icon: 'camera-outline', message: 'Allow camera access to attach a photo.', tone: 'warning' });
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      setPhoto(result.assets[0]);
+      setToast(null);
+    } catch (err) {
+      captureException(err, { screen: 'incidents', action: 'onTakePhoto' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not open the camera. You can still report the issue without a photo.',
+      });
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    setPhoto(result.assets[0]);
-    setToast(null);
   };
 
   const onPickPhotoFromLibrary = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setToast({ icon: 'images-outline', message: 'Allow photo library access to attach a photo.', tone: 'warning' });
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setToast({ icon: 'images-outline', message: 'Allow photo library access to attach a photo.', tone: 'warning' });
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      setPhoto(result.assets[0]);
+      setToast(null);
+    } catch (err) {
+      captureException(err, { screen: 'incidents', action: 'onPickPhotoFromLibrary' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not open your photo library. You can still report the issue without a photo.',
+      });
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    setPhoto(result.assets[0]);
-    setToast(null);
   };
 
   const onChoosePhotoSource = (source: 'camera' | 'library') => {
     setPickingPhotoSource(false);
     if (source === 'camera') {
-      onTakePhoto();
+      void onTakePhoto();
     } else {
-      onPickPhotoFromLibrary();
+      void onPickPhotoFromLibrary();
     }
   };
 

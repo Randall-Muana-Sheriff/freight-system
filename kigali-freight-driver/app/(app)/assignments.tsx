@@ -82,8 +82,14 @@ export default function AssignmentsScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      // finally, not a bare sequence: if load() ever rejects the spinner
+      // would otherwise turn indefinitely. load() reports its own failures
+      // through setError, so there is nothing to add here beyond stopping.
+      setRefreshing(false);
+    }
   };
 
   // Split into two groups so a driver juggling a couple of jobs can see at a

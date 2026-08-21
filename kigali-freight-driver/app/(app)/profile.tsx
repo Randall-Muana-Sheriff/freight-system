@@ -13,6 +13,7 @@ import { useAuth } from '../../lib/auth';
 import { fetchMyProfile, fetchMyVehicle, fetchMyCompletedDeliveries, fetchMyDocuments, type MyProfile, type MyVehicle, type CompletedDelivery } from '../../lib/api';
 import { getTrackingDiagnostics, sendTestLocationPing } from '../../lib/locationTracking';
 import { useBiometricSupport } from '../../lib/biometrics';
+import { captureException } from '../../lib/crashReporting';
 
 type Diagnostics = Awaited<ReturnType<typeof getTrackingDiagnostics>>;
 type Tone = 'good' | 'bad' | 'neutral';
@@ -195,7 +196,15 @@ export default function ProfileScreen() {
   };
 
   const loadDiagnostics = async () => {
-    setDiagnostics(await getTrackingDiagnostics());
+    try {
+      setDiagnostics(await getTrackingDiagnostics());
+    } catch (err) {
+      // Diagnostics are the screen a driver is sent to when tracking is
+      // already misbehaving, so this failing quietly is the worst moment for
+      // it. No toast: the panel simply shows nothing, and the report is what
+      // tells us the panel itself is broken.
+      captureException(err, { screen: 'profile', action: 'loadDiagnostics' });
+    }
   };
 
   // useFocusEffect (not a plain useEffect) so this re-runs every time the
@@ -232,7 +241,20 @@ export default function ProfileScreen() {
   }).length;
 
   const logout = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch (err) {
+      // Navigating away regardless would be worse: the driver would believe
+      // they had signed out while the session survived on the device. Say so
+      // and stay put.
+      captureException(err, { screen: 'profile', action: 'logout' });
+      setPingToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not sign you out. Check your connection and try again.',
+      });
+      return;
+    }
     router.replace('/(auth)/login');
   };
 
@@ -261,6 +283,15 @@ export default function ProfileScreen() {
       } else {
         await enableBiometric();
       }
+    } catch (err) {
+      captureException(err, { screen: 'profile', action: biometricEnabled ? 'disable-biometric' : 'enable-biometric' });
+      setPingToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: biometricEnabled
+          ? 'Could not turn off unlock with biometrics.'
+          : 'Could not turn on biometric unlock — your device may not have it set up.',
+      });
     } finally {
       setTogglingBiometric(false);
     }

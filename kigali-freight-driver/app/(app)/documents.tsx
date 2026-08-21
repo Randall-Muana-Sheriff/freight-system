@@ -11,6 +11,7 @@ import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
 import { fetchMyDocuments, uploadDriverDocument, type DriverDocumentStatus, type DocumentType } from '../../lib/api';
 import { useUpNavigation } from '../../lib/navigation';
+import { captureException } from '../../lib/crashReporting';
 
 const DOCUMENT_ICON: Record<DocumentType, keyof typeof Ionicons.glyphMap> = {
   national_id: 'card-outline',
@@ -88,25 +89,43 @@ export default function DocumentsScreen() {
   };
 
   const onTakePhoto = async (documentType: DocumentType) => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      setToast({ icon: 'camera-outline', message: 'Allow camera access to take a photo of this document.', tone: 'warning' });
-      return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setToast({ icon: 'camera-outline', message: 'Allow camera access to take a photo of this document.', tone: 'warning' });
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      await submitAsset(documentType, result.assets[0]);
+    } catch (err) {
+      captureException(err, { screen: 'documents', action: 'onTakePhoto' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not open the camera. Try again, or pick the photo from your library.',
+      });
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    await submitAsset(documentType, result.assets[0]);
   };
 
   const onPickFromLibrary = async (documentType: DocumentType) => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setToast({ icon: 'images-outline', message: 'Allow photo library access to select a clear picture of this document.', tone: 'warning' });
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setToast({ icon: 'images-outline', message: 'Allow photo library access to select a clear picture of this document.', tone: 'warning' });
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      await submitAsset(documentType, result.assets[0]);
+    } catch (err) {
+      captureException(err, { screen: 'documents', action: 'onPickFromLibrary' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not open your photo library. Try again, or take the photo with the camera.',
+      });
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    await submitAsset(documentType, result.assets[0]);
   };
 
   // Most drivers won't already have a digitized photo of their ID sitting
@@ -124,9 +143,9 @@ export default function DocumentsScreen() {
     setPickingSourceFor(null);
     if (!documentType) return;
     if (source === 'camera') {
-      onTakePhoto(documentType);
+      void onTakePhoto(documentType);
     } else {
-      onPickFromLibrary(documentType);
+      void onPickFromLibrary(documentType);
     }
   };
 

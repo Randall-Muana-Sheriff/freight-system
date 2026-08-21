@@ -13,6 +13,7 @@ import { updateOrderStatus, fetchOrderById, confirmDelivery, isNetworkFailure, t
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
 import { isJobInProgress } from '../../../lib/assignments';
 import { useUpNavigation } from '../../../lib/navigation';
+import { captureException } from '../../../lib/crashReporting';
 
 // How often to re-fetch the order while it's actively in progress, so the
 // route-progress bar/ETA below feels alive without needing a socket. Not
@@ -193,33 +194,51 @@ export default function TripDetailScreen() {
   };
 
   const onTakeDeliveryPhoto = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      setToast({ icon: 'camera-outline', message: 'Allow camera access to take a delivery confirmation photo.', tone: 'warning' });
-      return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setToast({ icon: 'camera-outline', message: 'Allow camera access to take a delivery confirmation photo.', tone: 'warning' });
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      await submitDeliveryPhoto(result.assets[0]);
+    } catch (err) {
+      captureException(err, { screen: 'trip', action: 'onTakeDeliveryPhoto' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not open the camera. Try again — the delivery is not confirmed yet.',
+      });
     }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.6, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    await submitDeliveryPhoto(result.assets[0]);
   };
 
   const onPickDeliveryPhotoFromLibrary = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setToast({ icon: 'images-outline', message: 'Allow photo library access to select a proof-of-delivery picture.', tone: 'warning' });
-      return;
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setToast({ icon: 'images-outline', message: 'Allow photo library access to select a proof-of-delivery picture.', tone: 'warning' });
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, allowsEditing: false });
+      if (result.canceled || !result.assets?.[0]) return;
+      await submitDeliveryPhoto(result.assets[0]);
+    } catch (err) {
+      captureException(err, { screen: 'trip', action: 'onPickDeliveryPhotoFromLibrary' });
+      setToast({
+        icon: 'alert-circle-outline',
+        tone: 'error',
+        message: 'Could not open your photo library. Try again — the delivery is not confirmed yet.',
+      });
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, allowsEditing: false });
-    if (result.canceled || !result.assets?.[0]) return;
-    await submitDeliveryPhoto(result.assets[0]);
   };
 
   const onChooseDeliverySource = (source: 'camera' | 'library') => {
     setPickingDeliverySource(false);
     if (source === 'camera') {
-      onTakeDeliveryPhoto();
+      void onTakeDeliveryPhoto();
     } else {
-      onPickDeliveryPhotoFromLibrary();
+      void onPickDeliveryPhotoFromLibrary();
     }
   };
 
