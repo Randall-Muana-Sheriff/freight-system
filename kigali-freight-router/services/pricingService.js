@@ -36,6 +36,26 @@ export class PricingError extends Error {
 
 const round = (value) => Math.round(value);
 
+// Which rate card a job falls under. Neither the public booking form nor the
+// dispatcher's order form asks for a vehicle class -- a customer knows what
+// they are shipping, not what it needs to travel in -- so it is derived from
+// the weight they did give. The top band is open-ended because
+// isValidWeightKg caps an order at 50 tonnes, and everything from 8t to that
+// cap is a Heavy Hauler job.
+export const WEIGHT_CLASS_BANDS = [
+    { maxKg: 1000, vehicleClass: 'Light Van' },
+    { maxKg: 8000, vehicleClass: 'Medium Truck' },
+    { maxKg: Infinity, vehicleClass: 'Heavy Hauler' },
+];
+
+export function classForWeight(weightKg) {
+    const n = Number(weightKg);
+    if (!Number.isFinite(n) || n <= 0) {
+        throw new PricingError(`Cannot choose a vehicle class for weight ${JSON.stringify(weightKg)}.`);
+    }
+    return WEIGHT_CLASS_BANDS.find((band) => n <= band.maxKg).vehicleClass;
+}
+
 function requireFiniteNumber(value, label) {
     const n = Number(value);
     if (!Number.isFinite(n)) throw new PricingError(`${label} must be a finite number, got ${JSON.stringify(value)}`);

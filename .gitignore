@@ -25,3 +25,11 @@ build/
 # but an untracked dump left here makes the tree dirty and push-to-production
 # refuses to deploy, which is a confusing way to discover you took a backup.
 kigali-freight-router/backups/
+
+# Regulator source documents kept for reference while pricing is calibrated.
+# RURA's tariff scans are multi-megabyte images with no text layer and are
+# re-downloadable from rura.rw, so they are not worth carrying in a public
+# repo -- and one of them arrived under two different filenames, which is
+# exactly the sort of thing that ends up committed twice.
+reference/
+*.pdf

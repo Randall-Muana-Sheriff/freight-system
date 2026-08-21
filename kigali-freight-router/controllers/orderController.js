@@ -8,9 +8,12 @@ import { sendPushToUser } from '../services/pushNotificationService.js';
 import { uploadDeliveryPhoto, toSignedUrl } from '../config/r2Client.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
 import { appendAuditLog } from '../services/auditLogService.js';
+import * as Sentry from '@sentry/node';
 import { logError } from '../utils/logger.js';
 import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
+import { priceJob, distanceKmBetween } from '../services/pricingRepository.js';
+import { PricingError } from '../services/pricingService.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
 const ALLOWED_ORDER_PRIORITIES = ['high', 'normal', 'low'];
@@ -269,6 +272,24 @@ export const OrderController = {
             }
             const hub = hubResult.rows[0];
 
+            // A dispatcher-created order has both ends already: pickup from
+            // the hub record above, delivery from the request. So unlike a
+            // public booking this is priced firm on a real distance from the
+            // start, and never carries an estimate.
+            let priced;
+            try {
+                const distanceKm = await distanceKmBetween(
+                    { lat: hub.lat, lng: hub.lng },
+                    { lat: delivery_lat, lng: delivery_lng }
+                );
+                priced = await priceJob({ weightKg: weight_kg, distanceKm });
+            } catch (err) {
+                if (err instanceof PricingError) {
+                    return fail(res, { status: 400, code: 'PRICING_INVALID_INPUT', message: err.message });
+                }
+                throw err;
+            }
+
             const query = `
                 INSERT INTO orders (
                     cargo_description,
@@ -285,7 +306,17 @@ export const OrderController = {
                     pickup_coordinates,
                     delivery_coordinates,
                     pickup_geom,
-                    delivery_geom
+                    delivery_geom,
+                    pricing_rate_id,
+                    priced_vehicle_class,
+                    quoted_total_rwf,
+                    price_total_rwf,
+                    price_fuel_rwf,
+                    price_service_rwf,
+                    platform_fee_rwf,
+                    driver_net_rwf,
+                    price_distance_km,
+                    price_is_estimate
                 )
                 VALUES (
                     $1,
@@ -302,15 +333,20 @@ export const OrderController = {
                     ST_SetSRID(ST_MakePoint($5, $6), 4326),
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
                     ST_SetSRID(ST_MakePoint($5, $6), 4326),
-                    ST_SetSRID(ST_MakePoint($7, $8), 4326)
+                    ST_SetSRID(ST_MakePoint($7, $8), 4326),
+                    $12, $13, $14, $14, $15, $16, $17, $18, $19, FALSE
                 )
-                RETURNING id, cargo_description, status, weight_kg, origin_hub_name, pickup_lng, pickup_lat, delivery_lng, delivery_lat, recipient_name, recipient_phone, priority;
+                RETURNING id, cargo_description, status, weight_kg, origin_hub_name, pickup_lng, pickup_lat, delivery_lng, delivery_lat, recipient_name, recipient_phone, priority,
+                          price_total_rwf, platform_fee_rwf, driver_net_rwf, price_distance_km, priced_vehicle_class, price_is_estimate;
             `;
 
             const result = await pool.query(query, [
                 cargo_description, weight_kg, hub.id, hub.name,
                 hub.lng, hub.lat, delivery_lng, delivery_lat,
-                recipient_name || null, recipient_phone || null, normalizedPriority
+                recipient_name || null, recipient_phone || null, normalizedPriority,
+                priced.pricingRateId, priced.vehicleClass, priced.totalRwf,
+                priced.fuelRwf, priced.serviceRwf, priced.platformFeeRwf,
+                priced.driverNetRwf, priced.distanceKm
             ]);
 
             const newOrder = result.rows[0];
@@ -1101,12 +1137,49 @@ export const OrderController = {
                     origin_hub_name = COALESCE($7, origin_hub_name),
                     updated_at = NOW()
                  WHERE id = $1
-                 RETURNING id, pickup_lat, pickup_lng, delivery_lat, delivery_lng, origin_hub_name;`,
+                 RETURNING id, pickup_lat, pickup_lng, delivery_lat, delivery_lng, origin_hub_name,
+                           weight_kg, quoted_total_rwf;`,
                 [id, pickupLat, pickupLng, deliveryLat, deliveryLng, hub?.id ?? null, hub?.name ?? null]
             );
 
             if (result.rows.length === 0) {
                 return fail(res, { status: 404, code: 'ORDERS_NOT_FOUND', message: 'That order no longer exists.' });
+            }
+
+            // This is the moment an estimate becomes a price. Until now the
+            // order had only two free-text addresses, so it was priced on
+            // class and weight alone; pinning it to the map is the first time
+            // a real distance exists. quoted_total_rwf is deliberately left
+            // alone -- a customer who was shown one number and is charged
+            // another is owed the original, and overwriting it would erase
+            // the only record of what they agreed to.
+            let repriced = null;
+            try {
+                const distanceKm = await distanceKmBetween(
+                    { lat: pickupLat, lng: pickupLng },
+                    { lat: deliveryLat, lng: deliveryLng }
+                );
+                repriced = await priceJob({ weightKg: result.rows[0].weight_kg, distanceKm });
+
+                await pool.query(
+                    `UPDATE orders SET
+                        pricing_rate_id = $2, priced_vehicle_class = $3,
+                        price_total_rwf = $4, price_fuel_rwf = $5, price_service_rwf = $6,
+                        platform_fee_rwf = $7, driver_net_rwf = $8,
+                        price_distance_km = $9, price_is_estimate = FALSE,
+                        updated_at = NOW()
+                      WHERE id = $1`,
+                    [id, repriced.pricingRateId, repriced.vehicleClass, repriced.totalRwf,
+                     repriced.fuelRwf, repriced.serviceRwf, repriced.platformFeeRwf,
+                     repriced.driverNetRwf, repriced.distanceKm]
+                );
+            } catch (err) {
+                // Placing the order on the map is the operation the dispatcher
+                // asked for and it has already succeeded. A pricing failure
+                // must not undo that -- the order stays placed, keeps its
+                // estimate, and is reported so it can be repriced.
+                logError(req, `Repricing order #${id} after placement failed`, err);
+                if (!(err instanceof PricingError)) Sentry.captureException(err, { tags: { orderId: String(id) } });
             }
 
             await appendAuditLog({

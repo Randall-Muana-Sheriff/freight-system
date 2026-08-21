@@ -9,7 +9,7 @@ import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../servi
 import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
 import { quote, PricingError } from '../services/pricingService.js';
-import { currentRateFor, listCurrentRates } from '../services/pricingRepository.js';
+import { currentRateFor, listCurrentRates, priceJob } from '../services/pricingRepository.js';
 import { normalizePhone } from '../utils/phone.js';
 import { isValidWeightKg } from '../utils/validators.js';
 import { toSignedUrl } from '../config/r2Client.js';
@@ -143,6 +143,26 @@ export const PublicOrderController = {
             // The UNIQUE index is the real guarantee; retrying just avoids
             // failing a customer's booking on a collision that is
             // astronomically unlikely but cheap to absorb.
+            // Priced before the insert so a pricing failure refuses the
+            // booking rather than storing an order nobody can be billed for.
+            // A public booking has no coordinates -- only the two addresses
+            // above, as free text -- so this is the estimate case: class and
+            // weight only, no distance, flagged price_is_estimate. It becomes
+            // a firm price when a dispatcher places the order.
+            let priced;
+            try {
+                priced = await priceJob({ weightKg, distanceKm: null });
+            } catch (err) {
+                if (err instanceof PricingError) {
+                    return fail(res, {
+                        status: 400,
+                        code: 'PRICING_INVALID_INPUT',
+                        message: 'We could not price that job. Check the weight and try again.',
+                    });
+                }
+                throw err;
+            }
+
             let created = null;
             for (let attempt = 0; attempt < 5 && !created; attempt++) {
                 try {
@@ -151,11 +171,18 @@ export const PublicOrderController = {
                             (cargo_description, weight_kg, status, source, tracking_token,
                              customer_name, customer_phone, customer_email,
                              pickup_address_text, delivery_address_text, special_instructions,
-                             needed_by)
-                         VALUES ($1, $2, 'PENDING', 'public', $3, $4, $5, $6, $7, $8, $9, $10)
+                             needed_by,
+                             pricing_rate_id, priced_vehicle_class, quoted_total_rwf,
+                             price_total_rwf, price_fuel_rwf, price_service_rwf,
+                             platform_fee_rwf, driver_net_rwf, price_distance_km, price_is_estimate)
+                         VALUES ($1, $2, 'PENDING', 'public', $3, $4, $5, $6, $7, $8, $9, $10,
+                                 $11, $12, $13, $13, $14, $15, $16, $17, $18, $19)
                          RETURNING tracking_token AS "trackingToken"`,
                         [cargoType, weightKg, generateTrackingToken(), customerName, customerPhone,
-                         customerEmail, pickup, delivery, instructions, neededBy]
+                         customerEmail, pickup, delivery, instructions, neededBy,
+                         priced.pricingRateId, priced.vehicleClass, priced.totalRwf,
+                         priced.fuelRwf, priced.serviceRwf, priced.platformFeeRwf,
+                         priced.driverNetRwf, priced.distanceKm, priced.isEstimate]
                     );
                     created = result.rows[0];
                 } catch (err) {
