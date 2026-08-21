@@ -39,6 +39,21 @@ function toLegacyItems(results) {
     return Object.fromEntries(Object.entries(results || {}).map(([key, value]) => [key, value === 'pass']));
 }
 
+// Rows written before the tri-state existed hold real booleans in the same
+// JSONB column, and there is no migration that can fix them — a stored
+// `true` means the driver ticked it, which is 'pass', but a stored `false`
+// is genuinely ambiguous and the only honest reading is 'unchecked'.
+//
+// Normalising on read rather than rewriting the rows: the old values are a
+// faithful record of what was known at the time, and a backfill would be
+// inventing a distinction those drivers were never offered.
+function toResults(stored) {
+    return Object.fromEntries(Object.entries(stored || {}).map(([key, value]) => {
+        if (value === 'pass' || value === 'fail' || value === 'unchecked') return [key, value];
+        return [key, value === true ? 'pass' : 'unchecked'];
+    }));
+}
+
 export const SafetyChecklistController = {
     // GET /api/driver-safety-checklist/today - never auto-creates a row;
     // a driver who hasn't touched anything today just gets everything
@@ -51,7 +66,7 @@ export const SafetyChecklistController = {
                  WHERE driver_username = $1 AND checklist_date = CURRENT_DATE;`,
                 [username]
             );
-            const results = result.rows[0]?.items || {};
+            const results = toResults(result.rows[0]?.items);
             return ok(res, { items: toLegacyItems(results), results });
         } catch (error) {
             return fail(res, {
@@ -176,7 +191,7 @@ export const SafetyChecklistController = {
                 ).catch(() => {});
             }
 
-            const results = result.rows[0].items;
+            const results = toResults(result.rows[0].items);
             return ok(res, { items: toLegacyItems(results), results, defectId });
         } catch (error) {
             return fail(res, {

@@ -531,6 +531,32 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(legacy.body.data.defectId, null);
     });
 
+    // Rows written before the tri-state existed hold real booleans in the
+    // same JSONB column. Production had exactly this on deploy: `results`
+    // came back full of true/false, so `results[key] === 'pass'` was false
+    // for an item the driver had genuinely ticked, and the app would have
+    // shown a completed check as outstanding. There is no migration that
+    // fixes it honestly — a stored `false` is ambiguous, and the only
+    // truthful reading is 'unchecked' — so it is normalised on read.
+    test('a checklist row written as booleans still reads as a tri-state', async () => {
+        await pool.query(
+            `INSERT INTO driver_safety_checklists (driver_username, checklist_date, items)
+             VALUES ($1, CURRENT_DATE, '{"seatbelt": true, "tyres": false}'::jsonb)
+             ON CONFLICT (driver_username, checklist_date)
+             DO UPDATE SET items = '{"seatbelt": true, "tyres": false}'::jsonb`,
+            [driverPhone]
+        );
+
+        const read = await request(app)
+            .get('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`);
+
+        assert.equal(read.body.data.results.seatbelt, 'pass', 'a stored true is a pass');
+        assert.equal(read.body.data.results.tyres, 'unchecked', 'a stored false is ambiguous, so unchecked');
+        assert.equal(read.body.data.items.seatbelt, true);
+        assert.equal(read.body.data.items.tyres, false);
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.
