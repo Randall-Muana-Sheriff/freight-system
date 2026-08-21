@@ -565,6 +565,49 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         socket.disconnect();
     });
 
+    // The speed attached to every fix used to be
+    // Math.floor(Math.random() * 46) + 40 — the app always sent a real,
+    // noise-filtered speedKmh and the server threw it away and invented a
+    // number between 40 and 85. That value went to the live map and was
+    // compared against geofence speed limits, so a driver could be recorded
+    // speeding because of a dice roll.
+    //
+    // Two things have to hold, and the second is the one that regressed
+    // invisibly for months: a reported speed is stored exactly, and an
+    // unreported one is stored as NULL rather than as something plausible.
+    test('telemetry records the speed reported, and NULL when none was', async () => {
+        const socket = socketClient(`http://127.0.0.1:${socketPort}`, {
+            auth: { token: `Bearer ${driverToken}` },
+            transports: ['websocket'],
+        });
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Socket connection timed out.')), 7000);
+            socket.on('connect', () => { clearTimeout(timeout); resolve(); });
+            socket.on('connect_error', (err) => { clearTimeout(timeout); reject(err); });
+        });
+
+        const before = await pool.query(
+            'SELECT COALESCE(MAX(id), 0) AS max_id FROM driver_location_history WHERE driver_name = $1',
+            [driverPhone]
+        );
+        const sinceId = before.rows[0].max_id;
+
+        socket.emit('driver:telemetry-push', { lat: -1.9502, lng: 30.0802, speedKmh: 41 });
+        await delay(600);
+        socket.emit('driver:telemetry-push', { lat: -1.9503, lng: 30.0803 });
+        await delay(900);
+
+        const rows = await pool.query(
+            'SELECT speed_kmh FROM driver_location_history WHERE driver_name = $1 AND id > $2 ORDER BY id ASC',
+            [driverPhone, sinceId]
+        );
+        assert.equal(rows.rows.length, 2, 'expected both fixes to be persisted');
+        assert.equal(Number(rows.rows[0].speed_kmh), 41, 'a reported speed must be stored exactly');
+        assert.equal(rows.rows[1].speed_kmh, null, 'an unreported speed must be NULL, never substituted');
+
+        socket.disconnect();
+    });
+
     test('telemetry queue exposes live metric counters after ingestion', async () => {
         // A driver token, same reasoning as the previous test — a
         // dispatcher-role socket's telemetry-push is silently dropped

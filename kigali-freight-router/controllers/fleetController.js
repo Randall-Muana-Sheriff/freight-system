@@ -40,12 +40,17 @@ export const FleetController = {
             });
         }
 
-        // Real GPS speed from the device (expo-location provides coords.speed
-        // in m/s) is more accurate than a simulated value — use it when the
-        // client supplies it, converting m/s to km/h.
+        // Real GPS speed from the device, or null. The client already
+        // converts m/s to km/h and applies a stationary deadband, so what
+        // arrives is usable as-is.
+        //
+        // The fallback here used to be Math.floor(Math.random() * 46) + 40.
+        // A driver whose phone reported no speed for a fix was assigned a
+        // plausible-looking invention, which then fed the live map and the
+        // geofence speed check. Unknown is a fact worth keeping.
         const currentVelocityKmh = typeof speedKmh === 'number' && Number.isFinite(speedKmh) && speedKmh >= 0
             ? Math.round(speedKmh)
-            : Math.floor(Math.random() * (85 - 40 + 1)) + 40;
+            : null;
 
         try {
             await telemetryQueue.enqueue({

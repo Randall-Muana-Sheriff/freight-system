@@ -270,7 +270,17 @@ io.on('connection', async (socket) => {
       : socket.user.username;
     const { lat, lng } = data;
     const timestamp = new Date().toISOString();
-    const currentVelocityKmh = Math.floor(Math.random() * (85 - 40 + 1)) + 40;
+    // The speed the client actually reported, or null. This was
+    // Math.floor(Math.random() * 46) + 40 — an invented value between 40 and
+    // 85 km/h, written to the live map and then compared against geofence
+    // speed limits, so a driver could be recorded speeding because of a
+    // random number. Nothing may substitute for a missing measurement here;
+    // an unknown speed stays unknown all the way through.
+    const currentVelocityKmh = typeof data.speedKmh === 'number'
+        && Number.isFinite(data.speedKmh)
+        && data.speedKmh >= 0
+        ? Math.round(data.speedKmh)
+        : null;
     try {
       await telemetryQueue.enqueue({ driverName, lat, lng, timestamp, currentVelocityKmh });
     } catch (dbErr) {

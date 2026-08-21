@@ -109,9 +109,9 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
         // for any later audit/dispute — filtering noise out at write time
         // would be throwing away the very data a smoothing algorithm needs.
         await pool.query(
-            `INSERT INTO driver_location_history (driver_name, lat, lng, geom, recorded_at)
-             VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), NOW())`,
-            [driverName, lat, lng]
+            `INSERT INTO driver_location_history (driver_name, lat, lng, geom, speed_kmh, recorded_at)
+             VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($3, $2), 4326), $4, NOW())`,
+            [driverName, lat, lng, currentVelocityKmh]
         );
 
         // "Current position" (driver_locations) is what the live map, ETA
@@ -159,7 +159,13 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
 
         if (activeZone) {
             const speedThreshold = activeZone.speedLimitKmh;
-            const isSpeeding = currentVelocityKmh > speedThreshold;
+            // A null speed is not a slow one. `null > 30` is false in JS, so
+            // an unmeasured fix falls through to BOUNDARY_BREACH — correct,
+            // but by accident rather than decision, and the accident only
+            // held while speed was never null. Stated explicitly now that it
+            // can be.
+            const speedKnown = typeof currentVelocityKmh === 'number';
+            const isSpeeding = speedKnown && currentVelocityKmh > speedThreshold;
             const violationType = isSpeeding ? 'SPEED_VIOLATION' : 'BOUNDARY_BREACH';
             const description = isSpeeding
                 ? `Speed limit breach inside [${activeZone.name}]. Value: ${currentVelocityKmh} km/h (Limit: ${speedThreshold} km/h)`
