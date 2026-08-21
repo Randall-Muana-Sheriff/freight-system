@@ -486,16 +486,51 @@ export async function fetchMyDocuments(token: string) {
 
 export type SafetyChecklistItems = Record<string, boolean>;
 
+// Three states, because two could not describe a fault. 'unchecked' is not
+// "fine", it is "nobody has looked yet" — the distinction the boolean could
+// not carry, and the reason a driver who found a bad tyre previously had to
+// either lie or stay silent.
+export type SafetyCheckResult = 'pass' | 'fail' | 'unchecked';
+export type SafetyChecklistResults = Record<string, SafetyCheckResult>;
+
+// The server returns both shapes on purpose: `items` is the old boolean map
+// an installed build still reads, `results` is the tri-state. See
+// safetyChecklistController.js.
+export type SafetyChecklistResponse = {
+  items: SafetyChecklistItems;
+  results: SafetyChecklistResults;
+  defectId?: number | null;
+};
+
+export type VehicleDefect = {
+  id: number;
+  description: string;
+  created_at: string;
+  driver_name: string;
+};
+
 export async function fetchTodaySafetyChecklist(token: string) {
-  return (await apiFetch('/api/driver-safety-checklist/today', { token })) as { items: SafetyChecklistItems };
+  return (await apiFetch('/api/driver-safety-checklist/today', { token })) as SafetyChecklistResponse;
 }
 
-export async function updateSafetyChecklistItem(token: string, itemKey: string, checked: boolean) {
+export async function updateSafetyChecklistItem(
+  token: string,
+  itemKey: string,
+  result: SafetyCheckResult,
+  note?: string,
+) {
   return (await apiFetch('/api/driver-safety-checklist/today', {
     method: 'PATCH',
     token,
-    body: { itemKey, checked },
-  })) as { items: SafetyChecklistItems };
+    body: { itemKey, result, ...(note ? { note } : {}) },
+  })) as SafetyChecklistResponse;
+}
+
+// What is already wrong with the truck this driver is about to take. The
+// whole reason a defect attaches to a vehicle rather than to the driver who
+// found it: the next person to walk up to it needs to know.
+export async function fetchOpenVehicleDefects(token: string) {
+  return (await apiFetch('/api/driver-safety-checklist/vehicle-defects', { token })) as { defects: VehicleDefect[] };
 }
 
 // Separate from apiFetch deliberately, same as confirmDelivery — a

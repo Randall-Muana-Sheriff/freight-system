@@ -19,6 +19,7 @@ const checklistWriteLimit = rateLimit({
 });
 
 router.get('/today', authMiddleware(['driver']), SafetyChecklistController.getTodayChecklist);
+router.get('/vehicle-defects', authMiddleware(['driver']), SafetyChecklistController.getOpenVehicleDefects);
 router.patch('/today', authMiddleware(['driver']), checklistWriteLimit, SafetyChecklistController.updateChecklistItem);
 
 export default router;

@@ -62,6 +62,39 @@ export const SafetyChecklistController = {
         }
     },
 
+    // GET /api/driver-safety-checklist/vehicle-defects — what is already
+    // open against the truck this driver is on.
+    //
+    // This is the point of attaching a defect to a vehicle rather than to
+    // the driver who found it. A fault reported at the end of yesterday's
+    // shift is only useful if the next person to walk up to that truck sees
+    // it before they set off.
+    getOpenVehicleDefects: async (req, res) => {
+        try {
+            const username = req.user?.username;
+            const result = await pool.query(
+                `SELECT ga.id, ga.description, ga.created_at, ga.driver_name
+                   FROM geofence_alerts ga
+                   JOIN fleet_vehicles fv ON fv.id = ga.vehicle_id
+                   JOIN users u ON u.id = fv.current_driver_id
+                  WHERE u.username = $1
+                    AND fv.status = 'ACTIVE'
+                    AND ga.event_type = 'VEHICLE_DEFECT'
+                    AND ga.status = 'OPEN'
+                  ORDER BY ga.created_at DESC
+                  LIMIT 20;`,
+                [username]
+            );
+            return ok(res, { defects: result.rows });
+        } catch (error) {
+            return fail(res, {
+                status: 500,
+                code: 'VEHICLE_DEFECTS_FETCH_FAILED',
+                message: errorMessage(error, 'Failed to load open defects for this vehicle.'),
+            });
+        }
+    },
+
     // PATCH /api/driver-safety-checklist/today - toggles one item at a
     // time. The jsonb `||` merge only touches the one key being sent, so
     // two rapid taps on different items can never clobber each other the
