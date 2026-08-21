@@ -3,6 +3,7 @@ import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } 
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { ToastOverlay, type Toast } from '../../components/ToastOverlay';
@@ -139,12 +140,34 @@ const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 // without the card swallowing the screen. The rest are one tap away.
 const HISTORY_PREVIEW = 3;
 
+// Android's own "tap Build number seven times" convention, reused so the
+// gesture is one a technical tester is likely to already try.
+const DIAGNOSTIC_TAP_TARGET = 7;
+
 export default function ProfileScreen() {
   const { token, pendingSyncCount, isOffline, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [sendingPing, setSendingPing] = useState(false);
   const [pingToast, setPingToast] = useState<Toast | null>(null);
+  const [versionTaps, setVersionTaps] = useState(0);
+  const diagnosticsShown = versionTaps >= DIAGNOSTIC_TAP_TARGET;
+  // expoConfig is the manifest actually running, so after an OTA this is the
+  // version that update was built from. The runtimeVersion policy is
+  // 'appVersion', so an update can only ever land on a binary of the same
+  // version -- the two cannot disagree.
+  const appVersion = Constants.expoConfig?.version ?? 'unknown';
+
+  // Counted outside the updater: a state updater has to be pure, and firing
+  // the toast from inside one would show it twice under StrictMode's
+  // double-invoke.
+  const onVersionTap = useCallback(() => {
+    const next = versionTaps + 1;
+    setVersionTaps(next);
+    if (next === DIAGNOSTIC_TAP_TARGET) {
+      setPingToast({ icon: 'construct-outline', message: 'Build diagnostics shown.', tone: 'info' });
+    }
+  }, [versionTaps]);
   const [togglingBiometric, setTogglingBiometric] = useState(false);
   const biometrics = useBiometricSupport();
 
@@ -560,12 +583,31 @@ export default function ProfileScreen() {
         <Text style={styles.logoutText}>Sign out</Text>
       </TouchableOpacity>
 
+      {/* The one line here meant for a driver. Worth showing because it is
+          the first thing dispatch asks when something looks wrong on one
+          phone and not another, and a driver can read it out. */}
+      <TouchableOpacity
+        onPress={onVersionTap}
+        activeOpacity={1}
+        accessibilityRole="button"
+        accessibilityLabel={`Inzira Driver version ${appVersion}. Tap repeatedly to show build diagnostics.`}
+      >
+        <Text style={styles.versionLine}>Inzira Driver {appVersion}</Text>
+      </TouchableOpacity>
+
       {/* Embedded/OTA build diagnostics only mean anything for a real
           preview/production build with an actual update channel — a
           dev-client build loads JS straight from Metro, so isEmbeddedLaunch/
           updateId/channel and "check & install update" are all meaningless
-          (or actively confusing) noise here. */}
-      {!__DEV__ && (
+          (or actively confusing) noise here.
+          
+          They are also meaningless to a driver, which is what this gesture is
+          really about: an update id and "none pending (unknown reason)" read
+          as a fault report to someone who just wants to start a shift, and
+          "check & install update now" invites a bundle download over a
+          metered connection for a benefit they cannot perceive. Testers who
+          need to know whether an OTA landed can still tap their way in. */}
+      {!__DEV__ && diagnosticsShown && (
         <>
           <Text style={styles.diagnosticFooter}>
             {Updates.isEmbeddedLaunch ? 'embedded build' : 'ota update'} · {Updates.updateId ? Updates.updateId.slice(0, 8) : 'no update id'} · channel: {Updates.channel ?? 'n/a'} · runtime: {Updates.runtimeVersion ?? 'n/a'}
@@ -736,6 +778,13 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   logoutText: { color: theme.colors.danger, ...theme.type.body, fontFamily: theme.fonts.bodySemiBold },
+  versionLine: {
+    color: theme.colors.muted,
+    ...theme.type.micro,
+    textAlign: 'center',
+    marginTop: 18,
+    opacity: 0.7,
+  },
   diagnosticFooter: {
     color: theme.colors.muted,
     // No lineHeight override here — the scale pairs 11/15 deliberately,
