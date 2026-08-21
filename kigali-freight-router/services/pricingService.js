@@ -87,8 +87,20 @@ export function quote(rate, { weightKg, distanceKm = null }) {
     // quote a customer a number no journey can be done for, so an estimate
     // charges the distance-independent parts only and is flagged as such.
     const isEstimate = distanceKm === null || distanceKm === undefined;
-    const distance = isEstimate ? 0 : requireFiniteNumber(distanceKm, 'distanceKm');
-    if (distance < 0) throw new PricingError('distanceKm cannot be negative.');
+    const measured = isEstimate ? 0 : requireFiniteNumber(distanceKm, 'distanceKm');
+    if (measured < 0) throw new PricingError('distanceKm cannot be negative.');
+
+    // What arrives here is straight-line distance -- ST_DistanceSphere between
+    // two points -- and no vehicle travels in a straight line. Kigali's hills
+    // and one-ways made one measured route 1.67x its crow's flight, so pricing
+    // on the raw figure charged for about 40% less road than the driver
+    // actually covers, in the per-km line and in the fuel alike. Both are
+    // charged on the corrected distance because the driver drives all of it.
+    const roadFactor = rate.road_distance_factor === undefined || rate.road_distance_factor === null
+        ? 1
+        : requireFiniteNumber(rate.road_distance_factor, 'road_distance_factor');
+    if (roadFactor <= 0) throw new PricingError('road_distance_factor must be positive.');
+    const distance = measured * roadFactor;
 
     const fuel = (distance / 100) * litresPer100 * dieselPrice;
     const service = baseFare + distance * perKm + weight * perKg;
@@ -110,6 +122,9 @@ export function quote(rate, { weightKg, distanceKm = null }) {
         vehicleClass: rate.vehicle_class,
         pricingRateId: rate.id ?? null,
         isEstimate,
+        // The corrected distance, because that is what was charged for. The
+        // straight-line figure it came from is not kept: it is an artefact of
+        // how the two points were measured, not a fact about the journey.
         distanceKm: isEstimate ? null : Number(distance.toFixed(3)),
         weightKg: weight,
         fuelRwf: round(fuel),
