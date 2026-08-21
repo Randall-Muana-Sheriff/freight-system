@@ -14,6 +14,8 @@ import type {
     SavedRoute,
     Geofence,
     KioskDevice,
+    ReturnLoadCandidate,
+    RateCard,
 } from '../types';
 
 export const API_BASE = getApiBase();
@@ -203,6 +205,31 @@ export async function setOrderPriority(orderId: number, priority: 'high' | 'norm
 
 export async function fetchNearestDrivers(orderId: number, token: string): Promise<{ recommendedDrivers?: DriverSuggestion[] }> {
     return apiFetch(`/api/orders/${orderId}/nearest-drivers`, { method: 'GET', token }) as Promise<{ recommendedDrivers?: DriverSuggestion[] }>;
+}
+
+// What could ride home on this order. Only meaningful for a delivery outside
+// Kigali: those are the ones charged for driving back empty, and the ones
+// where pairing takes that charge off both bills.
+export async function fetchReturnLoads(orderId: number, token: string): Promise<{ candidates: ReturnLoadCandidate[] }> {
+    return apiFetch(`/api/orders/${orderId}/return-loads`, { method: 'GET', token }) as Promise<{ candidates: ReturnLoadCandidate[] }>;
+}
+
+export async function fetchRateCards(token: string): Promise<{ rates: RateCard[] }> {
+    return apiFetch('/api/pricing/rates', { method: 'GET', token }) as Promise<{ rates: RateCard[] }>;
+}
+
+// Supersedes rather than edits: the server writes a new row, so a quote
+// already given stays explainable and a commission already taken is never
+// silently restated. Only the fields actually changed need sending.
+export async function saveRateCard(
+    vehicleClass: string,
+    changes: Record<string, number>,
+    note: string,
+    token: string,
+): Promise<{ rate: RateCard }> {
+    return apiFetch('/api/pricing/rates', {
+        method: 'POST', token, body: { vehicleClass, note, ...changes },
+    }) as Promise<{ rate: RateCard }>;
 }
 
 export async function fetchIncidents(token: string): Promise<Incident[]> {

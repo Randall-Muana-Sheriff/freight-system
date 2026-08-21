@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Send, Navigation, MapPin } from 'lucide-react';
-import { assignOrders, fetchNearestDrivers, placeOrderOnMap, setOrderPriority } from '../../utils/api';
+import { Send, Navigation, MapPin, CornerUpLeft } from 'lucide-react';
+import { assignOrders, fetchNearestDrivers, fetchReturnLoads, placeOrderOnMap, setOrderPriority } from '../../utils/api';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
-import { describeDriverChecks, type Order, type StaffUser, type DriverSuggestion } from '../../types';
+import { describeDriverChecks, type Order, type StaffUser, type DriverSuggestion, type ReturnLoadCandidate } from '../../types';
 import { useDialog } from '../DialogProvider';
 
 interface OrderRowProps {
@@ -45,6 +45,25 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
     const [suggestions, setSuggestions] = useState<DriverSuggestion[] | null>(null);
     const [assigning, setAssigning] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
+    const [returnLoads, setReturnLoads] = useState<ReturnLoadCandidate[] | null>(null);
+    const [findingReturn, setFindingReturn] = useState(false);
+
+    // Only a job that leaves the city is charged for driving home empty, so
+    // only those have anything to pair. Matches the 25km the rate card uses
+    // to decide the charge in the first place.
+    const runsHomeEmpty = Number(order.price_distance_km ?? 0) > 25;
+
+    const handleFindReturn = async () => {
+        setFindingReturn(true);
+        try {
+            const data = await fetchReturnLoads(order.id, jwtToken);
+            setReturnLoads(data.candidates || []);
+        } catch {
+            setReturnLoads([]);
+        } finally {
+            setFindingReturn(false);
+        }
+    };
 
     const handleSuggest = async () => {
         setSuggesting(true);
@@ -258,6 +277,20 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                     ) : null}
                 </div>
             ) : null}
+            {returnLoads ? (
+                <div className="text-micro font-mono">
+                    {returnLoads.length === 0 ? (
+                        <span className="text-carbon">Nothing to collect near the drop — this one runs home empty.</span>
+                    ) : (
+                        <span className="text-signal">
+                            Return load:{' '}
+                            {returnLoads
+                                .map((c) => `#${c.orderId} ${c.cargo} (${c.collectKmFromDrop}km from the drop)`)
+                                .join(' · ')}
+                        </span>
+                    )}
+                </div>
+            ) : null}
             {suggestions ? (
                 <div className="text-micro text-carbon font-mono">
                     {suggestions.length === 0
@@ -295,6 +328,21 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                 >
                     <Navigation size={11} strokeWidth={2.5} />
                 </button>
+                {/* Only offered on a job that runs home empty, because only
+                    those carry the charge a pairing takes back off. Putting it
+                    on every row would make it noise on the city work that is
+                    most of the board. */}
+                {runsHomeEmpty ? (
+                    <button
+                        type="button"
+                        onClick={() => void handleFindReturn()}
+                        disabled={findingReturn}
+                        title="Find a load to fill the empty run home"
+                        className="shrink-0 flex items-center justify-center bg-panel border border-line/15 text-carbon rounded px-2 disabled:opacity-50"
+                    >
+                        <CornerUpLeft size={11} strokeWidth={2.5} />
+                    </button>
+                ) : null}
                 <button
                     type="button"
                     onClick={() => void handleAssign()}

@@ -54,6 +54,7 @@ import driverDocumentRoutes from './routes/driverDocumentRoutes.js';
 import safetyChecklistRoutes from './routes/safetyChecklistRoutes.js';
 import geocodeRoutes from './routes/geocodeRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
+import pricingRoutes from './routes/pricingRoutes.js';
 
 const app = express();
 const allowedOrigins = appConfig.corsOrigins;
@@ -142,6 +143,7 @@ app.use('/api/driver-documents', driverDocumentRoutes);
 app.use('/api/driver-safety-checklist', safetyChecklistRoutes);
 app.use('/api/geocode', geocodeRoutes);
 app.use('/api/sms', smsRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 // Anything that reaches here escaped every controller's own try/catch —
 // a malformed JSON body, a multer error thrown before a route handler

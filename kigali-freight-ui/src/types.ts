@@ -145,6 +145,46 @@ export interface DriverSuggestion {
     distanceFromPickupKm: number;
 }
 
+// A job that could ride home on another one's empty return leg. Same shape
+// of question as DriverSuggestion -- what could fill a gap this order leaves.
+export interface ReturnLoadCandidate {
+    orderId: number;
+    cargo: string;
+    weightKg: number;
+    status: string;
+    neededBy: string | null;
+    /** How far this job collects from where the other one drops. The whole
+     *  point: close enough and the drive home is loaded rather than empty. */
+    collectKmFromDrop: number;
+    deliverKmFromOrigin: number;
+}
+
+// A row of the rate card. Every figure a job is priced from, and the only
+// place a price changes without a deploy. Numeric columns arrive from pg as
+// strings, hence the union — the panel coerces on read.
+export interface RateCard {
+    id: number;
+    vehicle_class: string;
+    base_fare_rwf: string | number;
+    per_km_rwf: string | number;
+    per_km_long_rwf: string | number | null;
+    per_kg_rwf: string | number;
+    minimum_fare_rwf: string | number;
+    fuel_litres_per_100km: string | number;
+    diesel_price_rwf_per_litre: string | number;
+    road_distance_factor: string | number;
+    taper_after_km: string | number;
+    return_leg_beyond_km: string | number;
+    return_leg_share_pct: string | number;
+    terrain_fuel_factor: string | number;
+    platform_commission_pct: string | number;
+    platform_minimum_fee_rwf: string | number;
+    detention_free_minutes: number;
+    detention_per_hour_rwf: string | number | null;
+    effective_from: string;
+    note: string | null;
+}
+
 export interface OrderBatch {
     batch_id: string;
     origin_cluster: string;
