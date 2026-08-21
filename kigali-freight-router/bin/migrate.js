@@ -52,6 +52,7 @@ const MIGRATIONS = [
     // the vehicle it describes.
     { id: 'add_document_expiry_and_vehicle_documents.sql', destructive: false },
     { id: 'add_telemetry_speed.sql', destructive: false },
+    { id: 'add_vehicle_defects.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

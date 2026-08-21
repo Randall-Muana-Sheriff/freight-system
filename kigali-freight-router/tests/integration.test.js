@@ -472,6 +472,65 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(bogus.statusCode, 400, JSON.stringify(bogus.body));
     });
 
+    // The checklist used to take a boolean, so a driver who looked at the
+    // tyres and found them bad could only tick (a lie) or leave it blank
+    // (indistinguishable from not having looked). A failure now raises a
+    // defect against the vehicle, which is the part the popular fleet
+    // platforms actually get from their equivalent — the ticks were never
+    // the point.
+    test('a failed check raises an open defect against the vehicle', async () => {
+        const failed = await request(app)
+            .patch('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ itemKey: 'tyres', result: 'fail', note: 'cord showing on nearside rear' });
+        assert.equal(failed.statusCode, 200, JSON.stringify(failed.body));
+        assert.equal(failed.body.data.results.tyres, 'fail');
+        assert.ok(failed.body.data.defectId, 'a failure must produce a defect id');
+
+        const defect = await pool.query(
+            `SELECT event_type, status, description FROM geofence_alerts WHERE id = $1`,
+            [failed.body.data.defectId]
+        );
+        assert.equal(defect.rows[0].event_type, 'VEHICLE_DEFECT');
+        assert.equal(defect.rows[0].status, 'OPEN');
+        assert.match(defect.rows[0].description, /cord showing on nearside rear/);
+
+        // A pass is not a defect.
+        const passed = await request(app)
+            .patch('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ itemKey: 'seatbelt', result: 'pass' });
+        assert.equal(passed.body.data.defectId, null);
+    });
+
+    // The compatibility case, and the reason it exists: storing the
+    // tri-state alone would have broken installed app builds quietly rather
+    // than loudly. 'unchecked' is a non-empty string, so `if (items[key])`
+    // is true for it, and an older client would have drawn an unchecked item
+    // as ticked — a checklist lying in the direction that matters.
+    test('an installed app build still reads booleans, and unchecked is false', async () => {
+        await request(app)
+            .patch('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ itemKey: 'cargo', result: 'unchecked' });
+
+        const read = await request(app)
+            .get('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`);
+
+        assert.equal(read.body.data.items.cargo, false, 'unchecked must not read as ticked');
+        assert.equal(read.body.data.results.cargo, 'unchecked');
+        assert.equal(read.body.data.items.seatbelt, true, 'a pass must still read as ticked');
+
+        // And the old boolean input shape must never raise a defect.
+        const legacy = await request(app)
+            .patch('/api/driver-safety-checklist/today')
+            .set('Authorization', `Bearer ${driverToken}`)
+            .send({ itemKey: 'fatigue', checked: false });
+        assert.equal(legacy.body.data.results.fatigue, 'unchecked');
+        assert.equal(legacy.body.data.defectId, null);
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.
