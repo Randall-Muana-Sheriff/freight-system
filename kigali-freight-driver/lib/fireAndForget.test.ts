@@ -1,3 +1,7 @@
+// Globals imported explicitly, matching offlineQueue.test.ts — this project's
+// tsconfig includes test files and does not pull in @types/jest, so the
+// ambient forms do not typecheck.
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { fireAndForget } from './fireAndForget';
 import { captureException } from './crashReporting';
 
@@ -5,7 +9,7 @@ jest.mock('./crashReporting', () => ({
     captureException: jest.fn(),
 }));
 
-const mockCapture = captureException as jest.MockedFunction<typeof captureException>;
+const mockCapture = jest.mocked(captureException);
 
 describe('fireAndForget', () => {
     beforeEach(() => {
