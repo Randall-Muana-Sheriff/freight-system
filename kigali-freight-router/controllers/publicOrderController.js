@@ -227,7 +227,8 @@ export const PublicOrderController = {
                 `SELECT o.id, o.tracking_token AS "trackingToken", o.cargo_description AS "cargo",
                         o.status, o.created_at AS "createdAt", o.updated_at AS "updatedAt",
                         o.pickup_address_text AS "pickupText", o.delivery_address_text AS "deliveryText",
-                        o.origin_hub_name AS "originHub", u.full_name AS "driverName"
+                        o.origin_hub_name AS "originHub", u.full_name AS "driverName",
+                        o.price_total_rwf AS "priceRwf", o.price_is_estimate AS "priceIsEstimate"
                    FROM orders o
                    LEFT JOIN users u ON u.username = o.assigned_to
                   WHERE o.tracking_token = $1`,
@@ -300,6 +301,19 @@ export const PublicOrderController = {
                 pickup: order.pickupText || order.originHub,
                 delivery: order.deliveryText,
                 driverFirstName: order.driverName ? String(order.driverName).split(' ')[0] : null,
+                // The total and nothing else. platform_fee_rwf and
+                // driver_net_rwf are deliberately not selected above, for the
+                // same reason distance_from_target_m is not: what the
+                // platform keeps and what the driver is paid are the
+                // commercial terms between this business and its drivers, not
+                // information about the customer's parcel. A customer who can
+                // see the split can negotiate against it or take it straight
+                // to the driver, and neither is a conversation this screen
+                // should start.
+                priceRwf: order.priceRwf === null ? null : Number(order.priceRwf),
+                // An estimate has not had a distance applied yet, so the site
+                // must say so rather than presenting it as a settled price.
+                priceIsEstimate: order.priceIsEstimate,
                 placedAt: order.createdAt,
                 updatedAt: order.updatedAt,
                 timeline: history.rows,

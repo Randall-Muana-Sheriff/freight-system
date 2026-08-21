@@ -33,6 +33,21 @@ async function incrementCounter(key, windowMs) {
     return { count: bucket.count, ttlMs: bucket.resetAt - now };
 }
 
+// Clears the single-instance fallback store. Exists for the integration
+// suite, which runs with REDIS_URL unset and so exercises exactly this
+// store -- its own reset helper only knew how to clear Redis keys, so it
+// silently did nothing and left tests failing on a limit a previous test in
+// the same run had already consumed.
+export function resetMemoryRateLimits(prefix = null) {
+    if (!prefix) {
+        memoryBuckets.clear();
+        return;
+    }
+    for (const key of memoryBuckets.keys()) {
+        if (key.startsWith(`ratelimit:${prefix}:`)) memoryBuckets.delete(key);
+    }
+}
+
 export function rateLimit({
     windowMs = 15 * 60 * 1000,
     max = 20,

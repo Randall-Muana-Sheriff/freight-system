@@ -7,6 +7,7 @@ import { io as socketClient } from 'socket.io-client';
 
 import pool from '../config/db.js';
 import { getRedisClient, isRedisEnabled } from '../config/redisClient.js';
+import { resetMemoryRateLimits } from '../middleware/rateLimit.js';
 import { app, server, startServer, shutdownServices } from '../server.js';
 import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 
@@ -799,11 +800,22 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
     // this suite inside the hour would get 429s where it expects 201s and
     // 400s. Clearing the counters keeps the production limit honest rather
     // than loosening it for tests.
+    // Clears whichever store the limiter is actually using. The Redis branch
+    // is not the common one here: this suite runs with REDIS_URL unset (see
+    // config/redisClient.js), so the limiter falls back to its in-memory map
+    // and every call to this helper used to return at the first line and do
+    // nothing at all. Two tests failed on that -- the suite makes twelve
+    // public bookings against a max of ten an hour, and the resets that were
+    // supposed to keep them apart were silently no-ops.
     async function resetPublicRateLimits() {
+        const prefixes = ['public-order', 'public-contact', 'public-track'];
+
+        for (const prefix of prefixes) resetMemoryRateLimits(prefix);
+
         if (!isRedisEnabled()) return;
         const client = await getRedisClient();
         if (!client) return;
-        for (const prefix of ['public-order', 'public-contact', 'public-track']) {
+        for (const prefix of prefixes) {
             const keys = await client.keys(`ratelimit:${prefix}:*`);
             if (keys.length) await client.del(keys);
         }
@@ -853,6 +865,35 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(tracked.body.data.assigned_to, undefined);
         assert.equal(tracked.body.data.driverName, undefined);
         assert.equal(tracked.body.data.customerPhone, undefined);
+    });
+
+    // The commercial boundary. A customer is shown what they pay and
+    // nothing about how it is divided: the platform's cut and the driver's
+    // net are the terms between this business and its drivers. A customer
+    // who can see the split can negotiate against it or go straight to the
+    // driver, and the tracking page should not start either conversation.
+    test('public: tracking shows the price but never the platform cut or driver net', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app)
+            .post('/api/public/orders')
+            .send({
+                pickupAddress: 'Nyabugogo', deliveryAddress: 'Kicukiro',
+                cargoType: 'Retail stock', weightKg: 300,
+                customerName: 'Price Probe', customerPhone: '0788123458',
+            });
+        assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+
+        const tracked = await request(app).get(`/api/public/track/${create.body.data.trackingToken}`);
+        assert.equal(tracked.statusCode, 200);
+
+        const body = tracked.body.data;
+        assert.ok(Number(body.priceRwf) > 0, 'the customer must be told what it costs');
+        // No distance has been applied yet, so it must be presented as an estimate.
+        assert.equal(body.priceIsEstimate, true);
+
+        for (const leak of ['platformFeeRwf', 'platform_fee_rwf', 'driverNetRwf', 'driver_net_rwf', 'priceServiceRwf', 'price_service_rwf']) {
+            assert.equal(body[leak], undefined, `tracking leaked ${leak}`);
+        }
     });
 
     test('public: sequential and guessed codes cannot find a shipment', async () => {

@@ -93,7 +93,19 @@ export const OrderController = {
                     delivery_address_text,
                     special_instructions,
                     customer_name,
-                    customer_phone
+                    customer_phone,
+                    -- What this job pays, and nothing else about the money.
+                    -- A driver is shown their own net, never the total the
+                    -- customer pays or the platform's cut: the figure they
+                    -- need in order to decide is what lands with them, and
+                    -- the rest is the commercial arrangement between the
+                    -- platform and its customer. This becomes the number an
+                    -- independent driver accepts or declines a job on, so it
+                    -- has to be the honest one -- it is already net of the
+                    -- platform fee and already includes the fuel the run
+                    -- will burn.
+                    driver_net_rwf,
+                    price_is_estimate
                 FROM orders
                 WHERE LOWER(COALESCE(assigned_to, '')) = LOWER($1)
                   AND UPPER(COALESCE(status, 'PENDING')) NOT IN ('DELIVERED', 'CANCELLED')
@@ -200,7 +212,20 @@ export const OrderController = {
                     -- What the customer said about timing. Informs the
                     -- dispatcher's priority call; deliberately does not set
                     -- it (see add_order_needed_by.sql).
-                    needed_by
+                    needed_by,
+                    -- The full breakdown, unlike the public tracking view
+                    -- which gets the total alone. Dispatch is the side of the
+                    -- business that has to know whether a job is worth
+                    -- running: price_is_estimate says whether this row still
+                    -- needs placing on the map before the price is real, and
+                    -- platform_fee_rwf is the only place the operator can see
+                    -- what the work actually earns them.
+                    priced_vehicle_class,
+                    price_total_rwf,
+                    price_is_estimate,
+                    platform_fee_rwf,
+                    driver_net_rwf,
+                    price_distance_km
                 FROM orders
                 WHERE status = 'PENDING'
                 ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;
@@ -1235,6 +1260,10 @@ export const OrderController = {
                     o.special_instructions,
                     o.customer_name,
                     o.customer_phone,
+                    -- Same rule as the assignments list: the driver's own net,
+                    -- never the customer total or the platform's cut.
+                    o.driver_net_rwf,
+                    o.price_is_estimate,
                     dl.lat AS driver_lat,
                     dl.lng AS driver_lng,
                     EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS telemetry_age_seconds,
