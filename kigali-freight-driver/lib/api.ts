@@ -58,6 +58,16 @@ export type DriverAssignment = {
   special_instructions?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
+  // What this job pays the driver, in RWF. Already net of the platform's
+  // fee and already covering the fuel the run will burn, so it is the whole
+  // of what lands with them -- which is what makes it the right number to
+  // decide on. The customer's total and the platform's cut are deliberately
+  // not on this endpoint.
+  driver_net_rwf?: string | number | null;
+  // True while the job was priced from weight alone, before a dispatcher
+  // pinned it to the map. The pay is provisional until that happens and the
+  // app has to say so rather than quote a figure that can still move.
+  price_is_estimate?: boolean;
 };
 
 // The rate-limit middleware already computes the exact remaining wait as

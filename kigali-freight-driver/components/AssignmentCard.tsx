@@ -39,6 +39,8 @@ export function AssignmentCard({
   status,
   priority,
   note,
+  payRwf,
+  payIsEstimate,
   onPress,
 }: {
   title: string;
@@ -48,6 +50,8 @@ export function AssignmentCard({
   status: string;
   priority: 'high' | 'normal' | 'low';
   note?: string | null;
+  payRwf?: number | null;
+  payIsEstimate?: boolean;
   onPress?: () => void;
 }) {
   const palette = getStatusPalette(status);
@@ -86,6 +90,21 @@ export function AssignmentCard({
           <Text style={styles.metaDot}>·</Text>
           <Text style={styles.metaMono}>{eta}</Text>
         </View>
+        {/* What the job pays, on the card itself. This is the figure a job
+            gets accepted or declined on, and one you have to open a job to
+            find is no use for choosing between two of them. Green because
+            it is the good news on the card, and mono so a column of them
+            line up. "About" when the price came from weight alone and can
+            still move -- a driver told a number that later changes stops
+            believing the next one. */}
+        {payRwf != null ? (
+          <View style={styles.payRow}>
+            <Text style={styles.payAmount}>
+              {payIsEstimate ? 'About ' : ''}{payRwf.toLocaleString()} RWF
+            </Text>
+            <Text style={styles.payCaption}>to you</Text>
+          </View>
+        ) : null}
         {/* The note itself, one line of it, rather than a "has a note"
             marker. Most are short enough to read whole, and one that is
             not still shows its opening words — which is usually enough to
@@ -125,6 +144,14 @@ const styles = StyleSheet.create({
   metaText: { color: theme.colors.text, ...theme.type.label, flexShrink: 1, fontFamily: theme.fonts.body },
   metaDot: { color: theme.colors.muted, ...theme.type.label },
   metaMono: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
+  payRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 6 },
+  payAmount: {
+    color: theme.colors.primary,
+    ...theme.type.body,
+    fontFamily: theme.fonts.mono,
+    fontVariant: ['tabular-nums'],
+  },
+  payCaption: { color: theme.colors.muted, ...theme.type.micro },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
   noteText: { color: theme.colors.warning, ...theme.type.micro, flexShrink: 1, fontFamily: theme.fonts.body },
 });

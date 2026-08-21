@@ -293,6 +293,33 @@ export default function TripDetailScreen() {
 
           <View style={styles.divider} />
 
+          {/* The driver's own share, and only that. What the customer paid
+              and what the platform kept are not on this endpoint and are
+              not a driver's business -- what they need is the figure that
+              lands with them, which this already is: net of the fee and
+              covering the run's fuel. Said again here rather than only on
+              the list card, because this is the screen open while the work
+              is actually being done. */}
+          {order.driver_net_rwf != null ? (
+            <View style={styles.infoBlock}>
+              <Text style={styles.label}>You earn</Text>
+              <Text style={styles.payValue}>
+                {order.price_is_estimate ? 'About ' : ''}
+                {Number(order.driver_net_rwf).toLocaleString()} RWF
+              </Text>
+              {order.price_is_estimate ? (
+                <Text style={styles.payNote}>
+                  Confirmed once dispatch sets the pickup and drop-off points.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* Blocks on this screen are separated by an explicit divider
+              rather than by margins, so one inserted without a trailing
+              divider sits flush against whatever follows it. */}
+          {order.driver_net_rwf != null ? <View style={styles.divider} /> : null}
+
           <View style={styles.infoBlock}>
             <Text style={styles.label}>Cargo</Text>
             <Text style={styles.value}>{order.cargo_description || 'Untitled shipment'}</Text>
@@ -476,6 +503,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontFamily: theme.fonts.body,
   },
+  payValue: {
+    color: theme.colors.primary,
+    ...theme.type.heading,
+    fontFamily: theme.fonts.mono,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  payNote: { color: theme.colors.muted, ...theme.type.micro, marginTop: 4 },
   divider: { height: 1, backgroundColor: theme.colors.border, marginVertical: 18 },
   manifestCodeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   manifestCode: { color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.mono, letterSpacing: 0.6 },

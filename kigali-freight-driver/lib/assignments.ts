@@ -10,6 +10,13 @@ export type DriverAssignmentCard = {
   priority: 'high' | 'normal' | 'low';
   /** The customer's own note, if they left one. */
   note: string | null;
+  /** What the job pays, in RWF, already net of the platform's fee and
+   *  already covering the run's fuel. Null when no price has been worked
+   *  out yet. */
+  payRwf: number | null;
+  /** True while that pay was priced from weight alone and can still move,
+   *  because dispatch has not pinned the job to the map yet. */
+  payIsEstimate: boolean;
 };
 
 // A job is "in progress" once a driver has physically picked it up — before
@@ -72,5 +79,11 @@ export function toDriverAssignmentCard(order: DriverAssignment): DriverAssignmen
     // yard closes at four" — is worth nothing if it is only found on
     // arrival, which is when a job usually gets opened.
     note: order.special_instructions?.trim() || null,
+    // Shown on the card rather than only inside the job. Under the model
+    // where drivers are independent this is the figure a job is accepted or
+    // declined on, and a number you have to open a job to find is no use for
+    // choosing between two of them.
+    payRwf: order.driver_net_rwf == null ? null : Number(order.driver_net_rwf),
+    payIsEstimate: order.price_is_estimate === true,
   };
 }
