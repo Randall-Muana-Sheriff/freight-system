@@ -6,6 +6,7 @@ import { flushOfflineQueue, getOfflineQueueCount } from './offlineQueue';
 import { registerPushTokenWithBackend } from './pushNotifications';
 import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from './locationTracking';
 import { updateNativeLocationServiceToken } from './nativeLocationService';
+import { fireAndForget } from './fireAndForget';
 import {
   hydrateTokenStore,
   setTokens as persistTokens,
@@ -136,14 +137,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // A silent refresh failure (refresh token itself expired/revoked)
         // clears the store - mirror that as a real, visible sign-out
         // rather than leaving the UI in a half-authenticated limbo state.
-        stopBackgroundLocationTracking();
+        fireAndForget(stopBackgroundLocationTracking(), 'auth: stop tracking after silent refresh failure');
         setPendingSyncCount(0);
       } else if (tokens.refreshToken) {
         // Hand the rotated pair to the native location service so it keeps
         // authenticating without having to run its own refresh — two
         // independent refreshers contending for the same single-use
         // refresh token is exactly the race to avoid.
-        updateNativeLocationServiceToken(tokens.token, tokens.refreshToken);
+        fireAndForget(
+          updateNativeLocationServiceToken(tokens.token, tokens.refreshToken),
+          'auth: hand rotated tokens to the native location service',
+        );
       }
     });
     return unsubscribe;
@@ -180,19 +184,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (activeToken) {
         await tryFlushOfflineQueue(activeToken);
-        registerPushTokenWithBackend(activeToken);
-        startBackgroundLocationTracking();
+        fireAndForget(registerPushTokenWithBackend(activeToken), 'auth: register push token on hydrate');
+        fireAndForget(startBackgroundLocationTracking(), 'auth: start tracking on hydrate');
       }
       setIsReady(true);
     };
 
-    hydrate();
+    fireAndForget(hydrate(), 'auth: hydrate session on mount');
   }, []);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active' && token) {
-        await tryFlushOfflineQueue(token);
+        // addEventListener discards whatever the callback returns, so an
+        // async one here means a failed flush is thrown away unseen.
+        fireAndForget(tryFlushOfflineQueue(token), 'auth: flush offline queue on app foreground');
       }
     });
 
@@ -214,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const offline = state.isConnected === false || state.isInternetReachable === false;
       setIsOffline(offline);
       if (previouslyOffline && !offline && token) {
-        tryFlushOfflineQueue(token);
+        fireAndForget(tryFlushOfflineQueue(token), 'auth: flush offline queue on reconnect');
       }
       previouslyOffline = offline;
     });
@@ -238,8 +244,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsername(phone);
     await refreshPendingCount();
     await tryFlushOfflineQueue(tokens.token);
-    registerPushTokenWithBackend(tokens.token);
-    startBackgroundLocationTracking();
+    fireAndForget(registerPushTokenWithBackend(tokens.token), 'auth: register push token after sign-in');
+    fireAndForget(startBackgroundLocationTracking(), 'auth: start tracking after sign-in');
   };
 
   const completePinSetup = async (otpSessionToken: string, pin: string, phone: string) => {

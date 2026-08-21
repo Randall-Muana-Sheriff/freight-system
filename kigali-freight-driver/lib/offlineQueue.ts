@@ -59,25 +59,37 @@ async function writeQueue(queue: PendingDriverAction[]) {
 // storage pressure the way it can with cache directories — the whole
 // point of queueing a delivery photo for later is that "later" might be
 // a while, in a rural signal-dead zone.
-export function persistDeliveryPhotoForQueue(sourceUri: string, fileName: string): string {
+export async function persistDeliveryPhotoForQueue(sourceUri: string, fileName: string): Promise<string> {
   const targetDir = new Directory(Paths.document, 'pending-delivery-photos');
   if (!targetDir.exists) targetDir.create({ intermediates: true });
 
   const source = new File(sourceUri);
   const destination = new File(targetDir, `${Date.now()}-${fileName}`);
-  source.copy(destination);
+  // Awaited, not fired. File.copy returns a Promise<void>, and this used to
+  // return destination.uri the instant the copy was *started* — handing back
+  // a path to a file that might not exist yet, then queueing an upload
+  // against it. On a fast copy nobody noticed; on a large photo or a slow
+  // device the queued action referenced an incomplete file, which is the one
+  // case this whole queue exists for.
+  await source.copy(destination);
   return destination.uri;
 }
 
 // Same purpose as persistDeliveryPhotoForQueue above, separate directory
 // so the two queues' leftover files are easy to tell apart on disk.
-export function persistIncidentPhotoForQueue(sourceUri: string, fileName: string): string {
+export async function persistIncidentPhotoForQueue(sourceUri: string, fileName: string): Promise<string> {
   const targetDir = new Directory(Paths.document, 'pending-incident-photos');
   if (!targetDir.exists) targetDir.create({ intermediates: true });
 
   const source = new File(sourceUri);
   const destination = new File(targetDir, `${Date.now()}-${fileName}`);
-  source.copy(destination);
+  // Awaited, not fired. File.copy returns a Promise<void>, and this used to
+  // return destination.uri the instant the copy was *started* — handing back
+  // a path to a file that might not exist yet, then queueing an upload
+  // against it. On a fast copy nobody noticed; on a large photo or a slow
+  // device the queued action referenced an incomplete file, which is the one
+  // case this whole queue exists for.
+  await source.copy(destination);
   return destination.uri;
 }
 

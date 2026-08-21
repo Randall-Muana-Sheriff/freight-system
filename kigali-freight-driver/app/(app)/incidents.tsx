@@ -268,7 +268,7 @@ export default function IncidentsScreen() {
       loadIncidents();
     } catch (error) {
       if (isNetworkFailure(error)) {
-        const localPhotoUri = photo ? persistIncidentPhotoForQueue(photo.uri, photo.fileName || 'incident-photo.jpg') : undefined;
+        const localPhotoUri = photo ? await persistIncidentPhotoForQueue(photo.uri, photo.fileName || 'incident-photo.jpg') : undefined;
         await enqueueOfflineAction({
           type: 'incident-report',
           payload: { orderId: selectedOrderId ?? undefined, title: trimmedTitle, description: trimmedDescription, lat: location?.lat, lng: location?.lng },

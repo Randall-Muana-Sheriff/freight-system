@@ -14,6 +14,7 @@ import {
 // actual logic (join a path under the document directory, copy the
 // source into it, later delete it) without a real native filesystem.
 const deletedUris: string[] = [];
+const copiedSources: string[] = [];
 jest.mock('expo-file-system', () => {
     function joinUri(parts: unknown[]): string {
         return parts.map((p) => (typeof p === 'string' ? p : (p as { uri: string }).uri)).join('/');
@@ -23,8 +24,17 @@ jest.mock('expo-file-system', () => {
         constructor(...parts: unknown[]) {
             this.uri = joinUri(parts);
         }
-        copy(_destination: MockFile) {
-            // no-op: nothing reads real file bytes in this test
+        // Async, like the real expo-file-system File.copy, which returns
+        // Promise<void>. It resolves on a later tick on purpose: with a
+        // synchronous stand-in, a caller that forgets to await still passes,
+        // which is exactly how the missing await went unnoticed. `copied` is
+        // what lets a test assert the copy finished before the URI was
+        // handed back.
+        copied = false;
+        async copy(_destination: MockFile) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            this.copied = true;
+            copiedSources.push(this.uri);
         }
         delete() {
             deletedUris.push(this.uri);
@@ -170,15 +180,27 @@ describe('offlineQueue', () => {
     });
 
     describe('delivery-photo queueing (proof-of-delivery, previously had no offline path at all)', () => {
-        it('persistDeliveryPhotoForQueue copies the photo into a path distinct from the original picker location', () => {
-            const persistedUri = persistDeliveryPhotoForQueue('file:///cache/ImagePicker/abc123.jpg', 'photo.jpg');
+        it('persistDeliveryPhotoForQueue copies the photo into a path distinct from the original picker location', async () => {
+            const persistedUri = await persistDeliveryPhotoForQueue('file:///cache/ImagePicker/abc123.jpg', 'photo.jpg');
             expect(persistedUri).not.toBe('file:///cache/ImagePicker/abc123.jpg');
+            expect(persistedUri).toContain('pending-delivery-photos');
+        });
+
+        // The regression this guards: the helper used to call source.copy()
+        // without awaiting and return destination.uri immediately, so the
+        // queue stored a path to a file whose copy had only just started.
+        // With the mock resolving on a later tick, a missing await leaves
+        // copiedSources empty at the point the URI comes back.
+        it('persistDeliveryPhotoForQueue finishes the copy before returning the path', async () => {
+            copiedSources.length = 0;
+            const persistedUri = await persistDeliveryPhotoForQueue('file:///cache/slow.jpg', 'slow.jpg');
+            expect(copiedSources).toContain('file:///cache/slow.jpg');
             expect(persistedUri).toContain('pending-delivery-photos');
         });
 
         it('flushOfflineQueue uploads a queued delivery photo via confirmDelivery', async () => {
             mockConfirmDelivery.mockResolvedValue(undefined);
-            const persistedUri = persistDeliveryPhotoForQueue('file:///cache/photo.jpg', 'photo.jpg');
+            const persistedUri = await persistDeliveryPhotoForQueue('file:///cache/photo.jpg', 'photo.jpg');
 
             await enqueueOfflineAction({
                 type: 'delivery-photo',
@@ -202,7 +224,7 @@ describe('offlineQueue', () => {
 
         it('deletes the persisted photo file only after a successful upload', async () => {
             mockConfirmDelivery.mockResolvedValue(undefined);
-            const persistedUri = persistDeliveryPhotoForQueue('file:///cache/photo.jpg', 'photo.jpg');
+            const persistedUri = await persistDeliveryPhotoForQueue('file:///cache/photo.jpg', 'photo.jpg');
             await enqueueOfflineAction({
                 type: 'delivery-photo', orderId: 1, localFileUri: persistedUri,
                 fileName: 'photo.jpg', mimeType: 'image/jpeg', createdAt: '2026-01-01T00:00:00Z',
@@ -215,7 +237,7 @@ describe('offlineQueue', () => {
 
         it('keeps the persisted photo file queued (not deleted) when the upload fails', async () => {
             mockConfirmDelivery.mockRejectedValue(new Error('Network request failed'));
-            const persistedUri = persistDeliveryPhotoForQueue('file:///cache/photo.jpg', 'photo.jpg');
+            const persistedUri = await persistDeliveryPhotoForQueue('file:///cache/photo.jpg', 'photo.jpg');
             await enqueueOfflineAction({
                 type: 'delivery-photo', orderId: 1, localFileUri: persistedUri,
                 fileName: 'photo.jpg', mimeType: 'image/jpeg', createdAt: '2026-01-01T00:00:00Z',

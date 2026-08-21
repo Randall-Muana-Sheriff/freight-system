@@ -164,7 +164,7 @@ export default function TripDetailScreen() {
       if (isNetworkFailure(error)) {
         try {
           const fileName = asset.fileName ?? 'delivery-confirmation.jpg';
-          const persistedUri = persistDeliveryPhotoForQueue(asset.uri, fileName);
+          const persistedUri = await persistDeliveryPhotoForQueue(asset.uri, fileName);
           await enqueueOfflineAction({
             type: 'delivery-photo',
             orderId: Number(id),
