@@ -57,6 +57,7 @@ const MIGRATIONS = [
     { id: 'add_pricing_calibration.sql', destructive: false },
     { id: 'add_pricing_route_factors.sql', destructive: false },
     { id: 'add_route_corridors.sql', destructive: false },
+    { id: 'add_order_detention.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

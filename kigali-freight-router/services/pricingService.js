@@ -160,6 +160,13 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
     // money. The driver's side is what gives way last.
     const cappedFee = Math.min(fee, total);
 
+    // Rounded once, then the driver's share is what is left. Rounding total
+    // and fee separately and deriving the net from the unrounded pair let the
+    // three disagree by a franc -- money that does not add up, which is the
+    // one thing a price breakdown may never do.
+    const totalRounded = round(total);
+    const feeRounded = round(cappedFee);
+
     return {
         currency: 'RWF',
         vehicleClass: rate.vehicle_class,
@@ -179,9 +186,9 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
         openRoadKm: Number(openRoadKm.toFixed(3)),
         terrainFactor: effectiveTerrain,
         serviceRwf: round(service),
-        totalRwf: round(total),
-        platformFeeRwf: round(cappedFee),
-        driverNetRwf: round(total - cappedFee),
+        totalRwf: totalRounded,
+        platformFeeRwf: feeRounded,
+        driverNetRwf: totalRounded - feeRounded,
         minimumFareApplied: subtotal < minimumFare,
         minimumFeeApplied: service * (commissionPct / 100) < minimumFee,
     };

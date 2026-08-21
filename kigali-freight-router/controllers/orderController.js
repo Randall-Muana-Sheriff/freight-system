@@ -12,7 +12,7 @@ import * as Sentry from '@sentry/node';
 import { logError } from '../utils/logger.js';
 import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
-import { priceJob, distanceKmBetween } from '../services/pricingRepository.js';
+import { priceJob, distanceKmBetween, detentionForOrder } from '../services/pricingRepository.js';
 import { PricingError } from '../services/pricingService.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
@@ -105,7 +105,11 @@ export const OrderController = {
                     -- platform fee and already includes the fuel the run
                     -- will burn.
                     driver_net_rwf,
-                    price_is_estimate
+                    price_is_estimate,
+                    -- Already folded into driver_net_rwf; shown separately so
+                    -- a driver can see the wait was paid for rather than
+                    -- wondering why the figure moved after they closed the job.
+                    detention_rwf
                 FROM orders
                 WHERE LOWER(COALESCE(assigned_to, '')) = LOWER($1)
                   AND UPPER(COALESCE(status, 'PENDING')) NOT IN ('DELIVERED', 'CANCELLED')
@@ -225,7 +229,9 @@ export const OrderController = {
                     price_is_estimate,
                     platform_fee_rwf,
                     driver_net_rwf,
-                    price_distance_km
+                    price_distance_km,
+                    detention_minutes,
+                    detention_rwf
                 FROM orders
                 WHERE status = 'PENDING'
                 ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;
@@ -922,9 +928,35 @@ export const OrderController = {
                 [id, driverName, photoKey, notes || null, distanceFromTargetM, locationFlagged]
             );
 
+            // Worked out before the status moves, because it reads the gap
+            // between ARRIVED and now -- once DELIVERED is written the wait is
+            // over and NOW() is the moment it ended.
+            let detention = null;
+            try {
+                detention = await detentionForOrder(client, id);
+            } catch (err) {
+                // A driver must be able to close a job whatever the pricing
+                // does. An uncharged wait can be recovered from the status log
+                // afterwards; a delivery that would not confirm cannot.
+                logError(req, `Detention for order #${id} could not be worked out`, err);
+            }
+
             const updateResult = await client.query(
-                `UPDATE orders SET status = 'DELIVERED', updated_at = NOW() WHERE id = $1 RETURNING id, cargo_description, status;`,
-                [id]
+                `UPDATE orders SET
+                    status = 'DELIVERED',
+                    detention_minutes = COALESCE($2, detention_minutes),
+                    detention_rwf = COALESCE($3, detention_rwf),
+                    -- Added to the customer's total and passed to the driver
+                    -- whole. No commission: this reimburses a driver's stolen
+                    -- hour, it is not service the platform brokered, which is
+                    -- the same reason fuel sits outside the fee.
+                    price_total_rwf = COALESCE(price_total_rwf, 0) + COALESCE($3, 0),
+                    driver_net_rwf = COALESCE(driver_net_rwf, 0) + COALESCE($3, 0),
+                    updated_at = NOW()
+                 WHERE id = $1
+                 RETURNING id, cargo_description, status, detention_minutes, detention_rwf,
+                           price_total_rwf, driver_net_rwf;`,
+                [id, detention?.waitedMinutes ?? null, detention?.detentionRwf ?? null]
             );
 
             await client.query(
@@ -1270,6 +1302,7 @@ export const OrderController = {
                     -- never the customer total or the platform's cut.
                     o.driver_net_rwf,
                     o.price_is_estimate,
+                    o.detention_rwf,
                     dl.lat AS driver_lat,
                     dl.lng AS driver_lng,
                     EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS telemetry_age_seconds,

@@ -226,7 +226,8 @@ export const PublicOrderController = {
                         o.status, o.created_at AS "createdAt", o.updated_at AS "updatedAt",
                         o.pickup_address_text AS "pickupText", o.delivery_address_text AS "deliveryText",
                         o.origin_hub_name AS "originHub", u.full_name AS "driverName",
-                        o.price_total_rwf AS "priceRwf", o.price_is_estimate AS "priceIsEstimate"
+                        o.price_total_rwf AS "priceRwf", o.price_is_estimate AS "priceIsEstimate",
+                        o.detention_rwf AS "detentionRwf"
                    FROM orders o
                    LEFT JOIN users u ON u.username = o.assigned_to
                   WHERE o.tracking_token = $1`,
@@ -312,6 +313,11 @@ export const PublicOrderController = {
                 // An estimate has not had a distance applied yet, so the site
                 // must say so rather than presenting it as a settled price.
                 priceIsEstimate: order.priceIsEstimate,
+                // Broken out of the total rather than folded in silently. A
+                // customer whose warehouse held the driver for two hours is
+                // owed the reason their bill went up, and the alternative is
+                // an unexplained number and a phone call.
+                detentionRwf: order.detentionRwf == null ? null : Number(order.detentionRwf),
                 placedAt: order.createdAt,
                 updatedAt: order.updatedAt,
                 timeline: history.rows,

@@ -619,6 +619,64 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         );
     });
 
+    // A driver held at a warehouse gate is working, and a job priced by
+    // distance pays them nothing for it. The wait needs nothing new recorded:
+    // order_status_logs has stamped every transition since the original
+    // schema, so it is the gap between ARRIVED and DELIVERED.
+    test('a driver held at the drop is paid for the wait', async () => {
+        const created = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Detention probe',
+                weight_kg: 3000,
+                origin_hub_id: hubId,
+                delivery_lng: 30.1186,
+                delivery_lat: -1.9536,
+            });
+        assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+        const orderId = created.body.data.order.id;
+        const quotedTotal = Number(created.body.data.order.price_total_rwf);
+        const quotedNet = Number(created.body.data.order.driver_net_rwf);
+
+        // Plant an ARRIVED ninety minutes ago. Written straight to the log
+        // because the point under test is the arithmetic on the gap, not the
+        // status machine that produces it -- and a test cannot wait an hour.
+        await pool.query(
+            `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by, changed_at)
+             VALUES ($1, 'IN_TRANSIT', 'ARRIVED', 'test', NOW() - INTERVAL '90 minutes')`,
+            [orderId]
+        );
+        await pool.query(`UPDATE orders SET status = 'ARRIVED', assigned_to = $2 WHERE id = $1`, [orderId, driverPhone]);
+
+        const confirmed = await request(app)
+            .post(`/api/orders/${orderId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`)
+            .attach('photo', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]), {
+                filename: 'pod.jpg', contentType: 'image/jpeg',
+            });
+        assert.equal(confirmed.statusCode, 200, JSON.stringify(confirmed.body));
+
+        const after = await pool.query(
+            `SELECT detention_minutes, detention_rwf, price_total_rwf, driver_net_rwf, platform_fee_rwf
+               FROM orders WHERE id = $1`,
+            [orderId]
+        );
+        const row = after.rows[0];
+
+        assert.ok(Number(row.detention_minutes) >= 89, `recorded ${row.detention_minutes} minutes for a 90 minute wait`);
+        // An hour is free, so thirty minutes are chargeable at the Medium
+        // Truck rate of 8,500 an hour.
+        assert.equal(Number(row.detention_rwf), 4250);
+
+        // The customer pays it and the driver keeps all of it -- the platform
+        // takes no commission on a driver's stolen hour, the same way it takes
+        // none on their fuel.
+        assert.equal(Number(row.price_total_rwf), quotedTotal + 4250);
+        assert.equal(Number(row.driver_net_rwf), quotedNet + 4250);
+        assert.equal(Number(row.platform_fee_rwf), quotedTotal - quotedNet);
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.

@@ -115,6 +115,19 @@ test('the fee can never leave the driver owing money', () => {
 });
 
 test('the parts always reconcile to the total', () => {
+    // Swept rather than spot-checked: rounding total and fee independently and
+    // deriving the net from the unrounded pair disagreed by a franc on roughly
+    // one input in three, and the handful of values here originally missed it.
+    for (let w = 0; w <= 2000; w += 137) {
+        for (let d = 0; d <= 60; d += 3.7) {
+            const q = quote(VAN, { weightKg: w, distanceKm: d });
+            assert.equal(
+                q.platformFeeRwf + q.driverNetRwf,
+                q.totalRwf,
+                `fee + driver net != total at ${w}kg/${d}km`
+            );
+        }
+    }
     for (const [w, d] of [[0, 0], [1, 0.1], [250, 8], [1200, 45], [5000, 120]]) {
         const q = quote(VAN, { weightKg: w, distanceKm: d });
         assert.equal(

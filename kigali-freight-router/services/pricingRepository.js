@@ -2,7 +2,7 @@
 // so the arithmetic there stays pure and testable without a database.
 import pool from '../config/db.js';
 import { SpatialService } from './spatialService.js';
-import { quote, classForWeight, PricingError } from './pricingService.js';
+import { quote, classForWeight, detentionCharge, PricingError } from './pricingService.js';
 
 // The newest card for a class. Rows are insert-only, so "current" is the
 // latest effective_from rather than a mutable flag nobody remembers to move.
@@ -93,4 +93,42 @@ export async function corridorFor(pickup, delivery, roadDistanceKm) {
 
     const row = rows[0];
     return row ? { name: row.name, terrainFactor: Number(row.terrain_fuel_factor), bearingDeg: Number(row.bearing) } : null;
+}
+
+// How long a driver was held at the drop, and what that is worth.
+//
+// The wait is the gap between the ARRIVED and DELIVERED entries in
+// order_status_logs, which has stamped every transition since the original
+// schema -- so this needs nothing recorded that was not already there. The
+// latest ARRIVED is used rather than the first: a driver who arrives, is
+// turned away and comes back has not been waiting the whole time in between.
+//
+// Priced against the same rate card the job was quoted on, not today's, so a
+// card superseded mid-shift cannot change what a completed job pays.
+export async function detentionForOrder(client, orderId) {
+    const { rows } = await client.query(
+        `WITH arrived AS (
+             SELECT MAX(changed_at) AS at FROM order_status_logs
+              WHERE order_id = $1 AND new_status = 'ARRIVED'
+         )
+         SELECT EXTRACT(EPOCH FROM (NOW() - arrived.at)) / 60 AS waited_minutes,
+                o.pricing_rate_id
+           FROM orders o, arrived
+          WHERE o.id = $1 AND arrived.at IS NOT NULL`,
+        [orderId]
+    );
+
+    const row = rows[0];
+    // No ARRIVED at all means the driver went straight to delivered, which is
+    // a job with no recorded wait rather than a job with a zero one.
+    if (!row || row.waited_minutes == null) return null;
+
+    const waited = Math.max(0, Math.round(Number(row.waited_minutes)));
+    if (!row.pricing_rate_id) return { waitedMinutes: waited, detentionRwf: 0, chargeableMinutes: 0 };
+
+    const rateResult = await client.query('SELECT * FROM pricing_rates WHERE id = $1', [row.pricing_rate_id]);
+    const rate = rateResult.rows[0];
+    if (!rate) return { waitedMinutes: waited, detentionRwf: 0, chargeableMinutes: 0 };
+
+    return detentionCharge(rate, waited);
 }
