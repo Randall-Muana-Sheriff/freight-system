@@ -56,6 +56,14 @@ export function classForWeight(weightKg) {
     return WEIGHT_CLASS_BANDS.find((band) => n <= band.maxKg).vehicleClass;
 }
 
+// A column an older rate row predates. Missing means "no adjustment", never
+// zero -- a rate card written before terrain existed must price exactly as it
+// always did rather than silently multiplying its fuel by nothing.
+function optionalNumber(value, label, fallback) {
+    if (value === undefined || value === null) return fallback;
+    return requireFiniteNumber(value, label);
+}
+
 function requireFiniteNumber(value, label) {
     const n = Number(value);
     if (!Number.isFinite(n)) throw new PricingError(`${label} must be a finite number, got ${JSON.stringify(value)}`);
@@ -102,8 +110,36 @@ export function quote(rate, { weightKg, distanceKm = null }) {
     if (roadFactor <= 0) throw new PricingError('road_distance_factor must be positive.');
     const distance = measured * roadFactor;
 
-    const fuel = (distance / 100) * litresPer100 * dieselPrice;
-    const service = baseFare + distance * perKm + weight * perKg;
+    // The city stretch and the stretch beyond it are different jobs and cost
+    // different amounts, so they are charged separately rather than averaged.
+    const taperAfter = optionalNumber(rate.taper_after_km, 'taper_after_km', Infinity);
+    const perKmLong = rate.per_km_long_rwf == null
+        ? perKm
+        : requireFiniteNumber(rate.per_km_long_rwf, 'per_km_long_rwf');
+    const cityKm = Math.min(distance, taperAfter);
+    const openRoadKm = Math.max(0, distance - taperAfter);
+
+    // Fuel on the open road carries the terrain penalty; the flat run across
+    // Kigali should not be charged for hills it never climbs.
+    const terrainFactor = optionalNumber(rate.terrain_fuel_factor, 'terrain_fuel_factor', 1);
+    const litrePerKm = litresPer100 / 100;
+    const fuelOut = (cityKm * litrePerKm * dieselPrice)
+        + (openRoadKm * litrePerKm * dieselPrice * terrainFactor);
+
+    // Past the city the driver comes back with nothing to carry, and that
+    // fuel is as real as the fuel going out. Inside it they pick up the next
+    // job where they finished, so there is nothing to charge for.
+    const returnBeyond = optionalNumber(rate.return_leg_beyond_km, 'return_leg_beyond_km', Infinity);
+    const returnsEmpty = distance > returnBeyond;
+    // Not the whole leg. The full cost works out at a ~50% uplift and the
+    // market only carries 20-40%, so charging all of it would price above
+    // every operator in Rwanda. What is left over is what a matched return
+    // load covers -- and finding that load is the point of the platform.
+    const returnShare = optionalNumber(rate.return_leg_share_pct, 'return_leg_share_pct', 100) / 100;
+    const fuelReturn = returnsEmpty ? fuelOut * returnShare : 0;
+
+    const fuel = fuelOut + fuelReturn;
+    const service = baseFare + cityKm * perKm + openRoadKm * perKmLong + weight * perKg;
 
     const subtotal = fuel + service;
     const total = Math.max(subtotal, minimumFare);
@@ -128,6 +164,12 @@ export function quote(rate, { weightKg, distanceKm = null }) {
         distanceKm: isEstimate ? null : Number(distance.toFixed(3)),
         weightKg: weight,
         fuelRwf: round(fuel),
+        // Broken out so a driver asking why an upcountry job costs what it
+        // does can be told, and so dispatch can see the empty leg rather than
+        // wondering why the same distance priced differently.
+        returnLegRwf: round(fuelReturn),
+        returnsEmpty,
+        openRoadKm: Number(openRoadKm.toFixed(3)),
         serviceRwf: round(service),
         totalRwf: round(total),
         platformFeeRwf: round(cappedFee),
@@ -151,5 +193,34 @@ export function platformMargin(quoted, { smsCount = 2, smsCostRwf = 14, momoFeeP
         smsCostRwf: round(sms),
         momoFeeRwf: round(momo),
         netToPlatformRwf: round(quoted.platformFeeRwf - sms - momo),
+    };
+}
+
+/**
+ * What a driver is owed for being kept waiting.
+ *
+ * A job priced by distance pays nothing for the hour spent at a warehouse
+ * gate, which is why drivers charge for it themselves past roughly an hour.
+ * The hourly figure on the rate card is derived from what a driver of that
+ * class reports clearing in a day over a nine-hour working day, so this is
+ * the same money their time is worth on the road.
+ *
+ * Charged in whole minutes past the free period rather than in blocks: a
+ * driver held for 61 minutes and one held for 89 have not waited the same
+ * amount, and rounding both up to an hour invites an argument at the gate.
+ */
+export function detentionCharge(rate, waitedMinutes) {
+    const waited = requireFiniteNumber(waitedMinutes, 'waitedMinutes');
+    if (waited < 0) throw new PricingError('waitedMinutes cannot be negative.');
+
+    const freeMinutes = optionalNumber(rate?.detention_free_minutes, 'detention_free_minutes', 60);
+    const perHour = optionalNumber(rate?.detention_per_hour_rwf, 'detention_per_hour_rwf', 0);
+
+    const chargeable = Math.max(0, waited - freeMinutes);
+    return {
+        waitedMinutes: waited,
+        freeMinutes,
+        chargeableMinutes: chargeable,
+        detentionRwf: round((chargeable / 60) * perHour),
     };
 }
