@@ -12,7 +12,7 @@ import * as Sentry from '@sentry/node';
 import { logError } from '../utils/logger.js';
 import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
-import { priceJob, distanceKmBetween, detentionForOrder } from '../services/pricingRepository.js';
+import { priceJob, distanceKmBetween, detentionForOrder, backfillCreditForOrder, returnLoadCandidatesFor } from '../services/pricingRepository.js';
 import { PricingError } from '../services/pricingService.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
@@ -359,7 +359,8 @@ export const OrderController = {
                     platform_fee_rwf,
                     driver_net_rwf,
                     price_distance_km,
-                    price_is_estimate
+                    price_is_estimate,
+                    return_leg_rwf
                 )
                 VALUES (
                     $1,
@@ -377,7 +378,7 @@ export const OrderController = {
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
                     ST_SetSRID(ST_MakePoint($5, $6), 4326),
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
-                    $12, $13, $14, $14, $15, $16, $17, $18, $19, FALSE
+                    $12, $13, $14, $14, $15, $16, $17, $18, $19, FALSE, $20
                 )
                 RETURNING id, cargo_description, status, weight_kg, origin_hub_name, pickup_lng, pickup_lat, delivery_lng, delivery_lat, recipient_name, recipient_phone, priority,
                           price_total_rwf, platform_fee_rwf, driver_net_rwf, price_distance_km, priced_vehicle_class, price_is_estimate;
@@ -389,7 +390,7 @@ export const OrderController = {
                 recipient_name || null, recipient_phone || null, normalizedPriority,
                 priced.pricingRateId, priced.vehicleClass, priced.totalRwf,
                 priced.fuelRwf, priced.serviceRwf, priced.platformFeeRwf,
-                priced.driverNetRwf, priced.distanceKm
+                priced.driverNetRwf, priced.distanceKm, priced.returnLegRwf
             ]);
 
             const newOrder = result.rows[0];
@@ -982,6 +983,17 @@ export const OrderController = {
             // Worked out before the status moves, because it reads the gap
             // between ARRIVED and now -- once DELIVERED is written the wait is
             // over and NOW() is the moment it ended.
+            // What the run actually turned out to be, settled together. Both
+            // are the same shape of question -- something only the finished
+            // job can answer -- and both must leave the delivery itself alone
+            // if they fail.
+            let backfill = null;
+            try {
+                backfill = await backfillCreditForOrder(client, id);
+            } catch (err) {
+                logError(req, `Backfill credit for order #${id} could not be worked out`, err);
+            }
+
             let detention = null;
             try {
                 detention = await detentionForOrder(client, id);
@@ -1003,13 +1015,21 @@ export const OrderController = {
                     -- whole. No commission: this reimburses a driver's stolen
                     -- hour, it is not service the platform brokered, which is
                     -- the same reason fuel sits outside the fee.
-                    price_total_rwf = COALESCE(price_total_rwf, 0) + COALESCE($3, 0),
-                    driver_net_rwf = COALESCE(driver_net_rwf, 0) + COALESCE($3, 0),
+                    price_total_rwf = COALESCE(price_total_rwf, 0) + COALESCE($3, 0) - COALESCE($4, 0),
+                    driver_net_rwf = COALESCE(driver_net_rwf, 0) + COALESCE($3, 0) - COALESCE($4, 0),
+                    -- The credit comes off the driver as well as the customer,
+                    -- because the driver did not drive the empty leg either.
+                    -- They are not out of pocket: the load that filled it is a
+                    -- second fare on the same run, which is the whole reason
+                    -- pairing is worth doing.
+                    backfill_credit_rwf = COALESCE($4, backfill_credit_rwf),
+                    backfilled_by_order_id = COALESCE($5, backfilled_by_order_id),
                     updated_at = NOW()
                  WHERE id = $1
                  RETURNING id, cargo_description, status, detention_minutes, detention_rwf,
                            price_total_rwf, driver_net_rwf;`,
-                [id, detention?.waitedMinutes ?? null, detention?.detentionRwf ?? null]
+                [id, detention?.waitedMinutes ?? null, detention?.detentionRwf ?? null,
+                 backfill?.creditRwf ?? null, backfill?.filledByOrderId ?? null]
             );
 
             await client.query(
@@ -1283,11 +1303,12 @@ export const OrderController = {
                         price_total_rwf = $4, price_fuel_rwf = $5, price_service_rwf = $6,
                         platform_fee_rwf = $7, driver_net_rwf = $8,
                         price_distance_km = $9, price_is_estimate = FALSE,
+                        return_leg_rwf = $10,
                         updated_at = NOW()
                       WHERE id = $1`,
                     [id, repriced.pricingRateId, repriced.vehicleClass, repriced.totalRwf,
                      repriced.fuelRwf, repriced.serviceRwf, repriced.platformFeeRwf,
-                     repriced.driverNetRwf, repriced.distanceKm]
+                     repriced.driverNetRwf, repriced.distanceKm, repriced.returnLegRwf]
                 );
             } catch (err) {
                 // Placing the order on the map is the operation the dispatcher
@@ -1409,6 +1430,26 @@ export const OrderController = {
                 status: 500,
                 code: 'ORDERS_HISTORY_FAILED',
                 message: 'Failed to read history logs.',
+            });
+        }
+    },
+
+    // GET /api/orders/:id/return-loads
+    //
+    // Jobs that could ride home on this one's empty leg. Dispatch-only and
+    // read-only: the credit at delivery only ever fires on a pairing that
+    // actually happened, and a pairing only happens if somebody makes one.
+    // Without this the empty leg is a number on an invoice nobody can act on.
+    getReturnLoads: async (req, res) => {
+        try {
+            const candidates = await returnLoadCandidatesFor(req.params.id);
+            return ok(res, { candidates });
+        } catch (error) {
+            logError(req, 'Return-load lookup failed', error);
+            return fail(res, {
+                status: 500,
+                code: 'ORDERS_RETURN_LOADS_FAILED',
+                message: 'Could not look for a return load just now.',
             });
         }
     },

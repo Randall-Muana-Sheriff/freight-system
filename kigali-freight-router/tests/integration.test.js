@@ -750,6 +750,91 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.notEqual(res.statusCode, 200, 'a dispatcher must not be able to claim a driver is waiting');
     });
 
+    // The empty leg only exists if nothing fills it. Two jobs on one run --
+    // out to a place and back from near it -- means the drive home happened
+    // loaded, and both customers were charged for something that never
+    // occurred.
+    test('a return load takes the empty-leg charge back off the bill', async () => {
+        const outbound = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Outbound upcountry',
+                weight_kg: 3000,
+                origin_hub_id: hubId,
+                // Far enough out that the driver would otherwise come home empty.
+                delivery_lng: 29.2603,
+                delivery_lat: -1.6778,
+            });
+        assert.equal(outbound.statusCode, 201, JSON.stringify(outbound.body));
+        const outboundId = outbound.body.data.order.id;
+
+        const charged = (await pool.query('SELECT return_leg_rwf, price_total_rwf FROM orders WHERE id = $1', [outboundId])).rows[0];
+        assert.ok(Number(charged.return_leg_rwf) > 0, 'an upcountry job must be charged for the empty return');
+        const totalBefore = Number(charged.price_total_rwf);
+        const emptyLeg = Math.round(Number(charged.return_leg_rwf));
+
+        // A second job collecting from where the first was dropped: the run
+        // home is loaded.
+        const backhaul = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Backhaul to Kigali', weight_kg: 2000,
+                origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536,
+            });
+        const backhaulId = backhaul.body.data.order.id;
+
+        // Both on one run, with the backhaul collecting beside the outbound's drop.
+        // COMPLETED, not ACTIVE: the run happened, which is what the credit
+        // requires, and trips_one_active_per_driver allows a driver only one
+        // active run at a time -- leaving one behind broke the trips test
+        // further down this same file.
+        const trip = await pool.query(
+            `INSERT INTO trips (driver_username, status, created_by) VALUES ($1, 'COMPLETED', 'test') RETURNING id`,
+            [driverPhone]
+        );
+        const tripId = trip.rows[0].id;
+        await pool.query(
+            `INSERT INTO trip_stops (trip_id, order_id, kind, sequence, lat, lng) VALUES
+                ($1, $2, 'DROP', 1, -1.6778, 29.2603),
+                ($1, $3, 'PICKUP', 2, -1.6800, 29.2650)`,
+            [tripId, outboundId, backhaulId]
+        );
+
+        await pool.query(`UPDATE orders SET status = 'ARRIVED', assigned_to = $2 WHERE id = $1`, [outboundId, driverPhone]);
+        const confirmed = await request(app)
+            .post(`/api/orders/${outboundId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`)
+            .attach('photo', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]), {
+                filename: 'pod.jpg', contentType: 'image/jpeg',
+            });
+        assert.equal(confirmed.statusCode, 200, JSON.stringify(confirmed.body));
+
+        const after = (await pool.query(
+            `SELECT backfill_credit_rwf, backfilled_by_order_id, price_total_rwf FROM orders WHERE id = $1`,
+            [outboundId]
+        )).rows[0];
+
+        assert.equal(Number(after.backfill_credit_rwf), emptyLeg, 'the whole empty-leg charge comes back');
+        assert.equal(Number(after.backfilled_by_order_id), backhaulId, 'and it records which job filled it');
+        assert.equal(Number(after.price_total_rwf), totalBefore - emptyLeg);
+    });
+
+    // A job that never had an empty leg has nothing to give back.
+    test('a job inside the city is never credited for a return it was not charged for', async () => {
+        const created = await request(app)
+            .post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'City job', weight_kg: 400,
+                origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536,
+            });
+        const orderId = created.body.data.order.id;
+        const row = (await pool.query('SELECT return_leg_rwf FROM orders WHERE id = $1', [orderId])).rows[0];
+        assert.equal(Number(row.return_leg_rwf), 0, 'nothing inside Kigali runs home empty');
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.

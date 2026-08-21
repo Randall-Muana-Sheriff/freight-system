@@ -75,5 +75,8 @@ router.get('/:id/history', authMiddleware(['admin', 'dispatcher']), OrderControl
 
 // Smart Spatial Matching View
 router.get('/:id/nearest-drivers', authMiddleware(['admin', 'dispatcher']), OrderController.getNearestDrivers);
+// Same audience as nearest-drivers, and the same kind of question: who or what
+// could fill a gap this job leaves.
+router.get('/:id/return-loads', authMiddleware(['admin', 'dispatcher']), OrderController.getReturnLoads);
 
 export default router;
