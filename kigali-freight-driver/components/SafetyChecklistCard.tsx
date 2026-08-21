@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { theme } from '../lib/theme';
@@ -13,6 +13,8 @@ import {
   type VehicleDefect,
 } from '../lib/api';
 import { captureException } from '../lib/crashReporting';
+import { ReportDefectModal } from './ReportDefectModal';
+import { ToastOverlay, type Toast } from './ToastOverlay';
 
 // Kept in sync by hand with SAFETY_CHECKLIST_ITEMS in
 // safetyChecklistController.js — the canonical list lives in application
@@ -35,6 +37,10 @@ export function SafetyChecklistCard() {
   // Tracks which single item is mid-request, not a screen-wide flag — so
   // tapping one row doesn't visually freeze the four rows you didn't tap.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  // Which item the report modal is open for, or null. Holding the key rather
+  // than a boolean means the modal always knows what it is reporting on.
+  const [reporting, setReporting] = useState<{ key: string; label: string } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -81,7 +87,18 @@ export function SafetyChecklistCard() {
       if (data.defectId) {
         // Confirm on the spot. A driver who reports a fault and sees the row
         // simply turn red has no way to know whether anyone was told.
-        Alert.alert('Defect reported', 'Dispatch has been notified, and the next driver of this vehicle will see it.');
+        setToast({
+          icon: 'checkmark-circle-outline',
+          tone: 'success',
+          message: 'Fault reported — dispatch has been notified.',
+        });
+        // Pull the banner again so the fault they just raised joins the ones
+        // already on the vehicle, rather than appearing only on next visit.
+        if (token) {
+          fetchOpenVehicleDefects(token)
+            .then((d) => setDefects(d.defects || []))
+            .catch(() => {});
+        }
       }
     } catch {
       setResults((current) => ({ ...current, [key]: previous })); // revert
@@ -103,22 +120,7 @@ export function SafetyChecklistCard() {
       void setResult(key, 'unchecked');
       return;
     }
-    Alert.prompt?.(
-      'Report a defect',
-      `What is wrong with: ${label}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Report', onPress: (note?: string) => void setResult(key, 'fail', note) },
-      ],
-      'plain-text',
-    ) ?? Alert.alert(
-      'Report a defect',
-      `Mark "${label}" as a defect? Dispatch will be notified.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Report', style: 'destructive', onPress: () => void setResult(key, 'fail') },
-      ],
-    );
+    setReporting({ key, label });
   };
 
   const passedCount = CHECKLIST_ITEMS.filter((item) => results[item.key] === 'pass').length;
@@ -206,6 +208,17 @@ export function SafetyChecklistCard() {
           </View>
         );
       })}
+      <ReportDefectModal
+        visible={reporting !== null}
+        itemLabel={reporting?.label ?? ''}
+        onCancel={() => setReporting(null)}
+        onReport={(note) => {
+          const target = reporting;
+          setReporting(null);
+          if (target) void setResult(target.key, 'fail', note || undefined);
+        }}
+      />
+      <ToastOverlay toast={toast} onHide={() => setToast(null)} />
     </View>
   );
 }
