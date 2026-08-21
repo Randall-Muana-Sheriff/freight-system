@@ -376,8 +376,6 @@ export default function IncidentsScreen() {
         subtitle="Let dispatch know about a delay, breakdown, or anything blocking your delivery."
       />
 
-      <SafetyChecklistCard />
-
       {activeAssignments.length > 0 && (
         <TouchableOpacity style={styles.assignmentChip} activeOpacity={0.8} onPress={() => setPickingAssignment(true)}>
           <Ionicons name="cube-outline" size={16} color={theme.colors.primary} />
@@ -483,6 +481,18 @@ export default function IncidentsScreen() {
         </Text>
       </TouchableOpacity>
       <Text style={styles.microcopy}>Works offline — we&apos;ll send it as soon as you&apos;re back in range.</Text>
+
+      <View style={styles.divider} />
+
+      {/* Below the report form, not above it. These are two different moments
+          in a driver's day: the checklist is done once, at the start of a
+          shift, standing still and unhurried, while a report is filed
+          mid-shift with something already going wrong — often roadside, in
+          poor light, one-handed. Above the form it pushed "Send report"
+          below the fold, so the urgent task required scrolling past the
+          routine one. Here the scroll falls on the calm task instead, which
+          is the right way round. */}
+      <SafetyChecklistCard />
 
       <View style={styles.divider} />
 
