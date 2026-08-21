@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -95,6 +95,13 @@ export default function IncidentsScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [sending, setSending] = useState(false);
+  // The button's own confirmation. The toast already said the report went,
+  // but it appears away from the control the driver just pressed and then
+  // disappears — someone glancing back at a button still reading "Send
+  // report" cannot tell whether it worked, and sends it twice. This holds
+  // the answer on the thing they pressed.
+  const [justSent, setJustSent] = useState(false);
+
   const [showErrors, setShowErrors] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const [pickingIssue, setPickingIssue] = useState(false);
@@ -111,6 +118,24 @@ export default function IncidentsScreen() {
   // description are no longer hard-required on their own, only "at least
   // one of {description, photo}" is — see onSubmit.
   const [photo, setPhoto] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  // Two ways back to a usable button, because one is not enough. The timer
+  // covers a driver who reads the confirmation and walks away; the form
+  // watcher covers one who immediately starts a second report, where a
+  // button still reading "Report sent" and refusing presses would look
+  // broken. Without either, the first report of a shift would be the last.
+  useEffect(() => {
+    if (!justSent) return;
+    const timer = setTimeout(() => setJustSent(false), 4000);
+    return () => clearTimeout(timer);
+  }, [justSent]);
+
+  useEffect(() => {
+    if (justSent && (description.trim() || title.trim() || photo)) setJustSent(false);
+    // justSent is deliberately absent: including it would clear the
+    // confirmation on the same render that set it, since submitting does not
+    // empty the fields until after.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description, title, photo]);
   const [pickingPhotoSource, setPickingPhotoSource] = useState(false);
   // Reporting is never blocked without an active job — a driver with
   // nothing assigned right now can still always reach dispatch. This is
@@ -239,16 +264,40 @@ export default function IncidentsScreen() {
     }
   };
 
+  // How long a report is willing to wait for coordinates before going
+  // without them. A driver reporting a breakdown is standing next to a
+  // problem; two seconds is already generous.
+  const LOCATION_BUDGET_MS = 2000;
+
   // Best-effort only — a safety report must never be blocked by a
   // location permission prompt or a slow GPS fix. Returns null on
   // anything short of a clean, already-granted read, and the backend
   // treats missing coordinates as "no nearest-hub guidance", not an error.
+  //
+  // That was the intent and not the behaviour. getCurrentPositionAsync has
+  // no timeout: it waits for a fix, and onSubmit awaits it before sending
+  // anything. Indoors, in a warehouse, or in a cab with poor sky view, the
+  // driver pressed Send and watched "Sending…" while the GPS hunted — for a
+  // coordinate pair the backend treats as optional.
+  //
+  // Now: the last known fix first, which returns from cache more or less
+  // instantly, and only then a live read bounded by LOCATION_BUDGET_MS.
+  // Whichever arrives first wins; if neither does, the report goes without
+  // coordinates, which was always an accepted outcome.
   const getBestEffortLocation = async (): Promise<{ lat: number; lng: number } | null> => {
     try {
       const permission = await Location.getForegroundPermissionsAsync();
       if (permission.status !== 'granted') return null;
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      return { lat: position.coords.latitude, lng: position.coords.longitude };
+
+      const cached = await Location.getLastKnownPositionAsync();
+      if (cached) return { lat: cached.coords.latitude, lng: cached.coords.longitude };
+
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), LOCATION_BUDGET_MS));
+      const live = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+        .then((position) => ({ lat: position.coords.latitude, lng: position.coords.longitude }))
+        .catch(() => null);
+
+      return await Promise.race([live, timeout]);
     } catch {
       return null;
     }
@@ -284,7 +333,8 @@ export default function IncidentsScreen() {
       setPhoto(null);
       setShowErrors(false);
       setToast(buildSuccessToast(result));
-      loadIncidents();
+      setJustSent(true);
+      void loadIncidents();
     } catch (error) {
       if (isNetworkFailure(error)) {
         const localPhotoUri = photo ? await persistIncidentPhotoForQueue(photo.uri, photo.fileName || 'incident-photo.jpg') : undefined;
@@ -302,6 +352,9 @@ export default function IncidentsScreen() {
         setPhoto(null);
         setShowErrors(false);
         setToast({ icon: 'cloud-offline-outline', message: "Saved offline — it'll send as soon as you're back in range.", tone: 'info' });
+        // Queued counts as sent from the driver's side: they are done, and
+        // the report leaves when there is signal.
+        setJustSent(true);
       } else {
         setToast({
           icon: 'alert-circle-outline',
@@ -414,9 +467,20 @@ export default function IncidentsScreen() {
       />
       {descriptionMissing ? <Text style={styles.fieldError}>Add a few details or attach a photo below.</Text> : null}
 
-      <TouchableOpacity activeOpacity={0.9} style={styles.button} onPress={onSubmit} disabled={sending}>
-        <Ionicons name="warning-outline" size={16} color={theme.colors.paper} />
-        <Text style={styles.buttonText}>{sending ? 'Sending…' : 'Send report'}</Text>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.button, justSent && styles.buttonSent]}
+        onPress={onSubmit}
+        disabled={sending || justSent}
+      >
+        <Ionicons
+          name={justSent ? 'checkmark-circle' : 'warning-outline'}
+          size={16}
+          color={theme.colors.ink}
+        />
+        <Text style={styles.buttonText}>
+          {justSent ? 'Report sent' : sending ? 'Sending…' : 'Send report'}
+        </Text>
       </TouchableOpacity>
       <Text style={styles.microcopy}>Works offline — we&apos;ll send it as soon as you&apos;re back in range.</Text>
 
@@ -557,6 +621,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.pill,
     paddingVertical: 15,
   },
+  buttonSent: { backgroundColor: theme.colors.success },
   buttonText: { color: theme.colors.ink, fontFamily: theme.fonts.bodySemiBold, ...theme.type.bodySm },
   microcopy: { color: theme.colors.muted, ...theme.type.micro, textAlign: 'center', marginTop: 10, fontFamily: theme.fonts.body },
   divider: { height: 1, backgroundColor: theme.colors.border, marginTop: 28, marginBottom: 20 },
