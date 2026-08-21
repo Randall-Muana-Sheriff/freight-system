@@ -15,7 +15,7 @@ import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js'
 import { priceJob, distanceKmBetween, detentionForOrder, backfillCreditForOrder, returnLoadCandidatesFor } from '../services/pricingRepository.js';
 import { PricingError } from '../services/pricingService.js';
 
-const ALLOWED_ORDER_STATUSES = ['PENDING', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
+const ALLOWED_ORDER_STATUSES = ['PENDING', 'OFFERED', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
 const ALLOWED_ORDER_PRIORITIES = ['high', 'normal', 'low'];
 
 // Matches the staleness threshold fleetController.js already uses to mark
@@ -1442,6 +1442,187 @@ export const OrderController = {
     // read-only: the credit at delivery only ever fires on a pairing that
     // actually happened, and a pairing only happens if somebody makes one.
     // Without this the empty leg is a number on an invoice nobody can act on.
+    // POST /api/orders/offer — the partner-driver path.
+    //
+    // Dispatch still assigns fleet drivers directly through /assign; this is
+    // for someone with their own truck, who is deciding whether the run is
+    // worth their diesel rather than being told to do it. Both have to work at
+    // once, which is why this is a second endpoint and not a changed one.
+    offerOrders: async (req, res) => {
+        const client = await pool.connect();
+        try {
+            const { orderIds, driverName, expiresInMinutes } = req.body || {};
+            if (!Array.isArray(orderIds) || orderIds.length === 0 || typeof driverName !== 'string') {
+                return fail(res, { status: 400, code: 'ORDERS_OFFER_INVALID', message: 'Give an order list and a driver.' });
+            }
+            // Long enough that a driver mid-delivery can answer, short enough
+            // that a customer's job is not parked all afternoon on somebody
+            // who has stopped looking at their phone.
+            const minutes = Number.isFinite(Number(expiresInMinutes)) ? Math.min(Math.max(Number(expiresInMinutes), 5), 240) : 30;
+
+            await client.query('BEGIN');
+
+            const driver = await client.query(`SELECT id FROM users WHERE username = $1 AND role = 'driver'`, [driverName]);
+            if (driver.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return fail(res, { status: 400, code: 'ORDERS_DRIVER_NOT_FOUND', message: 'No such driver.' });
+            }
+
+            // Already refused is not re-offered. A driver who said no to this
+            // run has told dispatch something, and handing it straight back
+            // teaches them the button does nothing.
+            const refused = await client.query(
+                `SELECT order_id FROM order_offer_declines WHERE driver_username = $1 AND order_id = ANY($2)`,
+                [driverName, orderIds]
+            );
+            if (refused.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: 'ORDERS_ALREADY_DECLINED',
+                    message: `That driver has already turned down order ${refused.rows.map((r) => `#${r.order_id}`).join(', ')}.`,
+                });
+            }
+
+            // Locked, and only from PENDING. Two dispatchers working the same
+            // queue must not be able to offer one job to two drivers.
+            const locked = await client.query(
+                `SELECT id FROM orders WHERE id = ANY($1) AND status = 'PENDING' FOR UPDATE`,
+                [orderIds]
+            );
+            if (locked.rows.length !== orderIds.length) {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: 'ORDERS_NOT_OFFERABLE',
+                    message: 'One of those is no longer waiting to be offered — someone may have taken it already.',
+                });
+            }
+
+            const updated = await client.query(
+                `UPDATE orders
+                    SET status = 'OFFERED', assigned_to = $1,
+                        offer_expires_at = NOW() + ($3 || ' minutes')::interval, updated_at = NOW()
+                  WHERE id = ANY($2)
+                  RETURNING id, cargo_description, status, offer_expires_at, driver_net_rwf`,
+                [driverName, orderIds, String(minutes)]
+            );
+
+            await client.query('COMMIT');
+
+            for (const order of updated.rows) io.emit('order:offered', order);
+            sendPushToUser(driverName, {
+                title: updated.rows.length === 1 ? 'A job is offered to you' : `${updated.rows.length} jobs offered to you`,
+                body: 'Open the app to accept or turn it down.',
+                data: { type: 'job-offer' },
+            });
+
+            return ok(res, { offered: updated.rows, expiresInMinutes: minutes });
+        } catch (error) {
+            await client.query('ROLLBACK').catch(() => {});
+            logError(req, 'Offer failed', error);
+            return fail(res, { status: 500, code: 'ORDERS_OFFER_FAILED', message: 'Could not offer that work.' });
+        } finally {
+            client.release();
+        }
+    },
+
+    // POST /api/orders/:id/accept — the driver takes it.
+    acceptOffer: async (req, res) => {
+        const client = await pool.connect();
+        try {
+            const { id } = req.params;
+            const driverName = req.user?.username;
+
+            await client.query('BEGIN');
+            // The whole race, in one statement. Only an offer still standing,
+            // still this driver's, and not yet lapsed can be taken -- so a
+            // second accept, or one arriving after the offer expired, changes
+            // nothing and reports honestly rather than quietly winning.
+            const taken = await client.query(
+                `UPDATE orders
+                    SET status = 'ASSIGNED', offer_expires_at = NULL, updated_at = NOW()
+                  WHERE id = $1 AND status = 'OFFERED' AND assigned_to = $2
+                    AND (offer_expires_at IS NULL OR offer_expires_at > NOW())
+                  RETURNING id, cargo_description, status, driver_net_rwf`,
+                [id, driverName]
+            );
+            if (taken.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: 'ORDERS_OFFER_GONE',
+                    message: 'That offer is no longer open — it may have expired or been withdrawn.',
+                });
+            }
+
+            await client.query(
+                `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by) VALUES ($1, 'OFFERED', 'ASSIGNED', $2)`,
+                [id, driverName]
+            );
+            await client.query('COMMIT');
+
+            io.emit('order:status-updated', { orderId: Number(id), status: 'ASSIGNED', initiatedByDriver: true, timestamp: new Date().toISOString() });
+            return ok(res, { order: taken.rows[0] });
+        } catch (error) {
+            await client.query('ROLLBACK').catch(() => {});
+            logError(req, 'Accept failed', error);
+            return fail(res, { status: 500, code: 'ORDERS_ACCEPT_FAILED', message: 'Could not accept that job.' });
+        } finally {
+            client.release();
+        }
+    },
+
+    // POST /api/orders/:id/decline — the driver says no.
+    //
+    // The refusal is recorded, not just the release. A run being turned down
+    // repeatedly is dispatch learning the rate is wrong for it, and that is
+    // only visible if the noes are kept.
+    declineOffer: async (req, res) => {
+        const client = await pool.connect();
+        try {
+            const { id } = req.params;
+            const driverName = req.user?.username;
+            const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 300) : null;
+
+            await client.query('BEGIN');
+            const released = await client.query(
+                `UPDATE orders
+                    SET status = 'PENDING', assigned_to = NULL, offer_expires_at = NULL, updated_at = NOW()
+                  WHERE id = $1 AND status = 'OFFERED' AND assigned_to = $2
+                  RETURNING id, cargo_description`,
+                [id, driverName]
+            );
+            if (released.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return fail(res, { status: 409, code: 'ORDERS_OFFER_GONE', message: 'That offer is no longer open.' });
+            }
+
+            await client.query(
+                `INSERT INTO order_offer_declines (order_id, driver_username, reason) VALUES ($1, $2, $3)
+                 ON CONFLICT (order_id, driver_username) DO UPDATE SET reason = EXCLUDED.reason, declined_at = NOW()`,
+                [id, driverName, reason]
+            );
+            await client.query(
+                `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by) VALUES ($1, 'OFFERED', 'PENDING', $2)`,
+                [id, driverName]
+            );
+            await client.query('COMMIT');
+
+            // Back on the board, and dispatch told why. A job silently
+            // returning to PENDING looks like a glitch; a job returning with
+            // "too far for the rate" is something to act on.
+            io.emit('order:offer-declined', { orderId: Number(id), driverName, reason });
+            return ok(res, { released: released.rows[0], reason });
+        } catch (error) {
+            await client.query('ROLLBACK').catch(() => {});
+            logError(req, 'Decline failed', error);
+            return fail(res, { status: 500, code: 'ORDERS_DECLINE_FAILED', message: 'Could not turn that job down.' });
+        } finally {
+            client.release();
+        }
+    },
+
     getReturnLoads: async (req, res) => {
         try {
             const candidates = await returnLoadCandidatesFor(req.params.id);

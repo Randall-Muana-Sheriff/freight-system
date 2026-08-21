@@ -9,7 +9,7 @@ import { ToastOverlay, type Toast } from '../../../components/ToastOverlay';
 import { theme } from '../../../lib/theme';
 import { useAuth } from '../../../lib/auth';
 import * as ImagePicker from 'expo-image-picker';
-import { updateOrderStatus, fetchOrderById, confirmDelivery, isNetworkFailure, type OrderDetail } from '../../../lib/api';
+import { updateOrderStatus, fetchOrderById, confirmDelivery, acceptJobOffer, declineJobOffer, isNetworkFailure, type OrderDetail } from '../../../lib/api';
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
 import { isJobInProgress } from '../../../lib/assignments';
 import { useUpNavigation } from '../../../lib/navigation';
@@ -90,6 +90,7 @@ export default function TripDetailScreen() {
   const goToJobs = useUpNavigation('/(app)/assignments');
   const { token } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [answeringOffer, setAnsweringOffer] = useState(false);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -271,6 +272,32 @@ export default function TripDetailScreen() {
   // have anything to transit with. PICKED_UP is deliberately not here: this
   // app has never sent it, and adding a step nobody asked for to a flow
   // drivers already know is a worse trade than leaving one status unused.
+  // Work the driver has not agreed to yet. Until they answer, none of the
+  // ordinary job controls belong on screen: "start transit" on a job you have
+  // not taken is an accept button wearing the wrong label.
+  const isOffer = (order?.status || '').toUpperCase() === 'OFFERED';
+
+  const answerOffer = async (accept: boolean) => {
+    if (!order || !token) return;
+    setAnsweringOffer(true);
+    try {
+      if (accept) {
+        await acceptJobOffer(token, order.id);
+      } else {
+        await declineJobOffer(token, order.id);
+      }
+      goToJobs();
+    } catch (error) {
+      setToast({
+        icon: 'alert-circle-outline',
+        message: error instanceof Error ? error.message : 'Could not answer that offer.',
+        tone: 'error',
+      });
+    } finally {
+      setAnsweringOffer(false);
+    }
+  };
+
   const nextAction = (['AT_PICKUP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'] as ActionStatus[]).find(
     (status) => STATUS_ORDER.indexOf(status) > currentStatusIndex
   );
@@ -406,6 +433,13 @@ export default function TripDetailScreen() {
             </>
           ) : null}
 
+          {/* No ladder on a job that is not theirs. stepIndexForStatus has no
+              case for OFFERED and falls through to step zero, so this rendered
+              "Accepted — current job state" directly above a button asking the
+              driver whether to accept. A job they have not taken has no
+              progress to show. */}
+          {isOffer ? null : (
+          <>
           <View style={styles.divider} />
 
           <View style={styles.timeline}>
@@ -421,6 +455,8 @@ export default function TripDetailScreen() {
               </View>
             ))}
           </View>
+          </>
+          )}
 
           {isJobInProgress(order.status || '') ? (
             <>
@@ -445,7 +481,44 @@ export default function TripDetailScreen() {
 
           <View style={styles.divider} />
 
-          {nextAction ? (
+          {/* An offer, before it is anything else. The ordinary controls are
+              hidden while this is up: "start transit" on a job the driver has
+              not taken is an accept button wearing the wrong label, and the
+              one decision in front of them is whether to take it at all. The
+              pay is repeated here because that is what the decision is made
+              on. */}
+          {isOffer ? (
+            <View style={styles.nextStep}>
+              <Text style={styles.nextStepEyebrow}>Offered to you</Text>
+              <Text style={styles.offerPrompt}>
+                {order.driver_net_rwf != null
+                  ? `${Number(order.driver_net_rwf).toLocaleString()} RWF to you. Take this job?`
+                  : 'Take this job?'}
+              </Text>
+              <View style={styles.offerRow}>
+                <TouchableOpacity
+                  style={[styles.offerButton, styles.offerDecline]}
+                  onPress={() => void answerOffer(false)}
+                  disabled={answeringOffer}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.offerDeclineText}>No thanks</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.offerButton, styles.offerAccept]}
+                  onPress={() => void answerOffer(true)}
+                  disabled={answeringOffer}
+                  accessibilityRole="button"
+                >
+                  {answeringOffer ? (
+                    <ActivityIndicator color={theme.colors.ink} size="small" />
+                  ) : (
+                    <Text style={styles.offerAcceptText}>Accept</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : nextAction ? (
             <View style={styles.nextStep}>
               <Text style={styles.nextStepEyebrow}>Next step</Text>
               <View style={styles.nextStepRow}>
@@ -528,6 +601,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontFamily: theme.fonts.body,
   },
+  offerPrompt: { color: theme.colors.text, ...theme.type.body, marginTop: 6 },
+  offerRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  offerButton: { flex: 1, borderRadius: theme.radius.pill, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
+  offerDecline: { backgroundColor: theme.colors.panelSoft },
+  offerDeclineText: { color: theme.colors.muted, ...theme.type.body },
+  offerAccept: { backgroundColor: theme.colors.primary },
+  offerAcceptText: { color: theme.colors.ink, ...theme.type.body, fontFamily: theme.fonts.headingBlack },
   payValue: {
     color: theme.colors.primary,
     ...theme.type.heading,

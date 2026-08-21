@@ -61,6 +61,7 @@ const MIGRATIONS = [
     { id: 'add_pickup_detention.sql', destructive: false },
     { id: 'add_backfill_credit.sql', destructive: false },
     { id: 'add_operator_licence.sql', destructive: false },
+    { id: 'add_job_offers.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

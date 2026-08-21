@@ -41,6 +41,7 @@ export function AssignmentCard({
   note,
   payRwf,
   payIsEstimate,
+  isOffer,
   onPress,
 }: {
   title: string;
@@ -52,6 +53,7 @@ export function AssignmentCard({
   note?: string | null;
   payRwf?: number | null;
   payIsEstimate?: boolean;
+  isOffer?: boolean;
   onPress?: () => void;
 }) {
   const palette = getStatusPalette(status);
@@ -97,6 +99,15 @@ export function AssignmentCard({
             line up. "About" when the price came from weight alone and can
             still move -- a driver told a number that later changes stops
             believing the next one. */}
+        {/* Work that is not theirs yet has to look different from work that
+            is. A driver scanning their board should never mistake an offer
+            for a job they have already agreed to and plan their day round it. */}
+        {isOffer ? (
+          <View style={styles.offerRow}>
+            <Ionicons name="help-circle-outline" size={12} color={theme.colors.gold} />
+            <Text style={styles.offerText}>Offered — accept or decline</Text>
+          </View>
+        ) : null}
         {payRwf != null ? (
           <View style={styles.payRow}>
             <Text style={styles.payAmount}>
@@ -144,6 +155,8 @@ const styles = StyleSheet.create({
   metaText: { color: theme.colors.text, ...theme.type.label, flexShrink: 1, fontFamily: theme.fonts.body },
   metaDot: { color: theme.colors.muted, ...theme.type.label },
   metaMono: { color: theme.colors.muted, ...theme.type.micro, fontFamily: theme.fonts.mono },
+  offerRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  offerText: { color: theme.colors.gold, ...theme.type.micro, fontFamily: theme.fonts.mono },
   payRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 6 },
   payAmount: {
     color: theme.colors.primary,

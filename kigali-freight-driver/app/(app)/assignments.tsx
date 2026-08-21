@@ -96,10 +96,14 @@ export default function AssignmentsScreen() {
   // glance what's actually in their hands right now versus what's still
   // waiting — a single undifferentiated list forced them to read every
   // status badge to figure that out themselves.
-  const { inProgress, awaiting } = useMemo(
+  const { offers, inProgress, awaiting } = useMemo(
     () => ({
-      inProgress: assignments.filter((a) => isJobInProgress(a.status)),
-      awaiting: assignments.filter((a) => !isJobInProgress(a.status)),
+      // Offers first and separate. Work a driver has not agreed to is a
+      // decision waiting on them, not a job on their plate, and burying it
+      // under "awaiting pickup" is how an offer quietly expires.
+      offers: assignments.filter((a) => a.isOffer),
+      inProgress: assignments.filter((a) => !a.isOffer && isJobInProgress(a.status)),
+      awaiting: assignments.filter((a) => !a.isOffer && !isJobInProgress(a.status)),
     }),
     [assignments]
   );
@@ -142,6 +146,17 @@ export default function AssignmentsScreen() {
         )
       ) : (
         <>
+          {offers.length > 0 ? (
+            <View style={styles.group}>
+              <Text style={styles.groupLabel}>Offered to you</Text>
+              <View>
+                {offers.map((item) => (
+                  <AssignmentCard key={item.id} {...item} onPress={() => router.push(`/(app)/trip/${item.id}`)} />
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           {inProgress.length > 0 ? (
             <View style={styles.group}>
               <Text style={styles.groupLabel}>In progress</Text>

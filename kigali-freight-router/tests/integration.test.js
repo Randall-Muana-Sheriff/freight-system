@@ -882,6 +882,96 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.notEqual(assignable.statusCode, 403, 'a verified driver must stay assignable');
     });
 
+    // An independent driver with their own truck is deciding whether a run is
+    // worth their diesel, not being told to do it. Assignment stays a push for
+    // fleet drivers; this is the other path.
+    test('offers: a driver can accept, and a second accept cannot also win', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ cargo_description: 'Offer probe', weight_kg: 500, origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536 });
+        const orderId = created.body.data.order.id;
+
+        const offered = await request(app).post('/api/orders/offer')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone, expiresInMinutes: 30 });
+        assert.equal(offered.statusCode, 200, JSON.stringify(offered.body));
+        assert.equal(offered.body.data.offered[0].status, 'OFFERED');
+
+        const accepted = await request(app).post(`/api/orders/${orderId}/accept`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(accepted.statusCode, 200, JSON.stringify(accepted.body));
+        assert.equal(accepted.body.data.order.status, 'ASSIGNED');
+
+        // The whole race lives in one conditional UPDATE, so a second accept
+        // must change nothing and say so rather than quietly winning.
+        const again = await request(app).post(`/api/orders/${orderId}/accept`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(again.statusCode, 409);
+        assert.equal(again.body.error.code, 'ORDERS_OFFER_GONE');
+    });
+
+    test('offers: declining puts the job back and records why', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ cargo_description: 'Decline probe', weight_kg: 500, origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536 });
+        const orderId = created.body.data.order.id;
+
+        await request(app).post('/api/orders/offer')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone });
+
+        const declined = await request(app).post(`/api/orders/${orderId}/decline`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ reason: 'Too far for the rate' });
+        assert.equal(declined.statusCode, 200, JSON.stringify(declined.body));
+
+        const row = (await pool.query('SELECT status, assigned_to FROM orders WHERE id = $1', [orderId])).rows[0];
+        assert.equal(row.status, 'PENDING', 'the job goes back on the board');
+        assert.equal(row.assigned_to, null);
+
+        // A run turned down repeatedly is dispatch learning its rate is wrong,
+        // which is only visible if the noes are kept.
+        const why = (await pool.query('SELECT reason FROM order_offer_declines WHERE order_id = $1', [orderId])).rows[0];
+        assert.equal(why.reason, 'Too far for the rate');
+
+        // And it is not handed straight back to the same driver.
+        const reoffer = await request(app).post('/api/orders/offer')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone });
+        assert.equal(reoffer.statusCode, 409);
+        assert.equal(reoffer.body.error.code, 'ORDERS_ALREADY_DECLINED');
+    });
+
+    test('offers: an expired offer cannot be accepted', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ cargo_description: 'Expiry probe', weight_kg: 500, origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536 });
+        const orderId = created.body.data.order.id;
+
+        await request(app).post('/api/orders/offer')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone, expiresInMinutes: 5 });
+        await pool.query(`UPDATE orders SET offer_expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1`, [orderId]);
+
+        const late = await request(app).post(`/api/orders/${orderId}/accept`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(late.statusCode, 409, 'an offer that ran out is not still open');
+    });
+
+    test('offers: assignment stays a push, so the fleet path is unchanged', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ cargo_description: 'Fleet push probe', weight_kg: 500, origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536 });
+        const orderId = created.body.data.order.id;
+
+        const assigned = await request(app).post('/api/orders/assign')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone });
+        assert.equal(assigned.statusCode, 200, JSON.stringify(assigned.body));
+
+        const row = (await pool.query('SELECT status FROM orders WHERE id = $1', [orderId])).rows[0];
+        assert.equal(row.status, 'ASSIGNED', 'an employed driver is given the work, not asked');
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.

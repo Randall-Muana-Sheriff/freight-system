@@ -17,6 +17,9 @@ export type DriverAssignmentCard = {
   /** True while that pay was priced from weight alone and can still move,
    *  because dispatch has not pinned the job to the map yet. */
   payIsEstimate: boolean;
+  /** True while this is an offer the driver has not answered. Work they have
+   *  not agreed to must not sit on the board looking like work they have. */
+  isOffer: boolean;
 };
 
 // A job is "in progress" once a driver has physically picked it up — before
@@ -85,5 +88,6 @@ export function toDriverAssignmentCard(order: DriverAssignment): DriverAssignmen
     // choosing between two of them.
     payRwf: order.driver_net_rwf == null ? null : Number(order.driver_net_rwf),
     payIsEstimate: order.price_is_estimate === true,
+    isOffer: (order.status || '').toUpperCase() === 'OFFERED',
   };
 }

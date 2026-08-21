@@ -40,3 +40,21 @@ describe('pay on an assignment card', () => {
         expect(toDriverAssignmentCard({ ...order, driver_net_rwf: 100 }).payIsEstimate).toBe(false);
     });
 });
+
+describe('offers on the board', () => {
+    it('marks a job the driver has not agreed to yet', () => {
+        expect(toDriverAssignmentCard({ ...order, status: 'OFFERED' }).isOffer).toBe(true);
+    });
+
+    it('does not mark work already assigned as an offer', () => {
+        // The whole distinction: a driver planning their day must not mistake
+        // an offer for a job that is already theirs.
+        for (const status of ['ASSIGNED', 'AT_PICKUP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED']) {
+            expect(toDriverAssignmentCard({ ...order, status }).isOffer).toBe(false);
+        }
+    });
+
+    it('reads the status case-insensitively, like everything else here', () => {
+        expect(toDriverAssignmentCard({ ...order, status: 'offered' }).isOffer).toBe(true);
+    });
+});

@@ -54,6 +54,13 @@ router.get('/:id', authMiddleware(['admin', 'dispatcher', 'driver']), OrderContr
 
 // Dispatch Routing & Driver Assignment Trigger
 router.post('/assign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.assignOrderBundle);
+// The partner path, alongside /assign rather than instead of it: a fleet
+// driver is given work, an independent one is asked.
+router.post('/offer', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.offerOrders);
+// Answering an offer is the driver's alone -- that is the entire point of
+// there being an offer rather than an assignment.
+router.post('/:id/accept', authMiddleware(['driver']), orderWriteLimit, OrderController.acceptOffer);
+router.post('/:id/decline', authMiddleware(['driver']), orderWriteLimit, OrderController.declineOffer);
 router.patch('/:id/reassign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.reassignOrder);
 // Pins a customer-placed order to real coordinates. Dispatch-only: it is a
 // judgement call about what a customer's free-text address actually means.

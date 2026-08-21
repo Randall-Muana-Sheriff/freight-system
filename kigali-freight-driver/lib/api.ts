@@ -71,6 +71,10 @@ export type DriverAssignment = {
   // Already inside driver_net_rwf. Sent separately so the app can say why
   // that figure moved rather than leaving the driver to guess.
   detention_rwf?: string | number | null;
+  // Set while a job is offered rather than assigned. An offer is work the
+  // driver has not agreed to yet, which is the difference between being an
+  // employee and being an independent operator with their own truck.
+  offer_expires_at?: string | null;
 };
 
 // The rate-limit middleware already computes the exact remaining wait as
@@ -335,6 +339,17 @@ export type OrderDetail = DriverAssignment & {
   distanceRemainingKm?: number | null;
   etaMinutes?: number | null;
 };
+
+export async function acceptJobOffer(token: string, orderId: number) {
+  return apiFetch(`/api/orders/${orderId}/accept`, { token, method: 'POST', body: {} });
+}
+
+// The reason is optional and free text. "Too far for the rate" and "already
+// loaded" are different problems, and only one of them is about pricing --
+// dispatch can only learn that if the driver can say which it was.
+export async function declineJobOffer(token: string, orderId: number, reason?: string) {
+  return apiFetch(`/api/orders/${orderId}/decline`, { token, method: 'POST', body: { reason } });
+}
 
 export async function fetchOrderById(token: string, orderId: number) {
   return (await apiFetch(`/api/orders/${orderId}`, { token })) as OrderDetail;
