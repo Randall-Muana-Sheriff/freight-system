@@ -28,6 +28,10 @@ const hasIntegrationEnv = requiredEnv.every((key) => Boolean(process.env[key]));
 const hasAdminBootstrap = Boolean(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
 
 const uniqueId = Date.now();
+// Everything this suite writes is created after this instant, which is what
+// the teardown below uses to find its own rows. Taken before any request so
+// nothing the run creates can predate it.
+const runStartedAt = new Date();
 const dispatcherUser = { username: `it_dispatcher_${uniqueId}`, password: 'TempPass123!' };
 const driverPhone = `+2507${String(uniqueId).slice(-8)}`;
 const driverPin = '4821';
@@ -1214,7 +1218,62 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(again.body.error.code, 'STOP_ALREADY_CLOSED');
     });
 
+    // Without this the suite leaves its whole world behind on every run:
+    // a dispatcher, a driver, their orders, alerts, checklists and OTPs. That
+    // accumulates — a local database had 42 users and 250 orders, most of them
+    // from past runs, and enough public orders to exhaust the max:10/hour
+    // rate limit and fail two of the suite's own tests.
+    //
+    // Rows are found by creation time rather than by id because the suite
+    // creates them across forty tests through the real HTTP endpoints and
+    // never collects the ids. That is only safe against a database nothing
+    // else is writing to, so it mirrors ops/seed-demo-data.js's guard and
+    // refuses anything but a local host.
     test.after(async () => {
+        const host = String(process.env.DB_HOST || '');
+        const isLocal = ['localhost', '127.0.0.1', 'postgres', ''].includes(host);
+
+        if (!isLocal) {
+            console.warn(`⚠️  Skipping test cleanup: DB_HOST is "${host}", not a local database. ` +
+                'Rows created by this run were left in place.');
+        } else {
+            const client = await pool.connect();
+            try {
+                await client.query('BEGIN');
+                await client.query('DELETE FROM geofence_alerts WHERE created_at >= $1', [runStartedAt]);
+                await client.query('DELETE FROM driver_safety_checklists WHERE driver_username = $1', [driverPhone]);
+                await client.query('DELETE FROM otp_codes WHERE created_at >= $1', [runStartedAt]);
+                // Before orders: trip_stops cascade from orders, but the trip
+                // row itself only has its driver nulled, so it would survive.
+                await client.query('DELETE FROM trips WHERE created_at >= $1', [runStartedAt]);
+                // orders.created_at is `timestamp WITHOUT time zone` while every
+                // other table here uses `timestamp WITH time zone`. Passing a JS
+                // Date to the bare column compares local wall-clock against
+                // UTC-stored values and silently matches nothing, which is how
+                // nine orders per run survived the first version of this. The
+                // cast reads the parameter as an instant, then converts it to the
+                // UTC wall-clock the column actually holds.
+                await client.query(
+                    `DELETE FROM orders WHERE created_at >= ($1::timestamptz AT TIME ZONE 'UTC')`,
+                    [runStartedAt]
+                );
+                // Never the bootstrap admin: it comes from migrate.js's seedAdmin
+                // and every later run logs in as it.
+                await client.query(
+                    `DELETE FROM users WHERE created_at >= $1 AND role <> 'admin'`,
+                    [runStartedAt]
+                );
+                await client.query('COMMIT');
+            } catch (err) {
+                await client.query('ROLLBACK');
+                // A cleanup failure must not turn a passing suite red — the rows
+                // are recoverable, a false failure costs more.
+                console.warn(`⚠️  Test cleanup failed, rows left behind: ${err.message}`);
+            } finally {
+                client.release();
+            }
+        }
+
         await shutdownServices();
     });
 }
