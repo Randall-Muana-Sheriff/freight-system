@@ -404,7 +404,15 @@ function NotificationBell() {
     );
 }
 
-export default function TopCommandBar() {
+// Two workspaces, one segmented control. Deliberately next to the brand and
+// not among the account/connection controls on the right: this is where you
+// ARE, not something you do. `act` count on Monitor so the switch itself says
+// whether anything is waiting over there — otherwise splitting the screens
+// just hides problems behind a tab.
+export default function TopCommandBar({ workspace, onSwitchWorkspace }: {
+    workspace: 'dispatch' | 'monitor';
+    onSwitchWorkspace: (w: 'dispatch' | 'monitor') => void;
+}) {
     const { userRole, jwtToken, isConnected, toggleNetworkStream, logout, trackedAssets, violations, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
     const [menuOpen, setMenuOpen] = useState(false);
     const now = useNow();
@@ -426,6 +434,22 @@ export default function TopCommandBar() {
                     <p className="data-label mt-1 text-steel">Dispatch Control</p>
                 </div>
             </div>
+
+            <nav aria-label="Workspace" className="flex shrink-0 items-center gap-1 rounded-md border border-line/15 p-0.5">
+                {([['dispatch', 'Dispatch'], ['monitor', 'Monitor']] as const).map(([id, label]) => (
+                    <button
+                        key={id}
+                        type="button"
+                        onClick={() => onSwitchWorkspace(id)}
+                        aria-current={workspace === id ? 'page' : undefined}
+                        className={`focus-ring rounded px-3 py-1.5 text-micro font-semibold uppercase tracking-wide transition-colors ${
+                            workspace === id ? 'bg-panel-soft text-paper' : 'text-steel hover:text-paper'
+                        }`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </nav>
 
             <div className="flex items-center gap-2 overflow-x-auto min-w-0">
                 <StatChip icon={Truck} label="Active assets" value={activeAssetCount} />

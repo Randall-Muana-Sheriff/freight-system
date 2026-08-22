@@ -307,6 +307,40 @@ export interface ComplianceReport {
     expiringSoon: ComplianceIssue[];
 }
 
+// The exception feed behind the Monitor workspace. Eight sources the backend
+// already computed but nothing surfaced: unplaced bookings, unanswered offers,
+// deliveries arrived but never closed, lapsed and expiring documents, stale
+// GPS, open vehicle defects, and orders still carrying an estimated price.
+//
+// Two severities on purpose. `act` means a person has to do something now;
+// `watch` is degrading but not yet blocking. If everything is an exception,
+// nothing is. Counts are exact; items are the worst five of each.
+export interface ExceptionItem {
+    id: string | number;
+    title: string;
+    subtitle?: string | null;
+    since?: string | null;
+    orderId?: number | null;
+    driver?: string | null;
+}
+
+export interface ExceptionGroup {
+    key: string;
+    label: string;
+    severity: 'act' | 'watch';
+    count: number;
+    items: ExceptionItem[];
+}
+
+export interface ExceptionReport {
+    generatedAt: string;
+    groups: ExceptionGroup[];
+}
+
+export async function fetchExceptions(token: string) {
+    return apiFetch('/api/exceptions', { method: 'GET', token }) as Promise<ExceptionReport>;
+}
+
 export async function fetchComplianceIssues(token: string) {
     return apiFetch('/api/fleet/compliance', { method: 'GET', token }) as Promise<ComplianceReport>;
 }

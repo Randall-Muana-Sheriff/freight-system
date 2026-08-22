@@ -5,6 +5,7 @@
 // down as 17 props to FleetMap and 18 to SecondaryPanel. Moved into
 // MapInteractionContext — same state, same handlers, just no longer
 // passed as props through a component that never read them.
+import { useState } from 'react';
 import { MapInteractionProvider, useMapInteraction } from '../context/MapInteractionContext';
 import { useResizableWidth } from '../hooks/useResizableWidth';
 import TopCommandBar from './TopCommandBar';
@@ -12,13 +13,29 @@ import OperationsRail from './OperationsRail';
 import SecondaryPanel from './SecondaryPanel';
 import FleetMap from './FleetMap';
 import ArrivalTimeline from './ArrivalTimeline';
+import ExceptionsHome from './ExceptionsHome';
+import MonitorRail from './MonitorRail';
+
+// Two jobs, two screens.
+//
+// The board previously carried roughly fourteen tools at once: a queue turning
+// over 131 orders sat on the same screen as 3 hubs, 1 kiosk, 18 users and 11
+// rate cards — things read once and changed a few times a year. That is a
+// three-orders-of-magnitude frequency mismatch, and it is the real argument
+// for splitting rather than any appeal to how other systems look.
+//
+// Dispatch is the doing: the queue, assignment, and the map, because geography
+// matters at the moment you place a load. Monitor is the watching: what has
+// gone wrong, sorted worst first, with no map because a list of exceptions is
+// not a geographic question. Admin Center was already correctly separate.
+export type Workspace = 'dispatch' | 'monitor';
 
 // When the map is wider than this it stops being a reference and starts
 // being a work surface, which is what placing a pin or tracing a boundary
 // actually needs. Only used while one of those modes is live.
 const PLACING_MIN_MAP = 940;
 
-function BoardLayout() {
+function BoardLayout({ workspace, onSwitch }: { workspace: Workspace; onSwitch: (w: Workspace) => void }) {
     // Which column is allowed to grow is the whole argument.
     //
     // The board used to give the map every pixel the two rails did not
@@ -53,6 +70,17 @@ function BoardLayout() {
         storageKey: 'operationsRailWidth', defaultWidth: 480, min: 260, max: 620, edge: 'right',
     });
 
+    if (workspace === 'monitor') {
+        return (
+            <div className="flex flex-1 overflow-hidden">
+                <div className="min-w-0 flex-1 bg-ink">
+                    <ExceptionsHome onGoToDispatch={() => onSwitch('dispatch')} />
+                </div>
+                <MonitorRail />
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-1 overflow-hidden">
             <OperationsRail collapsed={railCollapsed} onToggleCollapse={toggleRail} onStartResize={startResize} />
@@ -75,14 +103,15 @@ function BoardLayout() {
 }
 
 export default function Dashboard() {
+    const [workspace, setWorkspace] = useState<Workspace>('dispatch');
     return (
         <MapInteractionProvider>
             {/* font-sans now resolves to Inter rather than the OS UI
                 font; the focus-ring colour and the faux-bold guard come from
                 ops-surface, which App.tsx puts above all three staff screens. */}
             <div className="flex flex-col h-screen w-screen bg-ink text-paper overflow-hidden font-sans">
-                <TopCommandBar />
-                <BoardLayout />
+                <TopCommandBar workspace={workspace} onSwitchWorkspace={setWorkspace} />
+                <BoardLayout workspace={workspace} onSwitch={setWorkspace} />
             </div>
         </MapInteractionProvider>
     );
