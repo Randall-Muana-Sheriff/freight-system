@@ -126,6 +126,34 @@ async function main() {
     check('website enquiry accepted', enquiry.ok, JSON.stringify(enquiry.error));
 
     // ── Journey B: the dispatcher works the queue ───────────────────
+    // Before B, deliberately. A failed dispatcher sign-in ends the run, and
+    // pricing a job needs no sign-in at all -- it is the same call the booking
+    // form makes while somebody is still typing. Putting it behind an admin
+    // password meant a production run with the wrong credentials reported
+    // nothing about whether customers were being quoted correctly.
+    journey('A2. A visitor is quoted a price');
+
+    const vanQuote = await api('/api/public/quote?weightKg=400&distanceKm=8.38');
+    const van = vanQuote.data;
+    check('a job can be priced before anyone signs in', vanQuote.ok && van?.totalRwf > 0, JSON.stringify(vanQuote.error));
+    check('weight picks the vehicle class', van?.vehicleClass === 'Light Van', `got ${van?.vehicleClass}`);
+    check('the quote states the waiting terms', Number(van?.freeWaitingMinutes) > 0,
+        'the booking form reads the allowance from here rather than hardcoding it');
+
+    const truckQuote = await api('/api/public/quote?weightKg=3000&distanceKm=8.38');
+    check('a heavier load prices higher and as a truck',
+        truckQuote.data?.vehicleClass === 'Medium Truck' && truckQuote.data?.totalRwf > van?.totalRwf,
+        `${truckQuote.data?.vehicleClass} at ${truckQuote.data?.totalRwf}`);
+
+    // Distance has to cost something, and more than the same job across town:
+    // this is what the road factor and the long-distance taper exist for.
+    const farQuote = await api('/api/public/quote?weightKg=400&distanceKm=98');
+    check('a longer run costs more than a short one',
+        farQuote.data?.totalRwf > van?.totalRwf, `${farQuote.data?.totalRwf} vs ${van?.totalRwf}`);
+
+    const badQuote = await api('/api/public/quote?weightKg=-5');
+    check('a nonsense weight is refused rather than priced', !badQuote.ok, `status ${badQuote.status}`);
+
     journey('B. Dispatcher works the queue (control tower)');
     if (!ADMIN_USER || !ADMIN_PASS) {
         record(false, 'admin credentials available', 'set ADMIN_USERNAME and ADMIN_PASSWORD');
@@ -428,10 +456,18 @@ async function main() {
     const reviewQueue = await api('/api/driver-documents', { token: adminToken });
     check('the document review queue loads', reviewQueue.ok, JSON.stringify(reviewQueue.error));
     const rows = reviewQueue.data || [];
-    const dupes = rows.filter((r, i) =>
-        rows.findIndex((x) => x.username === r.username && x.documentType === r.documentType) !== i);
-    check('no document is listed twice', dupes.length === 0,
-        dupes.map((d) => `${d.username}/${d.documentType}`).join(', '));
+    // Keyed on what actually identifies a document, which is not the same for
+    // both kinds. A driver's papers are unique per person and type; a
+    // vehicle's are unique per plate and type, and a vehicle sitting between
+    // drivers has no username at all. Keying everything on username meant 75
+    // documents belonging to 25 different unassigned trucks all collapsed to
+    // "null/vehicle_registration" and were reported as duplicates -- a check
+    // that cried wolf on a healthy queue, which is worse than not checking.
+    const identity = (r) => (r.holderKind === 'vehicle'
+        ? `vehicle:${r.plateNumber}/${r.documentType}`
+        : `driver:${r.username}/${r.documentType}`);
+    const dupes = rows.filter((r, i) => rows.findIndex((x) => identity(x) === identity(r)) !== i);
+    check('no document is listed twice', dupes.length === 0, dupes.map(identity).join(', '));
     check('vehicle documents carry their plate',
         rows.filter((r) => r.holderKind === 'vehicle').every((r) => Boolean(r.plateNumber)), '');
 
@@ -474,6 +510,36 @@ async function main() {
     }
     const garbage = await api('/api/users', { token: 'not-a-real-token' });
     check('a forged token is rejected', garbage.status === 401 || garbage.status === 403, `status ${garbage.status}`);
+
+    // ── I ────────────────────────────────────────────────────────────────
+    //
+    // The money. Every figure here reaches either a customer's bill or a
+    // driver's pay, and each was built and checked on its own -- but nothing
+    // walked them together, which is the only way to notice that a quote, an
+    // offer, a refusal and a wait have to agree about the same job.
+    journey('I. The rate card, and who may touch it');
+
+    if (adminToken) {
+        const rates = await api('/api/pricing/rates', { token: adminToken });
+        check('an admin can read the rate card', rates.ok && Array.isArray(rates.data?.rates) && rates.data.rates.length > 0,
+            JSON.stringify(rates.error));
+        const diesel = Number(rates.data?.rates?.[0]?.diesel_price_rwf_per_litre);
+        check('the card carries a diesel price', Number.isFinite(diesel) && diesel > 0, `got ${diesel}`);
+
+        const badRate = await api('/api/pricing/rates', {
+            method: 'POST', token: adminToken,
+            body: { vehicleClass: 'Light Van', platform_commission_pct: 1500 },
+        });
+        check('an absurd commission is refused', !badRate.ok, `status ${badRate.status}`);
+    } else {
+        record(true, 'rate card checks skipped — needs an admin sign-in', '');
+    }
+
+    if (driverToken) {
+        const boundary = await api('/api/pricing/rates', { token: driverToken });
+        check('a driver cannot read the rate card', boundary.status === 401 || boundary.status === 403,
+            `status ${boundary.status} — this is what every customer is charged and every driver paid`);
+    }
 
     await finish();
 }
