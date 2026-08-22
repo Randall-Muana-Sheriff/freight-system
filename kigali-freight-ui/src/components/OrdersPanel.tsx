@@ -13,6 +13,7 @@ import BatchSuggestions from './orders/BatchSuggestions';
 import BulkActionBar from './orders/BulkActionBar';
 import BulkPlaceFlow from './orders/BulkPlaceFlow';
 import SavedViews from './orders/SavedViews';
+import { resolveQueueKey, isTypingTarget } from './orders/queueKeys';
 import OrderRow from './orders/OrderRow';
 import InFlightRow from './orders/InFlightRow';
 import { isAssignableDriver, type StaffUser, type LatLng, type Order } from '../types';
@@ -152,29 +153,19 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     const selectedIds = [...selected];
 
     // Keyboard navigation. A dispatcher lives at this desk all day, and
-    // reaching for the mouse to step down a queue is the kind of small tax
-    // that adds up over a shift. j/k rather than arrows so the list can be
-    // walked without leaving the home row, and because arrows are already
-    // scrolling the panel.
+    // reaching for the mouse to step down a queue is a small tax that adds up
+    // over a shift. What each key means lives in queueKeys.ts so it can be
+    // tested without mounting the board — this effect only wires it up.
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
-            const el = e.target as HTMLElement | null;
-            // Never steal a keystroke from something being typed into.
-            if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
+            if (isTypingTarget(e.target)) return;
             if (e.metaKey || e.ctrlKey || e.altKey) return;
-            if (visibleOrders.length === 0) return;
-
-            const at = visibleOrders.findIndex((o) => o.id === cursorId);
-            const move = (delta: number) => {
-                e.preventDefault();
-                const next = at === -1 ? 0 : Math.min(visibleOrders.length - 1, Math.max(0, at + delta));
-                setCursorId(visibleOrders[next].id);
-            };
-
-            if (e.key === 'j') move(1);
-            else if (e.key === 'k') move(-1);
-            else if (e.key === 'x' && at !== -1) { e.preventDefault(); toggleOne(visibleOrders[at].id); }
-            else if (e.key === 'Escape') { e.preventDefault(); setCursorId(null); }
+            const action = resolveQueueKey(e.key, visibleOrders.map((o) => o.id), cursorId);
+            if (!action) return;
+            e.preventDefault();
+            if (action.kind === 'move') setCursorId(action.toId);
+            else if (action.kind === 'toggle') toggleOne(action.id);
+            else setCursorId(null);
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
