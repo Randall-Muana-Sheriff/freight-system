@@ -3,9 +3,12 @@ import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
 import { lookupHints, resolveToken, unresolvedTokensForBacklog } from '../services/placeHintService.js';
 
-// A sweep is throttled at roughly a second a request, so a single call has to
-// be bounded or it becomes a request that never returns. Twenty-five is about
-// thirty seconds and covers the whole current backlog in one go.
+// A sweep is throttled at roughly a second a request and one phrase can spend
+// several attempts walking its candidates, so a call has to be bounded by the
+// clock rather than by a count -- twenty-five short names and twenty-five long
+// ones are minutes apart. The budget is checked before each new phrase, so a
+// sweep overruns by at most one phrase's worth of attempts.
+const SWEEP_BUDGET_MS = 45_000;
 const MAX_PER_SWEEP = 25;
 
 export const PlaceHintController = {
@@ -47,16 +50,23 @@ export const PlaceHintController = {
     warm: async (req, res) => {
         try {
             const pending = await unresolvedTokensForBacklog();
-            const batch = pending.slice(0, MAX_PER_SWEEP);
+            const deadline = Date.now() + SWEEP_BUDGET_MS;
             const resolved = [];
-            for (const token of batch) {
+            let attempted = 0;
+
+            for (const token of pending) {
+                if (attempted >= MAX_PER_SWEEP || Date.now() >= deadline) break;
+                attempted += 1;
                 const row = await resolveToken(token);
+                // A null row is a geocoder failure, not a miss -- nothing was
+                // written, so the next sweep will try this phrase again.
                 if (row) resolved.push({ token: row.token, found: row.lat !== null, resolvedFrom: row.resolved_from });
             }
+
             return ok(res, {
-                attempted: batch.length,
+                attempted,
                 found: resolved.filter((r) => r.found).length,
-                remaining: Math.max(0, pending.length - batch.length),
+                remaining: Math.max(0, pending.length - attempted),
                 resolved,
             });
         } catch (error) {

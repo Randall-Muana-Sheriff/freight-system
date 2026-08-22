@@ -15,7 +15,7 @@ import pool from '../config/db.js';
 import { geocodeSearch } from './geocodeService.js';
 // Two bookings that say "Kimironko Market, Shop 14" and "kimironko market
 // shop 14" are the same question and must not cost two lookups.
-import { normalizeToken } from '../utils/placeToken.js';
+import { candidatePhrases, normalizeToken } from '../utils/placeToken.js';
 
 export { normalizeToken };
 
@@ -39,27 +39,26 @@ export async function lookupHints(tokens) {
 }
 
 /**
- * Resolves one phrase, walking backwards until something matches.
+ * Resolves one phrase, trying its candidates until something matches.
  *
- * Returns the row it wrote. A miss is written too, with miss_count bumped --
- * otherwise a name Nominatim will never know is retried on every sweep for
- * ever, spending the throttle on a question already answered.
+ * Returns the row it wrote, or null if it gave up without writing. A miss is
+ * written, with miss_count bumped -- otherwise a name the geocoder will never
+ * know is retried on every sweep for ever, spending the throttle on a question
+ * already answered. A network failure is NOT a miss and writes nothing, so an
+ * outage never gets recorded as an answer.
+ *
+ * maxAttempts bounds the throttle a single phrase can spend: every attempt is
+ * about a second, and a long address line has a lot of candidates.
  */
-export async function resolveToken(raw) {
+export async function resolveToken(raw, { maxAttempts = 8 } = {}) {
     const token = normalizeToken(raw);
     if (!token) return null;
 
-    const words = token.split(' ');
-    for (let take = words.length; take > 0; take -= 1) {
-        const attempt = words.slice(0, take).join(' ');
-        if (attempt.length < 3) break;
-
+    for (const attempt of candidatePhrases(token).slice(0, maxAttempts)) {
         let results = [];
         try {
             results = await geocodeSearch(attempt, { limit: 1 });
         } catch {
-            // A network failure is not a miss. Leave the token untouched so
-            // the next sweep tries again rather than caching an outage.
             return null;
         }
 
