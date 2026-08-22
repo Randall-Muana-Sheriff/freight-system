@@ -452,9 +452,20 @@ export default function TopCommandBar({ workspace, onSwitchWorkspace }: {
             </nav>
 
             <div className="flex items-center gap-2 overflow-x-auto min-w-0">
-                <StatChip icon={Truck} label="Active assets" value={activeAssetCount} />
+                {/* Ordered as the work actually flows — queued, moving,
+                    visible, wrong — rather than as four unrelated counts.
+                    "Active assets" used to sit first and it was quietly
+                    dishonest: it counts DRIVERS whose last GPS ping is fresh,
+                    while "In flight" counts ORDERS. Two different units side
+                    by side, so "0 active assets" next to "16 in flight" read
+                    as a broken board when it was a true and rather important
+                    statement — sixteen loads moving with nobody reporting a
+                    position. Renamed to say what it measures, and placed
+                    immediately after In flight so the pair reads as the
+                    sentence it is. */}
                 <StatChip icon={Package} label="Dispatch queue" value={activeOrders.length} />
                 <StatChip icon={Radio} label="In flight" value={inFlightOrders.length} />
+                <StatChip icon={Truck} label="Reporting now" value={activeAssetCount} />
                 <StatChip icon={AlertTriangle} label="Incidents" value={violations.length} alert={violations.length > 0} />
             </div>
 
