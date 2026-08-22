@@ -1,4 +1,5 @@
 import { hashDelete, hashGet, hashGetAll, hashSet, listLength, listPopBatch, listPush } from './sharedState.js';
+import { marketTime } from '../utils/marketTime.js';
 import { sendPushToUser } from './pushNotificationService.js';
 import { getAssetLabelForDriver, ALERT_CATEGORY } from './alertDispatchService.js';
 
@@ -193,7 +194,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                     .catch(() => driverName)
                     .then((assetLabel) => {
                         dispatchExternalAlert(
-                            `🚨 *CRITICAL SAFETY INCIDENT* 🚨\n\n*Asset:* ${assetLabel}\n*Incident:* ${violationType}\n*Detail:* ${description}\n*Timestamp:* ${new Date(timestamp).toLocaleTimeString()}`,
+                            `🚨 *CRITICAL SAFETY INCIDENT* 🚨\n\n*Asset:* ${assetLabel}\n*Incident:* ${violationType}\n*Detail:* ${description}\n*Timestamp:* ${marketTime(timestamp)}`,
                             ALERT_CATEGORY.SAFETY
                         );
                     });
@@ -262,7 +263,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                     await hashSet(DRIVER_STALE_KEY, driverName, { since: Date.now() });
                     const assetLabel = await getAssetLabelForDriver(driverName).catch(() => driverName);
                     dispatchExternalAlert(
-                        `📡 *SIGNAL LOST* 📡\n\n*Asset:* ${assetLabel}\n*Detail:* No GPS update for over ${Math.round(ageSeconds / 60)} min during an active delivery.\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                        `📡 *SIGNAL LOST* 📡\n\n*Asset:* ${assetLabel}\n*Detail:* No GPS update for over ${Math.round(ageSeconds / 60)} min during an active delivery.\n*Timestamp:* ${marketTime()}`,
                         ALERT_CATEGORY.GPS
                     );
                 } else if (!isStale && alreadyFlagged) {
@@ -308,7 +309,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                 const assetLabel = await getAssetLabelForDriver(row.driverName).catch(() => row.driverName);
                 const hoursStuck = Math.round((Date.now() - new Date(row.updatedAt).getTime()) / 3_600_000);
                 dispatchExternalAlert(
-                    `📦 *DELIVERY NOT CONFIRMED* 📦\n\n*Asset:* ${assetLabel}\n*Order:* #${orderId} — ${row.cargoDescription}\n*Detail:* Marked arrived ${hoursStuck}h ago, never confirmed delivered.\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                    `📦 *DELIVERY NOT CONFIRMED* 📦\n\n*Asset:* ${assetLabel}\n*Order:* #${orderId} — ${row.cargoDescription}\n*Detail:* Marked arrived ${hoursStuck}h ago, never confirmed delivered.\n*Timestamp:* ${marketTime()}`,
                     ALERT_CATEGORY.DELIVERY
                 );
             }

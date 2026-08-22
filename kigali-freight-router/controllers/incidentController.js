@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/node';
+import { marketTime } from '../utils/marketTime.js';
 import pool from '../config/db.js';
 import { io } from '../server.js';
 import { ok, fail } from '../utils/httpResponse.js';
@@ -89,7 +90,7 @@ function alertDispatchOfIncident({ driverName, severity, title, description }) {
         .catch(() => driverName)
         .then((assetLabel) => {
             dispatchExternalAlert(
-                `${emoji} *DRIVER REPORTED INCIDENT* ${emoji}\n\n*Asset:* ${assetLabel}\n*Severity:* ${tone}\n*Report:* ${title}\n${description}\n*Timestamp:* ${new Date().toLocaleTimeString()}`,
+                `${emoji} *DRIVER REPORTED INCIDENT* ${emoji}\n\n*Asset:* ${assetLabel}\n*Severity:* ${tone}\n*Report:* ${title}\n${description}\n*Timestamp:* ${marketTime()}`,
                 ALERT_CATEGORY.INCIDENT
             );
         });
