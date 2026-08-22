@@ -66,6 +66,11 @@ router.patch('/:id/reassign', authMiddleware(['admin', 'dispatcher']), orderWrit
 // judgement call about what a customer's free-text address actually means.
 router.patch('/:id/priority', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.updateOrderPriority);
 router.patch('/:id/place', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.placeOrder);
+// Batch siblings. Registered before nothing in particular -- neither collides
+// with '/:id/...', because 'place-batch' and 'priority' are whole paths rather
+// than an id segment followed by one.
+router.patch('/place-batch', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.placeOrderBatch);
+router.post('/priority', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.setOrderPriorityBatch);
 
 // Delivery Lifecycle Milestone Route
 router.patch('/:id/status', authMiddleware(['admin', 'driver', 'dispatcher']), orderWriteLimit, OrderController.updateOrderStatus);

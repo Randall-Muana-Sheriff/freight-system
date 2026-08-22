@@ -17,6 +17,9 @@ import { issueDeliveryCode, sendDeliveryCode, verifyDeliveryCode, DELIVERY_CODE_
 import { PricingError } from '../services/pricingService.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'OFFERED', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
+// A dispatcher works a backlog in sittings, not in one gesture; this is
+// well above any real selection and still bounds the request.
+const MAX_BATCH_PLACEMENTS = 100;
 const ALLOWED_ORDER_PRIORITIES = ['high', 'normal', 'low'];
 
 // Matches the staleness threshold fleetController.js already uses to mark
@@ -67,6 +70,120 @@ const ARRIVAL_STATUSES = ['AT_PICKUP', 'ARRIVED'];
 // is still accepted — a stale/missing GPS fix or an imprecise drop pin
 // shouldn't block a driver from closing out a real delivery.
 const DELIVERY_LOCATION_FLAG_METERS = 500;
+
+// A refusal that names itself, so placing many orders can report which one
+// failed and why without each failure being an HTTP response.
+class PlacementError extends Error {
+    constructor(code, status, message) {
+        super(message);
+        this.name = 'PlacementError';
+        this.code = code;
+        this.status = status;
+    }
+}
+
+/**
+ * Everything that placing one order does, minus the HTTP.
+ *
+ * Both the single-order endpoint and the batch run through here. The subtle
+ * part is the repricing below -- a real price replaces the estimate while
+ * quoted_total is deliberately left alone -- and a second copy of that rule
+ * would drift from this one the first time either was touched.
+ *
+ * Throws PlacementError for anything the caller did wrong. Anything else is a
+ * real fault and is left to propagate.
+ */
+async function placeOneOrder({ id, pickupLat, pickupLng, deliveryLat, deliveryLng, originHubId, req }) {
+    for (const [label, lat, lng] of [
+        ['Pickup', pickupLat, pickupLng],
+        ['Delivery', deliveryLat, deliveryLng],
+    ]) {
+        if (!isValidLat(lat) || !isValidLng(lng)) {
+            throw new PlacementError('ORDERS_PLACE_INVALID_COORDS', 400,
+                `${label} coordinates are missing or out of range.`);
+        }
+    }
+
+    // Optional: a dispatcher may tie the pickup to a real hub, which is what
+    // keeps origin_hub_id's foreign key (and the "can't delete a hub in use"
+    // protection behind it) meaningful.
+    let hub = null;
+    if (originHubId !== undefined && originHubId !== null && originHubId !== '') {
+        const hubResult = await pool.query(`SELECT id, name FROM hubs WHERE id = $1;`, [originHubId]);
+        if (hubResult.rows.length === 0) {
+            throw new PlacementError('ORDERS_HUB_NOT_FOUND', 400, 'That pickup hub no longer exists.');
+        }
+        hub = hubResult.rows[0];
+    }
+
+    const result = await pool.query(
+        `UPDATE orders SET
+            pickup_lat = $2, pickup_lng = $3,
+            delivery_lat = $4, delivery_lng = $5,
+            pickup_coordinates  = ST_SetSRID(ST_MakePoint($3, $2), 4326),
+            delivery_coordinates = ST_SetSRID(ST_MakePoint($5, $4), 4326),
+            pickup_geom          = ST_SetSRID(ST_MakePoint($3, $2), 4326),
+            delivery_geom        = ST_SetSRID(ST_MakePoint($5, $4), 4326),
+            origin_hub_id   = COALESCE($6, origin_hub_id),
+            origin_hub_name = COALESCE($7, origin_hub_name),
+            updated_at = NOW()
+         WHERE id = $1
+         RETURNING id, pickup_lat, pickup_lng, delivery_lat, delivery_lng, origin_hub_name,
+                   weight_kg, quoted_total;`,
+        [id, pickupLat, pickupLng, deliveryLat, deliveryLng, hub?.id ?? null, hub?.name ?? null]
+    );
+
+    if (result.rows.length === 0) {
+        throw new PlacementError('ORDERS_NOT_FOUND', 404, 'That order no longer exists.');
+    }
+
+    // This is the moment an estimate becomes a price. Until now the order had
+    // only two free-text addresses, so it was priced on class and weight
+    // alone; pinning it to the map is the first time a real distance exists.
+    // quoted_total is deliberately left alone -- a customer who was shown one
+    // number and is charged another is owed the original, and overwriting it
+    // would erase the only record of what they agreed to.
+    try {
+        const pickup = { lat: pickupLat, lng: pickupLng };
+        const dropoff = { lat: deliveryLat, lng: deliveryLng };
+        const distanceKm = await distanceKmBetween(pickup, dropoff);
+        const repriced = await priceJob({
+            weightKg: result.rows[0].weight_kg,
+            distanceKm,
+            pickup,
+            delivery: dropoff,
+        });
+
+        await pool.query(
+            `UPDATE orders SET
+                pricing_rate_id = $2, priced_vehicle_class = $3,
+                price_total = $4, price_fuel = $5, price_service = $6,
+                platform_fee = $7, driver_net = $8,
+                price_distance_km = $9, price_is_estimate = FALSE,
+                return_leg_amount = $10,
+                updated_at = NOW()
+              WHERE id = $1`,
+            [id, repriced.pricingRateId, repriced.vehicleClass, repriced.totalAmount,
+             repriced.fuelAmount, repriced.serviceAmount, repriced.platformFee,
+             repriced.driverNet, repriced.distanceKm, repriced.returnLegAmount]
+        );
+    } catch (err) {
+        // Placing the order on the map is the operation the dispatcher asked
+        // for and it has already succeeded. A pricing failure must not undo
+        // that -- the order stays placed, keeps its estimate, and is reported
+        // so it can be repriced.
+        logError(req, `Repricing order #${id} after placement failed`, err);
+        if (!(err instanceof PricingError)) Sentry.captureException(err, { tags: { orderId: String(id) } });
+    }
+
+    await appendAuditLog({
+        actionType: 'ORDER_PLACED_ON_MAP',
+        description: `Order #${id} pinned to ${pickupLat.toFixed(5)},${pickupLng.toFixed(5)} -> ${deliveryLat.toFixed(5)},${deliveryLng.toFixed(5)}`,
+        username: req.user?.username || 'System',
+    });
+
+    return result.rows[0];
+}
 
 export const OrderController = {
     // Driver view of assigned jobs
@@ -1330,110 +1447,128 @@ export const OrderController = {
 
     placeOrder: async (req, res) => {
         try {
-            const { id } = req.params;
             const { pickupLat, pickupLng, deliveryLat, deliveryLng, originHubId } = req.body || {};
-
-            for (const [label, lat, lng] of [
-                ['Pickup', pickupLat, pickupLng],
-                ['Delivery', deliveryLat, deliveryLng],
-            ]) {
-                if (!isValidLat(lat) || !isValidLng(lng)) {
-                    return fail(res, {
-                        status: 400,
-                        code: 'ORDERS_PLACE_INVALID_COORDS',
-                        message: `${label} coordinates are missing or out of range.`,
-                    });
-                }
+            const row = await placeOneOrder({
+                id: req.params.id, pickupLat, pickupLng, deliveryLat, deliveryLng, originHubId, req,
+            });
+            return ok(res, row);
+        } catch (error) {
+            if (error instanceof PlacementError) {
+                return fail(res, { status: error.status, code: error.code, message: error.message });
             }
+            logError(req, 'Database error', error);
+            return fail(res, { status: 500, code: 'ORDERS_PLACE_FAILED', message: 'Could not save those locations.' });
+        }
+    },
 
-            // Optional: a dispatcher may tie the pickup to a real hub, which
-            // is what keeps origin_hub_id's foreign key (and the "can't
-            // delete a hub in use" protection behind it) meaningful.
-            let hub = null;
-            if (originHubId !== undefined && originHubId !== null && originHubId !== '') {
-                const hubResult = await pool.query(`SELECT id, name FROM hubs WHERE id = $1;`, [originHubId]);
-                if (hubResult.rows.length === 0) {
-                    return fail(res, { status: 400, code: 'ORDERS_HUB_NOT_FOUND', message: 'That pickup hub no longer exists.' });
+    // PATCH /api/orders/place-batch
+    //
+    // Placing the unplaced backlog is the one job a dispatcher does dozens of
+    // times in a sitting, and a round trip per pin makes the work feel like
+    // the tool is arguing with them.
+    //
+    // Every order is placed independently and reported independently. One
+    // order pinned into the sea must not discard the nineteen good pins
+    // beside it -- the dispatcher would have to redo work that was correct,
+    // which is worse than the bad pin. So there is no batch transaction:
+    // partial success is the intended outcome, not a compromise.
+    placeOrderBatch: async (req, res) => {
+        const placements = Array.isArray(req.body?.placements) ? req.body.placements : null;
+        if (!placements || placements.length === 0) {
+            return fail(res, { status: 400, code: 'ORDERS_PLACE_BATCH_EMPTY', message: 'Send at least one placement.' });
+        }
+        // Bounded because the work is bounded: each placement is several
+        // queries plus a repricing, and an unbounded array is an unbounded
+        // request.
+        if (placements.length > MAX_BATCH_PLACEMENTS) {
+            return fail(res, {
+                status: 400,
+                code: 'ORDERS_PLACE_BATCH_TOO_LARGE',
+                message: `Place at most ${MAX_BATCH_PLACEMENTS} orders at a time.`,
+            });
+        }
+
+        const placed = [];
+        const failed = [];
+        for (const p of placements) {
+            const orderId = p?.orderId;
+            try {
+                const row = await placeOneOrder({
+                    id: orderId,
+                    pickupLat: p?.pickupLat,
+                    pickupLng: p?.pickupLng,
+                    deliveryLat: p?.deliveryLat,
+                    deliveryLng: p?.deliveryLng,
+                    originHubId: p?.originHubId,
+                    req,
+                });
+                placed.push(row);
+            } catch (error) {
+                if (error instanceof PlacementError) {
+                    failed.push({ orderId, code: error.code, message: error.message });
+                    continue;
                 }
-                hub = hubResult.rows[0];
+                // A real fault against one order still must not take the rest
+                // of the batch down, but it is logged as the fault it is
+                // rather than reported as the dispatcher's mistake.
+                logError(req, `Placing order #${orderId} in a batch failed`, error);
+                failed.push({ orderId, code: 'ORDERS_PLACE_FAILED', message: 'Could not save those locations.' });
+            }
+        }
+
+        return ok(res, { placed, failed, placedCount: placed.length, failedCount: failed.length });
+    },
+
+    // POST /api/orders/priority
+    //
+    // Bulk sibling of PATCH /:id/priority. Reported the same way as the batch
+    // above: ids that no longer exist come back as failures rather than
+    // silently doing nothing, because a dispatcher who selected twenty rows
+    // and changed nineteen needs to know which one got away.
+    setOrderPriorityBatch: async (req, res) => {
+        try {
+            const { orderIds, priority } = req.body || {};
+            if (!Array.isArray(orderIds) || orderIds.length === 0) {
+                return fail(res, { status: 400, code: 'ORDERS_PRIORITY_NO_IDS', message: 'Select at least one order.' });
+            }
+            if (orderIds.length > MAX_BATCH_PLACEMENTS) {
+                return fail(res, {
+                    status: 400,
+                    code: 'ORDERS_PRIORITY_TOO_MANY',
+                    message: `Change at most ${MAX_BATCH_PLACEMENTS} orders at a time.`,
+                });
+            }
+            if (!ALLOWED_ORDER_PRIORITIES.includes(priority)) {
+                return fail(res, {
+                    status: 400,
+                    code: 'ORDERS_PRIORITY_INVALID',
+                    message: `Priority must be one of: ${ALLOWED_ORDER_PRIORITIES.join(', ')}.`,
+                });
             }
 
             const result = await pool.query(
-                `UPDATE orders SET
-                    pickup_lat = $2, pickup_lng = $3,
-                    delivery_lat = $4, delivery_lng = $5,
-                    pickup_coordinates  = ST_SetSRID(ST_MakePoint($3, $2), 4326),
-                    delivery_coordinates = ST_SetSRID(ST_MakePoint($5, $4), 4326),
-                    pickup_geom          = ST_SetSRID(ST_MakePoint($3, $2), 4326),
-                    delivery_geom        = ST_SetSRID(ST_MakePoint($5, $4), 4326),
-                    origin_hub_id   = COALESCE($6, origin_hub_id),
-                    origin_hub_name = COALESCE($7, origin_hub_name),
-                    updated_at = NOW()
-                 WHERE id = $1
-                 RETURNING id, pickup_lat, pickup_lng, delivery_lat, delivery_lng, origin_hub_name,
-                           weight_kg, quoted_total;`,
-                [id, pickupLat, pickupLng, deliveryLat, deliveryLng, hub?.id ?? null, hub?.name ?? null]
+                `UPDATE orders SET priority = $2, updated_at = NOW() WHERE id = ANY($1::int[])
+                 RETURNING id, priority, cargo_description`,
+                [orderIds, priority]
             );
 
-            if (result.rows.length === 0) {
-                return fail(res, { status: 404, code: 'ORDERS_NOT_FOUND', message: 'That order no longer exists.' });
-            }
+            const updatedIds = new Set(result.rows.map((r) => r.id));
+            const failed = orderIds
+                .filter((id) => !updatedIds.has(Number(id)))
+                .map((id) => ({ orderId: id, code: 'ORDERS_NOT_FOUND', message: 'That order no longer exists.' }));
 
-            // This is the moment an estimate becomes a price. Until now the
-            // order had only two free-text addresses, so it was priced on
-            // class and weight alone; pinning it to the map is the first time
-            // a real distance exists. quoted_total is deliberately left
-            // alone -- a customer who was shown one number and is charged
-            // another is owed the original, and overwriting it would erase
-            // the only record of what they agreed to.
-            let repriced = null;
-            try {
-                const pickup = { lat: pickupLat, lng: pickupLng };
-                const dropoff = { lat: deliveryLat, lng: deliveryLng };
-                const distanceKm = await distanceKmBetween(pickup, dropoff);
-                repriced = await priceJob({
-                    weightKg: result.rows[0].weight_kg,
-                    distanceKm,
-                    pickup,
-                    delivery: dropoff,
-                });
-
-                await pool.query(
-                    `UPDATE orders SET
-                        pricing_rate_id = $2, priced_vehicle_class = $3,
-                        price_total = $4, price_fuel = $5, price_service = $6,
-                        platform_fee = $7, driver_net = $8,
-                        price_distance_km = $9, price_is_estimate = FALSE,
-                        return_leg_amount = $10,
-                        updated_at = NOW()
-                      WHERE id = $1`,
-                    [id, repriced.pricingRateId, repriced.vehicleClass, repriced.totalAmount,
-                     repriced.fuelAmount, repriced.serviceAmount, repriced.platformFee,
-                     repriced.driverNet, repriced.distanceKm, repriced.returnLegAmount]
-                );
-            } catch (err) {
-                // Placing the order on the map is the operation the dispatcher
-                // asked for and it has already succeeded. A pricing failure
-                // must not undo that -- the order stays placed, keeps its
-                // estimate, and is reported so it can be repriced.
-                logError(req, `Repricing order #${id} after placement failed`, err);
-                if (!(err instanceof PricingError)) Sentry.captureException(err, { tags: { orderId: String(id) } });
-            }
-
+            // One line for the batch, not one per order: twenty rows saying
+            // the same thing at the same second buries the log it lives in.
             await appendAuditLog({
-                actionType: 'ORDER_PLACED_ON_MAP',
-                description: `Order #${id} pinned to ${pickupLat.toFixed(5)},${pickupLng.toFixed(5)} -> ${deliveryLat.toFixed(5)},${deliveryLng.toFixed(5)}`,
+                actionType: 'ORDER_PRIORITY_CHANGED',
+                description: `${result.rows.length} order(s) set to ${priority} priority: #${result.rows.map((r) => r.id).join(', #')}`,
                 username: req.user?.username || 'System',
             });
 
-            return ok(res, result.rows[0]);
+            return ok(res, { updated: result.rows, failed, updatedCount: result.rows.length, failedCount: failed.length });
         } catch (error) {
             logError(req, 'Database error', error);
-            return fail(res, {
-                status: 500,
-                code: 'ORDERS_PLACE_FAILED',
-                message: 'Could not save those locations.',
-            });
+            return fail(res, { status: 500, code: 'ORDERS_PRIORITY_BATCH_FAILED', message: 'Could not change those priorities.' });
         }
     },
 
