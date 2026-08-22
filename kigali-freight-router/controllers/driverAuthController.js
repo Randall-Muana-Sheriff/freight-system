@@ -119,8 +119,8 @@ export const DriverAuthController = {
             const forReview = isReviewDemoPhone(phone);
             const code = forReview ? REVIEW_DEMO_OTP : generateOtpCode();
             const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
-            await pool.query(
-                `INSERT INTO otp_codes (phone_number, code_hash, expires_at) VALUES ($1, $2, $3)`,
+            const { rows: [issued] } = await pool.query(
+                `INSERT INTO otp_codes (phone_number, code_hash, expires_at) VALUES ($1, $2, $3) RETURNING id`,
                 [phone, hashCode(code), expiresAt]
             );
 
@@ -147,6 +147,15 @@ export const DriverAuthController = {
             } else {
                 const result = await sendSms(phone, `Your Inzira verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
                 smsSent = result.sent;
+                // Recorded against the code itself, so the exceptions board
+                // can name the drivers left waiting. A driver asking for a
+                // code is not visible to dispatch the way inviting one is --
+                // they do it alone, from their own handset, and until this
+                // was written down nobody at dispatch could know it failed.
+                await pool.query(
+                    `UPDATE otp_codes SET sms_status = $2 WHERE id = $1`,
+                    [issued.id, smsSent ? 'Sent' : (result.reason || 'Unknown')]
+                ).catch(() => {});
                 if (!smsSent) {
                     console.warn(`⚠️  OTP issued for ${phone} but no SMS was sent (${result.reason || 'sms unavailable'}).`);
                 }

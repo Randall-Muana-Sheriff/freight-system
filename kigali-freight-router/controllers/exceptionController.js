@@ -1,7 +1,7 @@
 // What needs a human, gathered in one place.
 //
 // A dispatch board that opens on a queue asks the dispatcher to find the
-// problem. This is the other way round: eight sources of deviation, already
+// problem. This is the other way round: nine sources of deviation, already
 // computed elsewhere in the system, collected and ranked so the first thing
 // on screen is the thing that is wrong.
 //
@@ -55,6 +55,38 @@ const GROUPS = [
                 FROM orders o
                WHERE o.status = 'OFFERED' AND o.offer_expires_at IS NOT NULL AND o.offer_expires_at <= NOW()
                ORDER BY o.offer_expires_at ASC`,
+    },
+    {
+        key: 'sign_in_code_undelivered',
+        label: 'Drivers who never got their sign-in code',
+        severity: 'act',
+        // A driver inviting themselves back in is invisible to dispatch: they
+        // do it alone, from their own handset, and if the text fails they see
+        // a code that never comes while nobody here knows. That is a driver
+        // who cannot start their shift, which is why this is `act`.
+        //
+        // Scoped to codes still unused and still worth reading out: once one
+        // is consumed the driver is in, and once it expires reading it out
+        // would not help. The window matches the code's own life.
+        sql: `SELECT o.id::text AS id, NULL::int AS order_id,
+                     COALESCE(u.full_name, o.phone_number) AS title,
+                     'Could not text their code — ' || CASE o.sms_status
+                         WHEN 'InsufficientBalance'   THEN 'the SMS account is out of credit'
+                         WHEN 'InvalidSenderId'       THEN 'the sender ID is being refused'
+                         WHEN 'NotConfigured'         THEN 'no SMS provider is set up'
+                         WHEN 'Sandbox'               THEN 'sandbox account, texts do not reach Rwanda'
+                         WHEN 'SendFailed'            THEN 'the provider could not be reached'
+                         WHEN 'UserInBlacklist'       THEN 'they have opted out of our messages'
+                         WHEN 'InvalidPhoneNumber'    THEN 'the provider rejected their number'
+                         WHEN 'UnsupportedNumberType' THEN 'that number cannot receive texts'
+                         ELSE o.sms_status
+                     END AS subtitle,
+                     o.created_at AS since, o.phone_number AS driver
+                FROM otp_codes o
+                LEFT JOIN users u ON u.phone_number = o.phone_number AND u.role = 'driver'
+               WHERE o.sms_status IS NOT NULL AND o.sms_status <> 'Sent'
+                 AND o.consumed_at IS NULL AND o.expires_at > NOW()
+               ORDER BY o.created_at ASC`,
     },
     {
         key: 'delivery_not_confirmed',

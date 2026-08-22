@@ -1,3 +1,4 @@
+import { dispatchExternalAlert, ALERT_CATEGORY } from './alertDispatchService.js';
 // Sends SMS via Africa's Talking when AT_API_KEY/AT_USERNAME are configured.
 // Until then (no account set up yet), this logs the message to the server
 // console instead of failing — the entire OTP/invite flow stays fully
@@ -55,11 +56,40 @@ async function sendWithRetry(sms, payload, attempts = 2) {
     throw lastError;
 }
 
+// Some rejections are about one number; these are about the whole account,
+// and every driver and customer is affected until somebody acts.
+const ACCOUNT_WIDE_FAILURES = {
+    InsufficientBalance: 'Africa\u2019s Talking is out of credit. No sign-in codes, delivery codes or customer updates are being sent.',
+    InvalidSenderId: 'The Africa\u2019s Talking sender ID is being refused. No texts are going out.',
+    UnsupportedNumberType: null,
+    UserInBlacklist: null,
+};
+
+// Once an hour, not once a message. A dead account fails every send, and a
+// dispatcher who gets forty identical alerts learns to close them without
+// reading -- which is the same as having no alert at all.
+const ALARM_INTERVAL_MS = 60 * 60 * 1000;
+let lastAlarmAt = 0;
+let lastAlarmStatus = null;
+
+function raiseAccountAlarm(status) {
+    const description = ACCOUNT_WIDE_FAILURES[status];
+    if (!description) return;
+    const now = Date.now();
+    if (status === lastAlarmStatus && now - lastAlarmAt < ALARM_INTERVAL_MS) return;
+    lastAlarmAt = now;
+    lastAlarmStatus = status;
+    // Deliberately not awaited: an SMS must not be held up by the alerting
+    // for the SMS having failed, and dispatchExternalAlert is a no-op when
+    // no webhook is configured.
+    dispatchExternalAlert(`SMS DOWN: ${description}`, ALERT_CATEGORY.SYSTEM).catch(() => {});
+}
+
 export async function sendSms(phoneNumber, message) {
     const clientPromise = getSmsClient();
     if (!clientPromise) {
         console.log(`[smsService] AT_API_KEY/AT_USERNAME not set — logging instead of sending. To ${phoneNumber}: ${message}`);
-        return { sent: false, logged: true };
+        return { sent: false, logged: true, reason: 'NotConfigured' };
     }
 
     try {
@@ -78,6 +108,7 @@ export async function sendSms(phoneNumber, message) {
         if (recipient && recipient.status !== 'Success') {
             console.error(`❌ SMS rejected for ${phoneNumber}: ${recipient.status} (code ${recipient.statusCode})`);
             console.log(`[smsService] Falling back to log. To ${phoneNumber}: ${message}`);
+            raiseAccountAlarm(recipient.status);
             return { sent: false, logged: true, reason: recipient.status };
         }
 
@@ -92,12 +123,12 @@ export async function sendSms(phoneNumber, message) {
         // which is the precise failure the flag exists to prevent.
         if (isSandbox()) {
             console.log(`[smsService] Sandbox reported success, but only Kenyan Airtel numbers actually receive it — logging too. To ${phoneNumber}: ${message}`);
-            return { sent: false, logged: true, reason: 'sandbox' };
+            return { sent: false, logged: true, reason: 'Sandbox' };
         }
         return { sent: true, logged: false };
     } catch (error) {
         console.error(`❌ SMS send failed for ${phoneNumber}:`, error.message);
         console.log(`[smsService] Falling back to log. To ${phoneNumber}: ${message}`);
-        return { sent: false, logged: true };
+        return { sent: false, logged: true, reason: 'SendFailed' };
     }
 }
