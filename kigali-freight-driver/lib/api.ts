@@ -233,8 +233,15 @@ export type DriverInviteResult = {
 
 export type DriverAuthTokens = { token: string; refreshToken: string; role: string };
 
+// smsSent is false when Africa's Talking is unconfigured, out of credit, or
+// rejects the number. The code is still issued and still valid -- a dispatcher
+// can read it out over the phone -- so this is not an error, but the screen
+// must not tell the driver to check their messages when nothing was sent.
 export async function requestDriverOtp(phoneNumber: string) {
-  return (await apiFetch('/api/auth/driver/otp/request', { method: 'POST', body: { phoneNumber } })) as { accepted: boolean };
+  return (await apiFetch('/api/auth/driver/otp/request', { method: 'POST', body: { phoneNumber } })) as {
+    accepted: boolean;
+    smsSent: boolean;
+  };
 }
 
 // No /api prefix — this is served by systemRoutes.js, the router's one

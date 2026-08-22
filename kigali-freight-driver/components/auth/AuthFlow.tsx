@@ -112,6 +112,15 @@ export function AuthFlow() {
       .catch(() => {});
   }, []);
 
+  // Africa's Talking is not sending yet -- no credit, and the sender ID waits
+  // on registering Inzira -- so this is the path a real driver hits today,
+  // not a rare failure. Point them at a person rather than leaving them
+  // watching an inbox.
+  const noSmsMessage = () =>
+    dispatchPhone
+      ? `We could not text you. Call dispatch on ${dispatchPhone} for your code.`
+      : 'We could not text you. Contact dispatch for your code.';
+
   const enterApp = () => router.replace('/(app)');
 
   const onSubmitPhone = async () => {
@@ -122,9 +131,15 @@ export function AuthFlow() {
     setLoading(true);
     setToast(null);
     try {
-      await requestDriverOtp(phoneDigits);
+      const { smsSent } = await requestDriverOtp(phoneDigits);
       setOtpValue('');
       setStep('otp');
+      // Still advance: the code exists and is valid whether or not the text
+      // went out, so a driver standing next to a dispatcher can be read it.
+      // What must not happen is the OTP screen telling them to check their
+      // messages when no message was sent.
+      if (!smsSent) setToast({ icon: 'chatbubble-ellipses-outline', tone: 'warning',
+        message: noSmsMessage() });
     } catch (error) {
       setToast({ icon: 'alert-circle-outline', message: error instanceof Error ? error.message : 'Could not send a code.', tone: 'error' });
     } finally {
@@ -159,7 +174,11 @@ export function AuthFlow() {
 
   const onResend = async () => {
     try {
-      await requestDriverOtp(phoneDigits);
+      const { smsSent } = await requestDriverOtp(phoneDigits);
+      if (!smsSent) {
+        setToast({ icon: 'chatbubble-ellipses-outline', tone: 'warning', message: noSmsMessage() });
+        return;
+      }
       setResent(true);
       setTimeout(() => setResent(false), 2500);
     } catch (error) {

@@ -83,9 +83,16 @@ export async function sendSms(phoneNumber, message) {
 
         console.log(`[smsService] Sent to ${phoneNumber} — messageId ${recipient?.messageId ?? 'unknown'}, cost ${recipient?.cost ?? 'unknown'}.`);
 
+        // The sandbox charges a cost and reports Success, but only Kenyan
+        // Airtel numbers ever receive anything — no Rwandan handset will.
+        // So this reports sent: false. `sent` has one meaning to its two
+        // callers, both of which put it on a screen: a handset will get
+        // this. Returning true here would make the driver app tell a
+        // tester to check their messages for a text that cannot arrive,
+        // which is the precise failure the flag exists to prevent.
         if (isSandbox()) {
             console.log(`[smsService] Sandbox reported success, but only Kenyan Airtel numbers actually receive it — logging too. To ${phoneNumber}: ${message}`);
-            return { sent: true, logged: true };
+            return { sent: false, logged: true, reason: 'sandbox' };
         }
         return { sent: true, logged: false };
     } catch (error) {

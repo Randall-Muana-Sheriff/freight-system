@@ -124,16 +124,35 @@ export const DriverAuthController = {
                 [phone, hashCode(code), expiresAt]
             );
 
+            // Whether the text actually went. sendSms never throws -- it
+            // returns { sent: false } when Africa's Talking is unconfigured,
+            // out of credit, or rejects the recipient. This used to be
+            // discarded, and the endpoint answered "accepted" either way, so
+            // a driver was told a code was on its way and then waited for a
+            // message that was never sent. Nobody found out: not the driver,
+            // not dispatch, not the logs anyone reads.
+            //
+            // The code is still issued and still valid -- it can be read out
+            // over the phone by a dispatcher -- so this is not a failure.
+            // It is a fact the caller has to know in order to say something
+            // true on screen. adminController's inviteDriver already returns
+            // smsSent for exactly this reason.
+            let smsSent = false;
             if (forReview) {
                 // No SMS: the number belongs to App Review, not to a driver
                 // holding a handset, and texting a real code to it would
                 // both cost money and leak the constant over SMS.
                 console.log('ℹ️  Review sign-in code issued (no SMS sent).');
+                smsSent = true;
             } else {
-                await sendSms(phone, `Your Inzira verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
+                const result = await sendSms(phone, `Your Inzira verification code is ${code}. It expires in ${OTP_TTL_MINUTES} minutes.`);
+                smsSent = result.sent;
+                if (!smsSent) {
+                    console.warn(`⚠️  OTP issued for ${phone} but no SMS was sent (${result.reason || 'sms unavailable'}).`);
+                }
             }
 
-            return ok(res, { accepted: true });
+            return ok(res, { accepted: true, smsSent });
         } catch (error) {
             return fail(res, { status: 500, code: 'DRIVER_AUTH_OTP_REQUEST_FAILED', message: errorMessage(error, 'Could not send verification code.') });
         }
