@@ -138,51 +138,66 @@ export default function RateCardPanel() {
         }
     };
 
-    if (loading) return <div className="text-micro text-carbon font-mono">Reading the rate card…</div>;
+    if (loading) return <div className="font-mono text-data text-steel">Reading the rate card…</div>;
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             <header className="flex items-center gap-2">
-                <Coins size={14} className="text-signal" />
-                <h2 className="text-paper text-sm font-semibold">Rate card</h2>
+                <Coins size={16} strokeWidth={2.5} className="text-steel" />
+                <h2 className="display-tight text-lead text-paper">Rate card</h2>
             </header>
 
-            <div className="flex gap-1.5">
+            {/* Which vehicle class you are pricing. Was styled with `signal`,
+                which is a PUBLIC-site token and does not exist on the staff
+                palette — so the selected class rendered with no background and
+                no accent at all, and you could not tell which one you were
+                editing. Same segmented control as the workspace switcher, so
+                "where am I" looks the same everywhere on the board. */}
+            <nav aria-label="Vehicle class" className="flex w-fit items-center gap-1 rounded-md border border-line/15 p-0.5">
                 {cards.map((card) => (
                     <button
                         key={card.vehicle_class}
                         type="button"
                         onClick={() => selectClass(card.vehicle_class)}
-                        className={`rounded px-2.5 py-1 text-micro border ${
+                        aria-current={card.vehicle_class === active ? 'true' : undefined}
+                        className={`focus-ring rounded px-3 py-1.5 text-micro font-semibold uppercase tracking-wide transition-colors ${
                             card.vehicle_class === active
-                                ? 'bg-signal/15 border-signal/40 text-signal'
-                                : 'bg-panel border-line/15 text-carbon'
+                                ? 'bg-panel-soft text-paper'
+                                : 'text-steel hover:text-paper'
                         }`}
                     >
                         {card.vehicle_class}
                     </button>
                 ))}
-            </div>
+            </nav>
 
-            <form onSubmit={(e) => void handleSave(e)} className="space-y-5">
+            <form onSubmit={(e) => void handleSave(e)} className="space-y-6">
                 {FIELD_GROUPS.map((group) => (
-                    <fieldset key={group.title} className="space-y-2">
-                        <legend className="text-micro text-paper font-semibold">{group.title}</legend>
-                        <p className="text-micro text-carbon leading-snug">{group.hint}</p>
-                        <div className="grid grid-cols-2 gap-2">
+                    <fieldset key={group.title} className="space-y-3">
+                        <legend className="display-tight text-body text-paper">{group.title}</legend>
+                        <p className="max-w-prose text-data leading-relaxed text-steel">{group.hint}</p>
+                        {/* Wider than two columns where there is room: this is
+                            the full-width admin console, not a 400px rail. */}
+                        <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
                             {group.fields.map((field) => (
                                 <label key={String(field.key)} className="block">
-                                    <span className="text-micro text-carbon">{field.label}</span>
-                                    <div className="flex items-center gap-1.5">
+                                    <span className="data-label text-steel">{field.label}</span>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        {/* text-data, not text-micro. Every
+                                            figure here is money someone is
+                                            charged, and 11px is no size to
+                                            check a diesel price at. */}
                                         <input
                                             type="number"
                                             step="any"
                                             min="0"
                                             value={draft[field.key as string] ?? ''}
                                             onChange={(e) => setDraft((d) => ({ ...d, [field.key]: e.target.value }))}
-                                            className="w-full bg-panel border border-line/15 rounded px-1.5 py-1 text-micro text-paper font-mono tabular-nums"
+                                            className="focus-ring w-full rounded border border-line/15 bg-ink px-2 py-1.5 font-mono text-data tabular-nums text-paper focus:border-route focus:outline-none"
                                         />
-                                        {field.suffix ? <span className="text-micro text-carbon shrink-0">{field.suffix}</span> : null}
+                                        {field.suffix ? (
+                                            <span className="shrink-0 whitespace-nowrap text-micro text-steel">{field.suffix}</span>
+                                        ) : null}
                                     </div>
                                 </label>
                             ))}
@@ -190,36 +205,47 @@ export default function RateCardPanel() {
                     </fieldset>
                 ))}
 
-                <label className="block">
-                    <span className="text-micro text-carbon">Why (kept on the card)</span>
+                <label className="block max-w-xl">
+                    <span className="data-label text-steel">Why — kept on the card</span>
                     <input
                         type="text"
                         value={note}
                         onChange={(e) => setNote(e.target.value)}
                         placeholder="RURA raised diesel to 3,200"
-                        className="w-full bg-panel border border-line/15 rounded px-1.5 py-1 text-micro text-paper"
+                        className="focus-ring mt-1 w-full rounded border border-line/15 bg-ink px-2 py-1.5 text-data text-paper placeholder-steel/60 focus:border-route focus:outline-none"
                     />
                 </label>
 
-                {error ? <p className="text-micro text-hazard">{error}</p> : null}
-                {saved ? <p className="text-micro text-signal">{saved}</p> : null}
-
-                <button
-                    type="submit"
-                    disabled={saving || changeCount === 0}
-                    className="rounded bg-signal/15 border border-signal/40 text-signal px-3 py-1.5 text-micro disabled:opacity-40"
-                >
-                    {saving
-                        ? 'Saving…'
-                        : changeCount === 0
-                            ? 'Change a figure to supersede'
-                            : `Supersede ${active} — ${changeCount} change${changeCount === 1 ? '' : 's'}`}
-                </button>
-                {current?.note ? (
-                    <p className="text-micro text-carbon">
-                        Card in force: {current.note}
-                    </p>
+                {/* rust for a failure, tarp for a success. Previously hazard
+                    and signal — one of which meant "degrading" rather than
+                    "wrong", and the other of which rendered as nothing. */}
+                {error ? (
+                    <p role="alert" className="rounded border border-rust/30 bg-rust/10 p-2.5 font-mono text-data text-rust">{error}</p>
                 ) : null}
+                {saved ? (
+                    <p className="rounded border border-tarp/30 bg-tarp/10 p-2.5 text-data text-tarp">{saved}</p>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* The primary action on this screen, so it looks like one.
+                        It previously carried bg-signal/15, which resolved to no
+                        background whatsoever — a button that writes a new rate
+                        card was rendering as bare text. */}
+                    <button
+                        type="submit"
+                        disabled={saving || changeCount === 0}
+                        className="focus-ring rounded bg-route px-4 py-2 text-micro font-semibold uppercase tracking-wide text-ink transition-colors hover:bg-route-deep hover:text-paper disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                        {saving
+                            ? 'Saving…'
+                            : changeCount === 0
+                                ? 'Change a figure to supersede'
+                                : `Supersede ${active} — ${changeCount} change${changeCount === 1 ? '' : 's'}`}
+                    </button>
+                    {current?.note ? (
+                        <p className="text-data text-steel">Card in force: {current.note}</p>
+                    ) : null}
+                </div>
             </form>
         </div>
     );

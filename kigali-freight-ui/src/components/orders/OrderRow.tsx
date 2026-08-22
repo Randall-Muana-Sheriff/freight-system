@@ -11,6 +11,8 @@ interface OrderRowProps {
     drivers: StaffUser[];
     jwtToken: string;
     onAssigned: () => void;
+    selected: boolean;
+    onToggleSelected: () => void;
 }
 
 // A left-border accent rather than a second text badge next to the
@@ -32,7 +34,7 @@ const PRIORITY_BORDER: Record<'high' | 'normal' | 'low', string> = {
     low: 'border-l-steel/40',
 };
 
-export default function OrderRow({ order, drivers, jwtToken, onAssigned }: OrderRowProps) {
+export default function OrderRow({ order, drivers, jwtToken, onAssigned, selected, onToggleSelected }: OrderRowProps) {
     const { alert } = useDialog();
     const { resolveDriverName } = useSocket();
     const {
@@ -149,8 +151,22 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
     const priority = order.priority || 'normal';
 
     return (
-        <div className={`bg-ink/60 p-2.5 rounded border border-line/10 border-l-4 ${PRIORITY_BORDER[priority]} space-y-2`}>
+        <div className={`p-2.5 rounded border border-l-4 ${PRIORITY_BORDER[priority]} space-y-2 ${
+            selected ? 'border-route/50 bg-route/10' : 'border-line/10 bg-ink/60'
+        }`}>
             <div className="flex flex-wrap justify-between items-start gap-x-2 gap-y-1.5">
+                {/* Outside the disclosure button on purpose: nesting an input
+                    inside a button makes the checkbox unreachable by keyboard
+                    and lets one click do two things. */}
+                <label className="mt-0.5 flex shrink-0 cursor-pointer items-center">
+                    <span className="sr-only">Select {order.cargo_description}</span>
+                    <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={onToggleSelected}
+                        className="focus-ring accent-route"
+                    />
+                </label>
                 <button
                     type="button"
                     onClick={() => setExpanded((v) => !v)}
@@ -310,7 +326,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                                 </span>
                             ) : null}
                             {Number(order.backfill_credit) > 0 ? (
-                                <span className="font-mono tabular-nums text-signal">
+                                <span className="font-mono tabular-nums text-tarp">
                                     −{Number(order.backfill_credit).toLocaleString()} return filled
                                     {order.backfilled_by_order_id ? ` by #${order.backfilled_by_order_id}` : ''}
                                 </span>
@@ -351,7 +367,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                     {returnLoads.length === 0 ? (
                         <span className="text-carbon">Nothing to collect near the drop — this one runs home empty.</span>
                     ) : (
-                        <span className="text-signal">
+                        <span className="text-tarp">
                             Return load:{' '}
                             {returnLoads
                                 .map((c) => `#${c.orderId} ${c.cargo} (${c.collectKmFromDrop}km from the drop)`)

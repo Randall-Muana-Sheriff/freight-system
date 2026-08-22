@@ -10,6 +10,7 @@ import { PackagePlus, MapPin } from 'lucide-react';
 import { createOrder, fetchDrivers } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import BatchSuggestions from './orders/BatchSuggestions';
+import BulkActionBar from './orders/BulkActionBar';
 import OrderRow from './orders/OrderRow';
 import InFlightRow from './orders/InFlightRow';
 import { isAssignableDriver, type StaffUser, type LatLng } from '../types';
@@ -39,6 +40,10 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     // production TMS puts a filter above the queue and expects you to narrow
     // rather than scroll — the list is a work surface, not an archive.
     const [filter, setFilter] = useState('');
+    // Selection lives here rather than in the rows so that "select all" and
+    // the action bar can see it, and so it survives a row expanding or
+    // collapsing underneath it.
+    const [selected, setSelected] = useState<Set<number>>(new Set());
 
     const loadDrivers = useCallback(async () => {
         try {
@@ -108,6 +113,26 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             o.pickup_address_text, o.delivery_address_text,
         ].some((f) => String(f || '').toLowerCase().includes(needle)))
         : activeOrders;
+
+    const toggleOne = (id: number) => setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    });
+
+    // Select-all applies to what is on screen, not to the whole queue. With a
+    // filter active, "all" meaning 131 when 4 are shown is how someone assigns
+    // the wrong hundred loads.
+    const visibleIds = visibleOrders.map((o) => o.id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+    const toggleAllVisible = () => setSelected((prev) => {
+        const next = new Set(prev);
+        if (allVisibleSelected) visibleIds.forEach((id) => next.delete(id));
+        else visibleIds.forEach((id) => next.add(id));
+        return next;
+    });
+
+    const selectedIds = [...selected];
 
     return (
         <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3">
@@ -230,6 +255,26 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 </div>
             )}
 
+            <BulkActionBar
+                selectedIds={selectedIds}
+                drivers={drivers}
+                jwtToken={jwtToken}
+                onDone={() => void refreshFeeds()}
+                onClear={() => setSelected(new Set())}
+            />
+
+            {visibleOrders.length > 1 && (
+                <label className="flex w-fit items-center gap-2 text-micro text-steel">
+                    <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleAllVisible}
+                        className="focus-ring accent-route"
+                    />
+                    {allVisibleSelected ? 'Clear all' : `Select all ${visibleOrders.length} shown`}
+                </label>
+            )}
+
             {/* 46vh rather than a fixed 208px: at 131 queued this box was
                 showing 1.6 orders out of 131 — 25,000px of content behind a
                 208px window, with the rail scrolling underneath it. Sizing to
@@ -245,7 +290,15 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                     </div>
                 )}
                 {visibleOrders.map((order) => (
-                    <OrderRow key={order.id} order={order} drivers={drivers} jwtToken={jwtToken} onAssigned={() => void refreshFeeds()} />
+                    <OrderRow
+                        key={order.id}
+                        order={order}
+                        drivers={drivers}
+                        jwtToken={jwtToken}
+                        onAssigned={() => void refreshFeeds()}
+                        selected={selected.has(order.id)}
+                        onToggleSelected={() => toggleOne(order.id)}
+                    />
                 ))}
             </div>
 
