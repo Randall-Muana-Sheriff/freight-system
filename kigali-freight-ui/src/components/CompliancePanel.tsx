@@ -28,6 +28,31 @@ function daysUntil(iso: string) {
     return Math.ceil((new Date(iso).getTime() - Date.now()) / 86_400_000);
 }
 
+// A warning list is only useful while you can act on all of it. With a
+// fleet's worth of certificates renewing this panel measured 2,416px tall
+// and pushed the dispatch queue — the actual work — off the bottom of the
+// rail. Real control-tower software shows the few most urgent and a count;
+// nobody works a 2,400px wall from top to bottom.
+const VISIBLE_PER_GROUP = 4;
+
+function Group({ label, tone, issues }: { label: string; tone: string; issues: ComplianceIssue[] }) {
+    const shown = issues.slice(0, VISIBLE_PER_GROUP);
+    const rest = issues.length - shown.length;
+    return (
+        <>
+            <p className={`data-label mb-1 ${tone}`}>{label}</p>
+            <ul className="mb-3 last:mb-0">
+                {shown.map((i) => <Row key={`${i.holderKind}-${i.holder}-${i.plateNumber}-${i.documentType}`} issue={i} />)}
+            </ul>
+            {rest > 0 && (
+                <p className="mb-3 text-micro text-steel">
+                    +{rest} more {rest === 1 ? 'document' : 'documents'}, soonest first
+                </p>
+            )}
+        </>
+    );
+}
+
 function Row({ issue }: { issue: ComplianceIssue }) {
     const days = daysUntil(issue.expiresAt);
     // Whose problem it is, in the terms the office uses: a plate for a
@@ -107,21 +132,14 @@ export default function CompliancePanel() {
                 </button>
             </div>
 
+            {/* Already lapsed means the driver is out of the picker right
+                now, which is why it is stated as a consequence rather than
+                as a status. */}
             {expired.length > 0 && (
-                <>
-                    {/* Already lapsed means the driver is out of the picker
-                        right now, which is why it is stated as a consequence
-                        rather than as a status. */}
-                    <p className="data-label mb-1 text-rust">Lapsed — driver cannot be assigned</p>
-                    <ul className="mb-3">{expired.map((i) => <Row key={`${i.holderKind}-${i.holder}-${i.documentType}`} issue={i} />)}</ul>
-                </>
+                <Group label="Lapsed — driver cannot be assigned" tone="text-rust" issues={expired} />
             )}
-
             {soon.length > 0 && (
-                <>
-                    <p className="data-label mb-1 text-steel">Within {report.warningDays} days</p>
-                    <ul>{soon.map((i) => <Row key={`${i.holderKind}-${i.holder}-${i.documentType}`} issue={i} />)}</ul>
-                </>
+                <Group label={`Within ${report.warningDays} days`} tone="text-steel" issues={soon} />
             )}
         </div>
     );

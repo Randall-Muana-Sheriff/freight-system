@@ -1437,6 +1437,7 @@ export const OrderController = {
                     o.driver_net,
                     o.price_is_estimate,
                     o.detention_amount,
+                    o.delivery_code_sent_at,
                     dl.lat AS driver_lat,
                     dl.lng AS driver_lng,
                     EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS telemetry_age_seconds,

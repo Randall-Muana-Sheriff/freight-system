@@ -210,6 +210,15 @@ export async function fetchNearestDrivers(orderId: number, token: string): Promi
 // What could ride home on this order. Only meaningful for a delivery outside
 // Kigali: those are the ones charged for driving back empty, and the ones
 // where pairing takes that charge off both bills.
+// The partner path, beside assignOrders rather than instead of it. A fleet
+// driver is given work; an independent one with their own truck is asked, and
+// can say no. Both models run side by side.
+export async function offerOrders(orderIds: number[], driverName: string, token: string, expiresInMinutes = 30) {
+    return apiFetch('/api/orders/offer', {
+        method: 'POST', token, body: { orderIds, driverName, expiresInMinutes },
+    });
+}
+
 export async function fetchReturnLoads(orderId: number, token: string): Promise<{ candidates: ReturnLoadCandidate[] }> {
     return apiFetch(`/api/orders/${orderId}/return-loads`, { method: 'GET', token }) as Promise<{ candidates: ReturnLoadCandidate[] }>;
 }

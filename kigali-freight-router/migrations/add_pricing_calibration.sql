@@ -8,6 +8,13 @@
 -- drivers report taking home 20,000-35,000 a day over two or three van trips,
 -- and 40,000-70,000 over roughly two light-truck trips.
 --
+-- Settled since this was written: RURA publishes no goods tariff. Its whole
+-- tariff library is passenger transport and utilities -- city and intercity
+-- buses, motorcycles, taxis, electricity, water, LPG, pump prices. It licenses
+-- goods operators and enforces against unlicensed ones, which is a different
+-- thing from capping what they may charge. These rates need no regulatory
+-- ceiling; what binds is the licence, not the price.
+--
 -- The correction is the bigger change. ST_DistanceSphere returns straight-line
 -- distance, and that same Nyabugogo-Kimironko job measures 8.38 km straight
 -- while the route is about 14 km -- Kigali's hills and one-ways make the road

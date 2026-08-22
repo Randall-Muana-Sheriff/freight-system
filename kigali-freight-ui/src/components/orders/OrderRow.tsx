@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Send, Navigation, MapPin, CornerUpLeft } from 'lucide-react';
-import { assignOrders, fetchNearestDrivers, fetchReturnLoads, placeOrderOnMap, setOrderPriority } from '../../utils/api';
+import { Send, Navigation, MapPin, CornerUpLeft, HelpCircle } from 'lucide-react';
+import { assignOrders, offerOrders, fetchNearestDrivers, fetchReturnLoads, placeOrderOnMap, setOrderPriority } from '../../utils/api';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
 import { describeDriverChecks, type Order, type StaffUser, type DriverSuggestion, type ReturnLoadCandidate } from '../../types';
@@ -47,6 +47,24 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
     const [suggesting, setSuggesting] = useState(false);
     const [returnLoads, setReturnLoads] = useState<ReturnLoadCandidate[] | null>(null);
     const [findingReturn, setFindingReturn] = useState(false);
+    const [offering, setOffering] = useState(false);
+
+    // Offer rather than assign. The driver gets it as a decision they can
+    // refuse, which is the only model that works for someone running their own
+    // truck -- they are weighing this run against their diesel and their
+    // afternoon, not being handed a shift.
+    const handleOffer = async () => {
+        if (!selectedDriver) return;
+        setOffering(true);
+        try {
+            await offerOrders([order.id], selectedDriver, jwtToken);
+            onAssigned();
+        } catch (err) {
+            void alert({ title: 'Could not offer the order', body: (err as Error).message || 'Please try again.', tone: 'danger' });
+        } finally {
+            setOffering(false);
+        }
+    };
 
     // Only a job that leaves the city is charged for driving home empty, so
     // only those have anything to pair. Matches the 25km the rate card uses
@@ -360,6 +378,23 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                         <CornerUpLeft size={11} strokeWidth={2.5} />
                     </button>
                 ) : null}
+                {/* Two ways to give out work, because there are two kinds of
+                    driver. Assign puts the job straight onto a fleet driver's
+                    board -- being given work is the job. Offer asks, and can be
+                    refused, which is the only model that works for someone
+                    running their own truck against their own diesel. Offer is
+                    the quieter of the two on purpose: assigning is still the
+                    common case. */}
+                <button
+                    type="button"
+                    onClick={() => void handleOffer()}
+                    disabled={offering || !selectedDriver}
+                    title="Offer this job — the driver can accept or turn it down"
+                    className="shrink-0 flex items-center gap-1 bg-panel border border-line/15 text-carbon rounded px-2 text-micro uppercase disabled:opacity-50"
+                >
+                    <HelpCircle size={10} strokeWidth={2.5} />
+                    {offering ? '...' : 'Offer'}
+                </button>
                 <button
                     type="button"
                     onClick={() => void handleAssign()}

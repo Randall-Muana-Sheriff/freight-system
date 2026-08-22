@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View , TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenShell } from '../../../components/ScreenShell';
 import { SectionHeader } from '../../../components/SectionHeader';
@@ -9,7 +9,7 @@ import { ToastOverlay, type Toast } from '../../../components/ToastOverlay';
 import { theme } from '../../../lib/theme';
 import { useAuth } from '../../../lib/auth';
 import * as ImagePicker from 'expo-image-picker';
-import { updateOrderStatus, fetchOrderById, confirmDelivery, acceptJobOffer, declineJobOffer, isNetworkFailure, type OrderDetail } from '../../../lib/api';
+import { updateOrderStatus, fetchOrderById, confirmDelivery, confirmDeliveryByCode, acceptJobOffer, declineJobOffer, isNetworkFailure, type OrderDetail } from '../../../lib/api';
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
 import { isJobInProgress } from '../../../lib/assignments';
 import { useUpNavigation } from '../../../lib/navigation';
@@ -91,6 +91,8 @@ export default function TripDetailScreen() {
   const { token } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [answeringOffer, setAnsweringOffer] = useState(false);
+  const [deliveryCode, setDeliveryCode] = useState('');
+  const [codeEntryOpen, setCodeEntryOpen] = useState(false);
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -151,6 +153,39 @@ export default function TripDetailScreen() {
           tone: 'error',
         });
       }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Closing a delivery on the code the recipient was texted, with no photo.
+  //
+  // A photo shows a parcel somewhere; a code the recipient read off their own
+  // phone shows it reached the person it was addressed to. It is also the only
+  // proof available to a driver whose phone has no usable camera, which is not
+  // a rare case in a country where about a third of people own a smartphone.
+  //
+  // Not queued offline like the photo path. A code is checked against a hash
+  // on the server with a capped number of attempts, so it cannot be verified
+  // on the phone -- queuing it would mean telling a driver a delivery was
+  // confirmed and then discovering at sync that the code was wrong, with the
+  // recipient long gone.
+  const submitDeliveryCode = async () => {
+    if (!token || !id) return;
+    const entered = deliveryCode.replace(/\D/g, '');
+    if (!entered) return;
+    setIsUpdating(true);
+    try {
+      await confirmDeliveryByCode(token, Number(id), entered);
+      setDeliveryCode('');
+      setCodeEntryOpen(false);
+      loadOrder();
+    } catch (error) {
+      setToast({
+        icon: 'alert-circle-outline',
+        message: error instanceof Error ? error.message : 'That code could not be checked.',
+        tone: 'error',
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -556,6 +591,55 @@ export default function TripDetailScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* The other way to close a delivery. Offered only at the last
+                  step, and only when a code was actually issued -- suggesting
+                  one that was never sent would send a driver hunting for a
+                  number the recipient does not have. Quieter than the photo
+                  button because the photo is still the common path; this is
+                  the way out when the camera is not an option. */}
+              {nextAction === 'DELIVERED' && order.delivery_code_sent_at ? (
+                codeEntryOpen ? (
+                  <View style={styles.codeBlock}>
+                    <Text style={styles.codeLabel}>Code from the recipient</Text>
+                    <TextInput
+                      style={styles.codeInput}
+                      value={deliveryCode}
+                      onChangeText={setDeliveryCode}
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      placeholder="0000"
+                      placeholderTextColor={theme.colors.muted}
+                      autoFocus
+                      accessibilityLabel="Delivery code from the recipient"
+                    />
+                    <Text style={styles.codeHelper}>
+                      They were texted a four-digit code when you set off. Ask them to read it out.
+                    </Text>
+                    <View style={styles.codeRow}>
+                      <TouchableOpacity
+                        style={[styles.codeButton, styles.codeCancel]}
+                        onPress={() => { setCodeEntryOpen(false); setDeliveryCode(''); }}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.codeCancelText}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.codeButton, styles.codeConfirm, (!deliveryCode || isUpdating) && styles.buttonDisabled]}
+                        onPress={() => void submitDeliveryCode()}
+                        disabled={!deliveryCode || isUpdating}
+                        accessibilityRole="button"
+                      >
+                        <Text style={styles.codeConfirmText}>Confirm with code</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity onPress={() => setCodeEntryOpen(true)} accessibilityRole="button">
+                    <Text style={styles.codeLink}>No camera? Use the recipient's code instead</Text>
+                  </TouchableOpacity>
+                )
+              ) : null}
             </View>
           ) : (
             <View style={styles.doneRow}>
@@ -601,6 +685,26 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     fontFamily: theme.fonts.body,
   },
+  codeBlock: { marginTop: 14, gap: 8 },
+  codeLabel: { color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.8, ...theme.type.micro, fontFamily: theme.fonts.mono },
+  codeInput: {
+    backgroundColor: theme.colors.panelSoft,
+    borderRadius: theme.radius.md,
+    color: theme.colors.text,
+    paddingVertical: 14,
+    textAlign: 'center',
+    letterSpacing: 10,
+    ...theme.type.title,
+    fontFamily: theme.fonts.mono,
+  },
+  codeHelper: { color: theme.colors.muted, ...theme.type.micro, lineHeight: 16 },
+  codeRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  codeButton: { flex: 1, borderRadius: theme.radius.pill, paddingVertical: 13, alignItems: 'center' },
+  codeCancel: { backgroundColor: theme.colors.panelSoft },
+  codeCancelText: { color: theme.colors.muted, ...theme.type.body },
+  codeConfirm: { backgroundColor: theme.colors.primary },
+  codeConfirmText: { color: theme.colors.ink, ...theme.type.body, fontFamily: theme.fonts.headingBlack },
+  codeLink: { color: theme.colors.primary, ...theme.type.bodySm, textAlign: 'center', marginTop: 12 },
   offerPrompt: { color: theme.colors.text, ...theme.type.body, marginTop: 6 },
   offerRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
   offerButton: { flex: 1, borderRadius: theme.radius.pill, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },

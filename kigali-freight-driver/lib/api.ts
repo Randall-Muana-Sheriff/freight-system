@@ -75,6 +75,10 @@ export type DriverAssignment = {
   // driver has not agreed to yet, which is the difference between being an
   // employee and being an independent operator with their own truck.
   offer_expires_at?: string | null;
+  // Set once the recipient has been texted their handover code. The app only
+  // offers the code path when this is present -- suggesting a code that was
+  // never sent would send a driver hunting for a number nobody has.
+  delivery_code_sent_at?: string | null;
 };
 
 // The rate-limit middleware already computes the exact remaining wait as
@@ -359,11 +363,32 @@ export async function fetchOrderById(token: string, orderId: number) {
 // multipart body itself rather than JSON.stringify'ing it. Uses
 // expo-file-system's native File.upload() instead of fetch+FormData — see
 // the comment on parseUploadResult for why.
+// Closing a delivery on the recipient's code alone, with no photograph.
+//
+// A separate call rather than a parameter on the one above, because that one
+// is built around File.upload() and there is no file here. This is the path a
+// driver takes when their phone has no usable camera -- and the proof is
+// arguably the better of the two: a photo shows a parcel somewhere, a code
+// shows it reached the person it was addressed to.
+export async function confirmDeliveryByCode(
+  token: string,
+  orderId: number,
+  deliveryCode: string,
+  notes?: string
+) {
+  return apiFetch(`/api/orders/${orderId}/confirm-delivery`, {
+    token,
+    method: 'POST',
+    body: { deliveryCode, ...(notes ? { notes } : {}) },
+  });
+}
+
 export async function confirmDelivery(
   token: string,
   orderId: number,
   photo: { uri: string; fileName?: string; mimeType?: string },
-  notes?: string
+  notes?: string,
+  deliveryCode?: string
 ) {
   const file = new File(photo.uri);
   let timeoutId: ReturnType<typeof setTimeout>;
@@ -378,7 +403,10 @@ export async function confirmDelivery(
         fieldName: 'photo',
         mimeType: photo.mimeType || 'image/jpeg',
         headers: { Authorization: `Bearer ${token}` },
-        parameters: notes ? { notes } : undefined,
+        parameters: {
+          ...(notes ? { notes } : {}),
+          ...(deliveryCode ? { deliveryCode } : {}),
+        },
       }),
       timeout,
     ]);
