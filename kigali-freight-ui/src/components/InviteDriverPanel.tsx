@@ -154,25 +154,47 @@ export default function InviteDriverPanel() {
                     </div>
                 </form>
 
+                {/* Two different outcomes wearing one costume.
+                    When the text sends, this is done and the code is a
+                    convenience. When it does not, the invite still worked but
+                    the code is now the ONLY way that driver gets in — and
+                    until the SMS service started reporting failure honestly,
+                    this branch effectively never ran, so the failure read as a
+                    line of grey small print under a green success box.
+                    A dispatcher who skims that has just lost a driver. */}
                 {result && (
-                    <div className="p-3 bg-tarp/10 border border-tarp/30 rounded space-y-2">
-                        <div className="text-tarp font-bold">Driver invited — {result.staffId}</div>
-                        <div className="flex items-center gap-2">
+                    <div className={`rounded border p-3 space-y-2 ${
+                        result.smsSent ? 'border-tarp/30 bg-tarp/10' : 'border-hazard/40 bg-hazard/10'
+                    }`}>
+                        <div className={result.smsSent ? 'font-bold text-tarp' : 'font-bold text-hazard'}>
+                            {result.smsSent
+                                ? `Driver invited — ${result.staffId}`
+                                : `Driver invited — ${result.staffId} — but the text did not send`}
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                             <span className="text-steel">Invite code:</span>
-                            <span className="text-paper font-bold text-body tracking-widest">{result.inviteCode}</span>
+                            {/* Bigger when it is the only channel, because it
+                                is about to be read down a phone. */}
+                            <span className={`font-mono font-bold tracking-widest text-paper ${
+                                result.smsSent ? 'text-body' : 'text-lead'
+                            }`}>
+                                {result.inviteCode}
+                            </span>
                             <button
                                 type="button"
                                 onClick={handleCopy}
-                                className="flex items-center gap-1 text-micro text-carbon hover:text-paper transition-colors"
+                                className="focus-ring flex items-center gap-1 text-micro text-carbon transition-colors hover:text-paper"
                             >
                                 {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.5} />}
                                 {copied ? 'Copied' : 'Copy'}
                             </button>
                         </div>
-                        <div className="text-steel text-micro">
+
+                        <div className="text-micro text-steel">
                             {result.smsSent
                                 ? `Also texted to ${result.phoneNumber}.`
-                                : `Could not text this automatically — share the code with the driver yourself.`}
+                                : `Nothing was delivered to ${result.phoneNumber}. Read this code to the driver or send it yourself — they cannot sign in without it.`}
                         </div>
                     </div>
                 )}
