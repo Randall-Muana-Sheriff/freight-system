@@ -56,6 +56,7 @@ import geocodeRoutes from './routes/geocodeRoutes.js';
 import smsRoutes from './routes/smsRoutes.js';
 import pricingRoutes from './routes/pricingRoutes.js';
 import exceptionRoutes from './routes/exceptionRoutes.js';
+import placeHintRoutes from './routes/placeHintRoutes.js';
 
 const app = express();
 const allowedOrigins = appConfig.corsOrigins;
@@ -146,6 +147,7 @@ app.use('/api/geocode', geocodeRoutes);
 app.use('/api/sms', smsRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/exceptions', exceptionRoutes);
+app.use('/api/place-hints', placeHintRoutes);
 
 // Anything that reaches here escaped every controller's own try/catch —
 // a malformed JSON body, a multer error thrown before a route handler

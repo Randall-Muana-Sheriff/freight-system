@@ -64,6 +64,7 @@ const MIGRATIONS = [
     { id: 'add_job_offers.sql', destructive: false },
     { id: 'add_currency_and_market.sql', destructive: false },
     { id: 'add_delivery_code.sql', destructive: false },
+    { id: 'add_place_hints.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';
