@@ -166,18 +166,31 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                         />
                         <span className="truncate text-paper font-bold text-data">{order.cargo_description}</span>
                     </div>
-                    {/* truncate, not wrap: at the rail's 260px minimum a long
-                        hub name pushed this line past the panel edge. The
-                        cargo title above it already truncates for the same
-                        reason, and a clipped hub name costs less than a row
-                        that reflows to three lines. */}
+                    {/* Where it is going, not where it came from.
+                        Seen against the real queue, seven collapsed rows read
+                        "General goods · No hub yet · 20.00 kg · High priority"
+                        one under another — identical, because a public booking
+                        has no hub until someone pins it and the cargo line is
+                        whatever the customer typed. A list you cannot tell
+                        apart is not a list. The destination is the field that
+                        actually differs between these rows, so it leads.
+
+                        truncate, not wrap: at the rail's 260px minimum a long
+                        address pushed this line past the panel edge, and a
+                        clipped address costs less than a row that reflows to
+                        three lines. */}
                     <div className="text-micro text-steel font-mono truncate">
-                        {order.origin_hub_name || 'No hub yet'} &middot; {order.weight_kg} kg
-                        {priority !== 'normal' && (
-                            <span className={priority === 'high' ? 'text-rust' : 'text-steel'}>
-                                {' '}&middot; {priority === 'high' ? 'High priority' : 'Low priority'}
-                            </span>
-                        )}
+                        {order.delivery_address_text || order.origin_hub_name || 'No destination yet'}
+                        {' '}&middot; {order.weight_kg} kg
+                        {/* 61% of this queue is unplaced, so "needs placing" is
+                            not a warning — it is the row's state, and the one
+                            thing that says whether it can be dispatched. */}
+                        {needsPlacing && <span className="text-hazard"> &middot; needs placing</span>}
+                        {/* Priority is deliberately NOT repeated here. The
+                            HIGH/NORMAL/LOW control sits on the same row a few
+                            pixels right, and saying it twice was pushing the
+                            destination — the only field that distinguishes one
+                            row from the next — out through the truncation. */}
                     </div>
                 </button>
                 <div className="shrink-0 flex items-center gap-1.5">
