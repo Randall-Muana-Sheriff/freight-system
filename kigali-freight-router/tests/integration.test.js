@@ -1513,6 +1513,116 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.ok(ranked.length > 0, 'a placed order should rank drivers by real distance');
     });
 
+    // The design this protects: there is deliberately no transaction around a
+    // batch placement. It looks like an omission, and the obvious "fix" is to
+    // wrap it in one — which would silently turn nineteen good pins into zero
+    // the moment a dispatcher mistypes the twentieth. These assertions are
+    // here so that change fails loudly instead.
+    test('placing a batch keeps the good pins when one of them is bad', async () => {
+        await resetPublicRateLimits();
+        const tokens = [];
+        for (const name of ['Batch One', 'Batch Two', 'Batch Three']) {
+            const create = await request(app).post('/api/public/orders').send({
+                pickupAddress: 'Nyabugogo taxi park', deliveryAddress: 'Remera, Giporoso',
+                cargoType: 'General goods', weightKg: 150,
+                customerName: name, customerPhone: '0788556123',
+            });
+            assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+            tokens.push(create.body.data.trackingToken);
+        }
+
+        const queue = await request(app).get('/api/orders/active')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const rows = tokens.map((t) => queue.body.data.find((o) => o.tracking_token === t));
+        assert.ok(rows.every((r) => r && r.pickup_lat === null), 'public bookings start unplaced');
+
+        const response = await request(app).patch('/api/orders/place-batch')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({
+                placements: [
+                    { orderId: rows[0].id, pickupLat: -1.9536, pickupLng: 30.0606, deliveryLat: -1.9706, deliveryLng: 30.1044 },
+                    { orderId: rows[1].id, pickupLat: -1.9441, pickupLng: 30.0619, deliveryLat: -1.9800, deliveryLng: 30.1300 },
+                    // Nonexistent, and out of range: the two ways a row can be
+                    // wrong without the request being wrong.
+                    { orderId: 2147483000, pickupLat: -1.95, pickupLng: 30.06, deliveryLat: -1.97, deliveryLng: 30.10 },
+                    { orderId: rows[2].id, pickupLat: 999, pickupLng: 30.06, deliveryLat: -1.97, deliveryLng: 30.10 },
+                ],
+            });
+
+        // Not a 4xx. Some rows failing is the expected shape of this call, so
+        // the failures are data the dispatcher acts on, not an error that
+        // throws the response away.
+        assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+        assert.equal(response.body.data.placedCount, 2);
+        assert.equal(response.body.data.failedCount, 2);
+
+        const codes = response.body.data.failed.map((f) => f.code).sort();
+        assert.deepEqual(codes, ['ORDERS_NOT_FOUND', 'ORDERS_PLACE_INVALID_COORDS']);
+
+        // The whole point: the good ones are on the map.
+        const after = await pool.query(
+            'SELECT id, pickup_lat, price_is_estimate, price_distance_km FROM orders WHERE id = ANY($1::int[]) ORDER BY id',
+            [rows.map((r) => r.id)]
+        );
+        const [first, second, third] = after.rows;
+        assert.ok(first.pickup_lat !== null, 'a valid pin must survive an invalid one beside it');
+        assert.ok(second.pickup_lat !== null, 'a valid pin must survive an invalid one beside it');
+        assert.equal(third.pickup_lat, null, 'the rejected order is left exactly as it was');
+
+        // Placing is also when an estimate becomes a real price, so the rows
+        // the caller holds go stale the moment a batch lands.
+        assert.equal(first.price_is_estimate, false, 'placing reprices against a real distance');
+        assert.ok(Number(first.price_distance_km) > 0);
+        assert.equal(third.price_is_estimate, true, 'the rejected order keeps its estimate');
+    });
+
+    test('placing a batch refuses a request that is itself wrong', async () => {
+        const empty = await request(app).patch('/api/orders/place-batch')
+            .set('Authorization', `Bearer ${adminToken}`).send({ placements: [] });
+        assert.equal(empty.statusCode, 400);
+        assert.equal(empty.body.error.code, 'ORDERS_PLACE_BATCH_EMPTY');
+
+        const one = { orderId: 1, pickupLat: -1.95, pickupLng: 30.06, deliveryLat: -1.97, deliveryLng: 30.10 };
+        const huge = await request(app).patch('/api/orders/place-batch')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ placements: Array.from({ length: 101 }, () => one) });
+        assert.equal(huge.statusCode, 400);
+        assert.equal(huge.body.error.code, 'ORDERS_PLACE_BATCH_TOO_LARGE');
+    });
+
+    test('setting priority in bulk names the orders that got away', async () => {
+        const create = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Bulk priority cargo', weight_kg: 80,
+                origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+            });
+        assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+        // createOrder nests it: { message, order } — not data.id.
+        const id = create.body.data.order.id;
+        assert.ok(Number.isInteger(id), `expected a real order id, got ${JSON.stringify(id)}`);
+
+        const response = await request(app).post('/api/orders/priority')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [id, 2147483000], priority: 'high' });
+
+        assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+        assert.equal(response.body.data.updatedCount, 1);
+        assert.equal(response.body.data.failedCount, 1, 'an id that no longer exists is reported, not ignored');
+        assert.equal(response.body.data.failed[0].code, 'ORDERS_NOT_FOUND');
+
+        const check = await pool.query('SELECT priority FROM orders WHERE id = $1', [id]);
+        assert.equal(check.rows[0].priority, 'high');
+
+        // One value for the whole call, so a bad one is the request's fault
+        // rather than any single order's.
+        const bad = await request(app).post('/api/orders/priority')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [id], priority: 'urgent' });
+        assert.equal(bad.statusCode, 400);
+        assert.equal(bad.body.error.code, 'ORDERS_PRIORITY_INVALID');
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');
