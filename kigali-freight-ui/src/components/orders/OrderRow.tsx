@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Send, Navigation, MapPin, CornerUpLeft, HelpCircle } from 'lucide-react';
+import { Send, Navigation, MapPin, CornerUpLeft, HelpCircle, ChevronRight } from 'lucide-react';
 import { assignOrders, offerOrders, fetchNearestDrivers, fetchReturnLoads, placeOrderOnMap, setOrderPriority } from '../../utils/api';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
@@ -48,6 +48,13 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
     const [returnLoads, setReturnLoads] = useState<ReturnLoadCandidate[] | null>(null);
     const [findingReturn, setFindingReturn] = useState(false);
     const [offering, setOffering] = useState(false);
+    // Collapsed by default. Against a real queue this row is ~190px tall, so
+    // 131 orders meant seeing roughly one and a half of them at a time behind
+    // a scrollbar. A dispatcher scanning for one load needs the list to be a
+    // list; the controls matter only for the row they have found. Dense
+    // summary, full card on selection — the master-detail shape every
+    // production dispatch board settles on.
+    const [expanded, setExpanded] = useState(false);
 
     // Offer rather than assign. The driver gets it as a decision they can
     // refuse, which is the only model that works for someone running their own
@@ -144,8 +151,21 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
     return (
         <div className={`bg-ink/60 p-2.5 rounded border border-line/10 border-l-4 ${PRIORITY_BORDER[priority]} space-y-2`}>
             <div className="flex flex-wrap justify-between items-start gap-x-2 gap-y-1.5">
-                <div className="min-w-0">
-                    <div className="text-paper font-bold text-data truncate">{order.cargo_description}</div>
+                <button
+                    type="button"
+                    onClick={() => setExpanded((v) => !v)}
+                    aria-expanded={expanded}
+                    className="focus-ring min-w-0 flex-1 text-left"
+                >
+                    <div className="flex items-center gap-1">
+                        <ChevronRight
+                            size={12}
+                            strokeWidth={3}
+                            aria-hidden="true"
+                            className={`shrink-0 text-steel transition-transform ${expanded ? 'rotate-90' : ''}`}
+                        />
+                        <span className="truncate text-paper font-bold text-data">{order.cargo_description}</span>
+                    </div>
                     {/* truncate, not wrap: at the rail's 260px minimum a long
                         hub name pushed this line past the panel edge. The
                         cargo title above it already truncates for the same
@@ -159,7 +179,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                             </span>
                         )}
                     </div>
-                </div>
+                </button>
                 <div className="shrink-0 flex items-center gap-1.5">
                     {/* The queue sorts on this, so it belongs where the
                         sorting is looked at rather than behind a detail
@@ -187,6 +207,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                 </div>
             </div>
 
+            {expanded && (<>
             {/* A customer-submitted order carries no coordinates and no hub
                 — the addresses below are free text the customer typed, and
                 are the only thing telling the dispatcher where this goes.
@@ -405,6 +426,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                     {assigning ? '...' : 'Assign'}
                 </button>
             </div>
+            </>)}
         </div>
     );
 }
