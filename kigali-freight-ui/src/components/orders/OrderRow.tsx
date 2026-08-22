@@ -39,7 +39,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
     const { resolveDriverName } = useSocket();
     const {
         placingOrderId, placementStep, placementPickup, placementDelivery,
-        beginPlacement, cancelPlacement,
+        beginPlacement, cancelPlacement, batchPlacing,
     } = useMapInteraction();
     const [placing, setPlacing] = useState(false);
     const [changingPriority, setChangingPriority] = useState(false);
@@ -111,7 +111,10 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
     const needsPlacing = order.source === 'public' && order.pickup_lat == null;
 
     useEffect(() => {
-        if (!isThisOrder || !placementPickup || !placementDelivery || placing) return;
+        // batchPlacing: a batch placer is walking a list and will send every
+        // order in one call. Submitting this one here would race it and
+        // defeat the point of the batch.
+        if (!isThisOrder || !placementPickup || !placementDelivery || placing || batchPlacing) return;
         setPlacing(true);
         placeOrderOnMap(order.id, {
             pickupLat: placementPickup[0], pickupLng: placementPickup[1],

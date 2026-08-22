@@ -197,6 +197,38 @@ export async function placeOrderOnMap(
     return apiFetch(`/api/orders/${orderId}/place`, { method: 'PATCH', token, body: coords });
 }
 
+// Placing many bookings in one call.
+//
+// Every public booking arrives as free text with no coordinates, so placing is
+// on the critical path of every customer order rather than a rare chore. The
+// endpoint deliberately runs WITHOUT a transaction: a bad row must not throw
+// away the good pins beside it, so failures come back as data with a 200
+// rather than as an error. Treat partial success as the normal case.
+//
+// Placing is also the moment an estimated price becomes a real one, so the
+// rows this returns supersede whatever the caller was holding.
+export interface PlacementInput {
+    orderId: number;
+    pickupLat: number;
+    pickupLng: number;
+    deliveryLat: number;
+    deliveryLng: number;
+    originHubId?: number;
+}
+
+export interface PlaceBatchResult {
+    placed: Order[];
+    failed: { orderId: number; code: string; message: string }[];
+    placedCount: number;
+    failedCount: number;
+}
+
+export async function placeOrdersBatch(placements: PlacementInput[], token: string) {
+    return apiFetch('/api/orders/place-batch', {
+        method: 'PATCH', token, body: { placements },
+    }) as Promise<PlaceBatchResult>;
+}
+
 // The dispatch queue sorts by priority, but until now nothing could change
 // it after an order was created.
 export async function setOrderPriority(orderId: number, priority: 'high' | 'normal' | 'low', token: string) {

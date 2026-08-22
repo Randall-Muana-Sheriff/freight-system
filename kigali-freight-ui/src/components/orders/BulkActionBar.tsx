@@ -10,7 +10,7 @@
 // that are disabled most of the time teaches people to ignore that strip of
 // screen, which is exactly where you then want to put something urgent.
 import { useState } from 'react';
-import { Send, Clock, X } from 'lucide-react';
+import { Send, Clock, X, MapPin } from 'lucide-react';
 import { assignOrders, offerOrders } from '../../utils/api';
 import { useDialog } from '../DialogProvider';
 import type { StaffUser } from '../../types';
@@ -19,11 +19,17 @@ interface BulkActionBarProps {
     selectedIds: number[];
     drivers: StaffUser[];
     jwtToken: string;
+    /* How many of the selection still have no coordinates. Placing is offered
+       only when there is something to place — walking a dispatcher through
+       re-pinning orders that are already on the map is worse than not
+       offering it. */
+    placeableCount: number;
+    onPlace: () => void;
     onDone: () => void;
     onClear: () => void;
 }
 
-export default function BulkActionBar({ selectedIds, drivers, jwtToken, onDone, onClear }: BulkActionBarProps) {
+export default function BulkActionBar({ selectedIds, drivers, jwtToken, placeableCount, onPlace, onDone, onClear }: BulkActionBarProps) {
     const { alert, confirm } = useDialog();
     const [driver, setDriver] = useState('');
     const [busy, setBusy] = useState<'assign' | 'offer' | null>(null);
@@ -74,6 +80,17 @@ export default function BulkActionBar({ selectedIds, drivers, jwtToken, onDone, 
             className="sticky top-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-route/40 bg-route/10 px-3 py-2"
         >
             <span className="shrink-0 font-mono text-data text-paper">{noun} selected</span>
+
+            {placeableCount > 0 && (
+                <button
+                    type="button"
+                    onClick={onPlace}
+                    className="focus-ring flex shrink-0 items-center gap-1.5 rounded border border-route/40 bg-route/15 px-2.5 py-1 text-micro font-semibold uppercase tracking-wide text-route transition-colors hover:bg-route/25"
+                >
+                    <MapPin size={12} strokeWidth={2.5} />
+                    Place {placeableCount} on the map
+                </button>
+            )}
 
             <label htmlFor="bulk-driver" className="sr-only">Driver for the selected loads</label>
             <select

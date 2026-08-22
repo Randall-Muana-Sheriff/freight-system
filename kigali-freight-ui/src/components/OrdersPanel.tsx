@@ -11,9 +11,10 @@ import { createOrder, fetchDrivers } from '../utils/api';
 import { useSocket } from '../context/SocketContext';
 import BatchSuggestions from './orders/BatchSuggestions';
 import BulkActionBar from './orders/BulkActionBar';
+import BulkPlaceFlow from './orders/BulkPlaceFlow';
 import OrderRow from './orders/OrderRow';
 import InFlightRow from './orders/InFlightRow';
-import { isAssignableDriver, type StaffUser, type LatLng } from '../types';
+import { isAssignableDriver, type StaffUser, type LatLng, type Order } from '../types';
 
 interface OrdersPanelProps {
     pickTargetMode: boolean;
@@ -44,6 +45,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     // the action bar can see it, and so it survives a row expanding or
     // collapsing underneath it.
     const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [placingBatch, setPlacingBatch] = useState<Order[] | null>(null);
 
     const loadDrivers = useCallback(async () => {
         try {
@@ -133,6 +135,12 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     });
 
     const selectedIds = [...selected];
+    // Only the ones that can actually be placed. Offering "place 12" when
+    // nine of them already have coordinates would walk a dispatcher through
+    // re-pinning work that was already done.
+    const selectedUnplaced = activeOrders.filter(
+        (o) => selected.has(o.id) && o.source === 'public' && o.pickup_lat == null,
+    );
 
     return (
         <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3">
@@ -255,13 +263,24 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 </div>
             )}
 
-            <BulkActionBar
-                selectedIds={selectedIds}
-                drivers={drivers}
-                jwtToken={jwtToken}
-                onDone={() => void refreshFeeds()}
-                onClear={() => setSelected(new Set())}
-            />
+            {placingBatch ? (
+                <BulkPlaceFlow
+                    orders={placingBatch}
+                    jwtToken={jwtToken}
+                    onFinished={() => { setPlacingBatch(null); setSelected(new Set()); void refreshFeeds(); }}
+                    onCancel={() => setPlacingBatch(null)}
+                />
+            ) : (
+                <BulkActionBar
+                    selectedIds={selectedIds}
+                    drivers={drivers}
+                    jwtToken={jwtToken}
+                    placeableCount={selectedUnplaced.length}
+                    onPlace={() => setPlacingBatch(selectedUnplaced)}
+                    onDone={() => void refreshFeeds()}
+                    onClear={() => setSelected(new Set())}
+                />
+            )}
 
             {visibleOrders.length > 1 && (
                 <label className="flex w-fit items-center gap-2 text-micro text-steel">

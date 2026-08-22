@@ -39,7 +39,13 @@ interface MapInteractionContextValue {
     placementStep: 'pickup' | 'delivery' | null;
     placementPickup: LatLng | null;
     placementDelivery: LatLng | null;
-    beginPlacement: (orderId: number) => void;
+    // True while a batch placer is driving the sequence. OrderRow submits a
+    // single order the moment both pins land, which is right when a
+    // dispatcher placed it from that row and wrong when something is walking
+    // a list — the batch collects the coordinates and sends them in one call
+    // so a bad row cannot cost the good ones.
+    batchPlacing: boolean;
+    beginPlacement: (orderId: number, options?: { batch?: boolean }) => void;
     cancelPlacement: () => void;
     handlePlacementPick: (lat: number, lng: number) => void;
     hubTargetMode: boolean;
@@ -96,6 +102,7 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
     const [placementStep, setPlacementStep] = useState<'pickup' | 'delivery' | null>(null);
     const [placementPickup, setPlacementPickup] = useState<LatLng | null>(null);
     const [placementDelivery, setPlacementDelivery] = useState<LatLng | null>(null);
+    const [batchPlacing, setBatchPlacing] = useState(false);
     const [hubTargetMode, setHubTargetMode] = useState(false);
     const [newHubCoords, setNewHubCoords] = useState<LatLng | null>(null);
 
@@ -238,18 +245,20 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
         handleDispatchClick,
         orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, setNewOrderDeliveryCoords,
         clearNewOrderDeliveryCoords: () => setNewOrderDeliveryCoords(null),
-        placingOrderId, placementStep, placementPickup, placementDelivery,
-        beginPlacement: (orderId: number) => {
+        placingOrderId, placementStep, placementPickup, placementDelivery, batchPlacing,
+        beginPlacement: (orderId: number, options?: { batch?: boolean }) => {
             setPlacingOrderId(orderId);
             setPlacementStep('pickup');
             setPlacementPickup(null);
             setPlacementDelivery(null);
+            setBatchPlacing(Boolean(options?.batch));
         },
         cancelPlacement: () => {
             setPlacingOrderId(null);
             setPlacementStep(null);
             setPlacementPickup(null);
             setPlacementDelivery(null);
+            setBatchPlacing(false);
         },
         // Two clicks, in order. Advancing here rather than in the map keeps
         // the sequence in one place; the panel just reads which step it is
