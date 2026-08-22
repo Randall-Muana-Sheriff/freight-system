@@ -13,6 +13,7 @@ import { logError } from '../utils/logger.js';
 import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
 import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js';
 import { priceJob, distanceKmBetween, detentionForOrder, backfillCreditForOrder, returnLoadCandidatesFor } from '../services/pricingRepository.js';
+import { issueDeliveryCode, sendDeliveryCode, verifyDeliveryCode, DELIVERY_CODE_MAX_ATTEMPTS } from '../services/deliveryCodeService.js';
 import { PricingError } from '../services/pricingService.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'OFFERED', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
@@ -861,9 +862,33 @@ export const OrderController = {
                 }
             }
 
+            // Issued when the driver sets off, not when they arrive. A code
+            // that lands while the driver is already at the gate turns a
+            // handover into a wait for an SMS.
+            let codeToSend = null;
+            if (normalizedStatus === 'IN_TRANSIT' || normalizedStatus === 'ARRIVED') {
+                try {
+                    const issued = await issueDeliveryCode(client, id);
+                    if (issued && issued.code) codeToSend = issued;
+                } catch (err) {
+                    // A driver must be able to move a job on whatever the SMS
+                    // does. Without a code they fall back to the photo, which
+                    // is what every delivery used until now.
+                    logError(req, `Could not issue a delivery code for #${id}`, err);
+                }
+            }
+
             await client.query(logQuery, [id, previousStatus, normalizedStatus, userEmail]);
 
             await client.query('COMMIT');
+
+            // Outside the transaction: an SMS failure must not roll back a
+            // status change the driver already made, and the code is on the
+            // row either way so dispatch can resend it.
+            if (codeToSend) {
+                sendDeliveryCode(codeToSend).catch((err) =>
+                    logError(req, `Delivery code SMS failed for #${id}`, err));
+            }
 
             // After the commit, never before: an SMS round trip inside an
             // open transaction would hold this order's row lock for the
@@ -915,16 +940,42 @@ export const OrderController = {
             const { notes } = req.body;
             const driverName = req.user?.username || 'SYSTEM_DRIVER';
 
-            if (!req.file) {
+            // Photo or code, not photo only. An app driver keeps taking the
+            // picture and nothing about their day changes; a driver with no
+            // camera closes the job on the code the recipient read out, which
+            // is the better evidence of the two -- a photo shows a parcel
+            // somewhere, a code shows it reached the person it was for.
+            const submittedCode = typeof req.body?.deliveryCode === 'string' ? req.body.deliveryCode.trim() : '';
+            if (!req.file && !submittedCode) {
                 await client.query('ROLLBACK').catch(() => {});
                 return fail(res, {
                     status: 400,
-                    code: 'DELIVERY_PHOTO_REQUIRED',
-                    message: 'A delivery confirmation photo is required.',
+                    code: 'DELIVERY_PROOF_REQUIRED',
+                    message: 'Take a photo, or enter the code the recipient was sent.',
                 });
             }
 
             await client.query('BEGIN');
+
+            let proofMethod = req.file ? 'photo' : null;
+            if (submittedCode) {
+                const check = await verifyDeliveryCode(client, id, submittedCode);
+                if (!check.ok) {
+                    await client.query('ROLLBACK').catch(() => {});
+                    const reasons = {
+                        NO_CODE_ISSUED: 'No code was sent for this delivery — take a photo instead.',
+                        TOO_MANY_ATTEMPTS: `That code has been tried ${DELIVERY_CODE_MAX_ATTEMPTS} times. Take a photo instead.`,
+                        NO_CODE_GIVEN: 'Enter the code the recipient was sent.',
+                        WRONG_CODE: `That code is not right${check.attemptsLeft != null ? ` — ${check.attemptsLeft} tries left` : ''}.`,
+                    };
+                    return fail(res, {
+                        status: check.reason === 'WRONG_CODE' ? 400 : 409,
+                        code: `DELIVERY_CODE_${check.reason}`,
+                        message: reasons[check.reason] || 'That code could not be checked.',
+                    });
+                }
+                proofMethod = req.file ? 'photo+code' : 'code';
+            }
 
             const currentResult = await client.query(
                 'SELECT status, assigned_to, delivery_geom FROM orders WHERE id = $1 FOR UPDATE;',
@@ -953,11 +1004,17 @@ export const OrderController = {
             // only a freshly-signed URL (generated below, just for this
             // response) is ever handed to a client; the key is what's
             // persisted to delivery_confirmations.photo_url.
-            const photoKey = await uploadDeliveryPhoto({
-                buffer: req.file.buffer,
-                mimeType: req.file.mimetype,
-                orderId: id,
-            });
+            //
+            // Null on a code-only delivery: there is no file to upload, and
+            // calling this with no req.file would throw on the buffer before
+            // ever reaching storage.
+            const photoKey = req.file
+                ? await uploadDeliveryPhoto({
+                    buffer: req.file.buffer,
+                    mimeType: req.file.mimetype,
+                    orderId: id,
+                })
+                : null;
 
             // Soft location check: compare the driver's last known position
             // against the order's delivery point. A missing/stale GPS fix
@@ -978,9 +1035,9 @@ export const OrderController = {
             }
 
             await client.query(
-                `INSERT INTO delivery_confirmations (order_id, driver_name, photo_url, notes, distance_from_target_m, location_flagged)
-                 VALUES ($1, $2, $3, $4, $5, $6);`,
-                [id, driverName, photoKey, notes || null, distanceFromTargetM, locationFlagged]
+                `INSERT INTO delivery_confirmations (order_id, driver_name, photo_url, notes, distance_from_target_m, location_flagged, proof_method)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+                [id, driverName, photoKey, notes || null, distanceFromTargetM, locationFlagged, proofMethod]
             );
 
             // Worked out before the status moves, because it reads the gap

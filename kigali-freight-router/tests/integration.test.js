@@ -972,6 +972,103 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(row.status, 'ASSIGNED', 'an employed driver is given the work, not asked');
     });
 
+    // A photograph shows a parcel somewhere. It does not show who took it. A
+    // code the recipient read off their own phone does -- and it is the only
+    // proof available to a driver whose phone has no camera.
+    test('a delivery can be proved by the code the recipient was sent', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Code proof probe', weight_kg: 400, origin_hub_id: hubId,
+                delivery_lng: 30.1186, delivery_lat: -1.9536,
+                recipient_name: 'Claudine', recipient_phone: '+250788555999',
+            });
+        assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+        const orderId = created.body.data.order.id;
+        await pool.query(`UPDATE orders SET status = 'ASSIGNED', assigned_to = $2 WHERE id = $1`, [orderId, driverPhone]);
+
+        // Setting off is what issues it, so the recipient has the number
+        // before the driver is standing at their gate.
+        const off = await request(app).patch(`/api/orders/${orderId}/status`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ status: 'IN_TRANSIT' });
+        assert.equal(off.statusCode, 200, JSON.stringify(off.body));
+
+        const issued = (await pool.query(
+            'SELECT delivery_code_hash, delivery_code_sent_at FROM orders WHERE id = $1', [orderId]
+        )).rows[0];
+        assert.ok(issued.delivery_code_hash, 'a code must have been issued on setting off');
+        assert.ok(issued.delivery_code_sent_at, 'and stamped when it went out');
+
+        // The code itself is never stored, so the test has to plant a known
+        // hash the way the OTP tests do -- which is also the proof that it is
+        // hashed rather than kept in the clear.
+        const known = '4271';
+        // Hashed here rather than in SQL: digest() needs pgcrypto, which this
+        // database does not have, and the application hashes in Node anyway.
+        await pool.query(
+            `UPDATE orders SET delivery_code_hash = $2 WHERE id = $1`,
+            [orderId, crypto.createHash('sha256').update(known).digest('hex')]
+        );
+
+        const wrong = await request(app).post(`/api/orders/${orderId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`).field('deliveryCode', '9999');
+        assert.equal(wrong.statusCode, 400);
+        assert.equal(wrong.body.error.code, 'DELIVERY_CODE_WRONG_CODE');
+        assert.match(wrong.body.error.message, /tries left/, 'a driver at a gate needs to know how many chances remain');
+
+        const right = await request(app).post(`/api/orders/${orderId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`).field('deliveryCode', known);
+        assert.equal(right.statusCode, 200, JSON.stringify(right.body));
+
+        const proof = (await pool.query(
+            `SELECT photo_url, proof_method FROM delivery_confirmations WHERE order_id = $1`, [orderId]
+        )).rows[0];
+        assert.equal(proof.proof_method, 'code', 'a dispute has to be told what the evidence actually is');
+        assert.equal(proof.photo_url, null, 'and there is no photo behind a code-only delivery');
+
+        const order = (await pool.query('SELECT status FROM orders WHERE id = $1', [orderId])).rows[0];
+        assert.equal(order.status, 'DELIVERED');
+    });
+
+    test('a delivery with neither photo nor code is refused', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ cargo_description: 'No proof probe', weight_kg: 400, origin_hub_id: hubId,
+                    delivery_lng: 30.1186, delivery_lat: -1.9536 });
+        const orderId = created.body.data.order.id;
+        await pool.query(`UPDATE orders SET status = 'ARRIVED', assigned_to = $2 WHERE id = $1`, [orderId, driverPhone]);
+
+        const bare = await request(app).post(`/api/orders/${orderId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(bare.statusCode, 400);
+        assert.equal(bare.body.error.code, 'DELIVERY_PROOF_REQUIRED');
+    });
+
+    // The photo path is what every delivery has used until now and must be
+    // untouched: an app driver's day does not change because a code exists.
+    test('a photo alone still closes a delivery, exactly as before', async () => {
+        const created = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({ cargo_description: 'Photo path probe', weight_kg: 400, origin_hub_id: hubId,
+                    delivery_lng: 30.1186, delivery_lat: -1.9536 });
+        const orderId = created.body.data.order.id;
+        await pool.query(`UPDATE orders SET status = 'ARRIVED', assigned_to = $2 WHERE id = $1`, [orderId, driverPhone]);
+
+        const withPhoto = await request(app).post(`/api/orders/${orderId}/confirm-delivery`)
+            .set('Authorization', `Bearer ${driverToken}`)
+            .attach('photo', Buffer.concat([
+                Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00]),
+                Buffer.alloc(20_000, 0x20), Buffer.from([0xff, 0xd9]),
+            ]), { filename: 'pod.jpg', contentType: 'image/jpeg' });
+        assert.equal(withPhoto.statusCode, 200, JSON.stringify(withPhoto.body));
+
+        const proof = (await pool.query(
+            `SELECT photo_url, proof_method FROM delivery_confirmations WHERE order_id = $1`, [orderId]
+        )).rows[0];
+        assert.ok(proof.photo_url, 'the photo is still stored');
+        assert.equal(proof.proof_method, 'photo');
+    });
+
     // Regression guards for two endpoints that used to dereference request
     // fields before validating them, answering 500 to what is really a
     // client mistake.
