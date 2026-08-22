@@ -35,6 +35,10 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     // that queue made the two read as one long list instead of two
     // different modes (enter data vs. manage what already exists).
     const [showCreateForm, setShowCreateForm] = useState(false);
+    // With 131 loads queued, scrolling is not how anyone finds one. Every
+    // production TMS puts a filter above the queue and expects you to narrow
+    // rather than scroll — the list is a work surface, not an archive.
+    const [filter, setFilter] = useState('');
 
     const loadDrivers = useCallback(async () => {
         try {
@@ -92,6 +96,18 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     if (userRole !== 'admin' && userRole !== 'dispatcher') {
         return null;
     }
+
+    // Matches what a dispatcher actually has in front of them when someone
+    // rings: a cargo description, a hub, a name, or the tracking code off a
+    // confirmation text.
+    const needle = filter.trim().toLowerCase();
+    const visibleOrders = needle
+        ? activeOrders.filter((o) => [
+            o.cargo_description, o.origin_hub_name, o.customer_name,
+            o.customer_phone, o.tracking_token,
+            o.pickup_address_text, o.delivery_address_text,
+        ].some((f) => String(f || '').toLowerCase().includes(needle)))
+        : activeOrders;
 
     return (
         <div className="bg-panel border border-line/10 p-4 rounded-md text-paper space-y-3">
@@ -196,11 +212,39 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             </form>
             )}
 
-            <div className="max-h-52 overflow-y-auto space-y-1.5">
+            {activeOrders.length > 6 && (
+                <div className="flex items-center gap-2">
+                    <label htmlFor="queue-filter" className="sr-only">Filter the dispatch queue</label>
+                    <input
+                        id="queue-filter"
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value)}
+                        placeholder="Filter by cargo, address, customer or code"
+                        className="focus-ring w-full rounded border border-line/15 bg-ink px-2 py-1.5 text-data text-paper placeholder-steel/60 focus:border-route focus:outline-none"
+                    />
+                    {needle && (
+                        <span className="shrink-0 font-mono text-micro text-steel">
+                            {visibleOrders.length}/{activeOrders.length}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* 46vh rather than a fixed 208px: at 131 queued this box was
+                showing 1.6 orders out of 131 — 25,000px of content behind a
+                208px window, with the rail scrolling underneath it. Sizing to
+                the viewport means the queue gets the space it deserves on a
+                dispatcher's monitor instead of a fixed sliver. */}
+            <div className="max-h-[46vh] min-h-24 overflow-y-auto space-y-1.5">
                 {activeOrders.length === 0 && (
                     <div className="text-steel text-center py-2 text-data">No pending orders — dispatch queue is clear.</div>
                 )}
-                {activeOrders.map((order) => (
+                {activeOrders.length > 0 && visibleOrders.length === 0 && (
+                    <div className="py-2 text-center text-data text-steel">
+                        Nothing matches &ldquo;{filter.trim()}&rdquo;. Clear the filter to see all {activeOrders.length}.
+                    </div>
+                )}
+                {visibleOrders.map((order) => (
                     <OrderRow key={order.id} order={order} drivers={drivers} jwtToken={jwtToken} onAssigned={() => void refreshFeeds()} />
                 ))}
             </div>
@@ -208,7 +252,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             {inFlightOrders.length > 0 && (
                 <div className="pt-2 border-t border-line/10 space-y-1.5">
                     <div className="text-micro text-steel uppercase tracking-wider font-mono">Awaiting pickup ({inFlightOrders.length}) &middot; reassign or unassign</div>
-                    <div className="max-h-52 overflow-y-auto space-y-1.5">
+                    <div className="max-h-[32vh] overflow-y-auto space-y-1.5">
                         {inFlightOrders.map((order) => (
                             <InFlightRow key={order.id} order={order} drivers={drivers} jwtToken={jwtToken} onChanged={() => void refreshFeeds()} />
                         ))}
