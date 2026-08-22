@@ -24,7 +24,7 @@ const FIELD_GROUPS: { title: string; hint: string; fields: { key: keyof RateCard
         title: 'Fuel',
         hint: 'The figure that moves. RURA sets the diesel price nationally — change it here the day it changes there.',
         fields: [
-            { key: 'diesel_price_rwf_per_litre', label: 'Diesel price', suffix: 'RWF / litre' },
+            { key: 'fuel_price_per_litre', label: 'Diesel price', suffix: 'RWF / litre' },
             { key: 'fuel_litres_per_100km', label: 'Consumption', suffix: 'L / 100km' },
         ],
     },
@@ -32,11 +32,11 @@ const FIELD_GROUPS: { title: string; hint: string; fields: { key: keyof RateCard
         title: 'The fare',
         hint: 'Charged on road distance, which is straight-line distance times the road factor.',
         fields: [
-            { key: 'base_fare_rwf', label: 'Base fare', suffix: 'RWF' },
-            { key: 'per_km_rwf', label: 'Per km in the city', suffix: 'RWF' },
-            { key: 'per_km_long_rwf', label: 'Per km beyond', suffix: 'RWF' },
-            { key: 'per_kg_rwf', label: 'Per kg', suffix: 'RWF' },
-            { key: 'minimum_fare_rwf', label: 'Minimum fare', suffix: 'RWF' },
+            { key: 'base_fare', label: 'Base fare', suffix: 'RWF' },
+            { key: 'per_km', label: 'Per km in the city', suffix: 'RWF' },
+            { key: 'per_km_long', label: 'Per km beyond', suffix: 'RWF' },
+            { key: 'per_kg', label: 'Per kg', suffix: 'RWF' },
+            { key: 'minimum_fare', label: 'Minimum fare', suffix: 'RWF' },
             { key: 'road_distance_factor', label: 'Road vs straight line', suffix: '×' },
         ],
     },
@@ -55,9 +55,9 @@ const FIELD_GROUPS: { title: string; hint: string; fields: { key: keyof RateCard
         hint: 'Detention is paid to the driver in full. Commission is charged on the fare only, never on fuel or waiting.',
         fields: [
             { key: 'detention_free_minutes', label: 'Free waiting', suffix: 'min' },
-            { key: 'detention_per_hour_rwf', label: 'Then per hour', suffix: 'RWF' },
+            { key: 'detention_per_hour', label: 'Then per hour', suffix: 'RWF' },
             { key: 'platform_commission_pct', label: 'Commission', suffix: '%' },
-            { key: 'platform_minimum_fee_rwf', label: 'Minimum fee', suffix: 'RWF' },
+            { key: 'platform_minimum_fee', label: 'Minimum fee', suffix: 'RWF' },
         ],
     },
 ];

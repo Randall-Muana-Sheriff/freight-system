@@ -13,7 +13,7 @@ export type DriverAssignmentCard = {
   /** What the job pays, in RWF, already net of the platform's fee and
    *  already covering the run's fuel. Null when no price has been worked
    *  out yet. */
-  payRwf: number | null;
+  payAmount: number | null;
   /** True while that pay was priced from weight alone and can still move,
    *  because dispatch has not pinned the job to the map yet. */
   payIsEstimate: boolean;
@@ -86,7 +86,7 @@ export function toDriverAssignmentCard(order: DriverAssignment): DriverAssignmen
     // where drivers are independent this is the figure a job is accepted or
     // declined on, and a number you have to open a job to find is no use for
     // choosing between two of them.
-    payRwf: order.driver_net_rwf == null ? null : Number(order.driver_net_rwf),
+    payAmount: order.driver_net == null ? null : Number(order.driver_net),
     payIsEstimate: order.price_is_estimate === true,
     isOffer: (order.status || '').toUpperCase() === 'OFFERED',
   };

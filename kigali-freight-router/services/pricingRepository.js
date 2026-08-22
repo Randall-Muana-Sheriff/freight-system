@@ -1,28 +1,36 @@
 // The one place that reads the rate card. Kept apart from pricingService.js
 // so the arithmetic there stays pure and testable without a database.
 import pool from '../config/db.js';
+
+// The market this deployment serves. One country per deployment for now --
+// every rate card, corridor and order here belongs to it. When a second
+// market arrives this stops being a constant and starts coming from the
+// booking, but making that call before there is a second market would be
+// guessing at how it should be chosen.
+const DEFAULT_COUNTRY = process.env.MARKET_COUNTRY_CODE || 'RW';
 import { SpatialService } from './spatialService.js';
 import { quote, classForWeight, detentionCharge, PricingError } from './pricingService.js';
 
 // The newest card for a class. Rows are insert-only, so "current" is the
 // latest effective_from rather than a mutable flag nobody remembers to move.
-export async function currentRateFor(vehicleClass) {
+export async function currentRateFor(vehicleClass, countryCode = 'RW') {
     const { rows } = await pool.query(
         `SELECT * FROM pricing_rates
-          WHERE vehicle_class = $1 AND effective_from <= NOW()
+          WHERE vehicle_class = $1 AND country_code = $2 AND effective_from <= NOW()
           ORDER BY effective_from DESC, id DESC
           LIMIT 1`,
-        [vehicleClass]
+        [vehicleClass, countryCode]
     );
     return rows[0] || null;
 }
 
-export async function listCurrentRates() {
+export async function listCurrentRates(countryCode = DEFAULT_COUNTRY) {
     const { rows } = await pool.query(
         `SELECT DISTINCT ON (vehicle_class) *
            FROM pricing_rates
-          WHERE effective_from <= NOW()
-          ORDER BY vehicle_class, effective_from DESC, id DESC`
+          WHERE effective_from <= NOW() AND country_code = $1
+          ORDER BY vehicle_class, effective_from DESC, id DESC`,
+        [countryCode]
     );
     return rows;
 }
@@ -33,17 +41,17 @@ export async function listCurrentRates() {
 // distanceKm is optional and normally absent on a public booking, which
 // captures addresses as free text and has no coordinates until a dispatcher
 // places the order. The returned breakdown says which it was.
-export async function priceJob({ weightKg, distanceKm = null, pickup = null, delivery = null }) {
+export async function priceJob({ weightKg, distanceKm = null, pickup = null, delivery = null, countryCode = DEFAULT_COUNTRY }) {
     const vehicleClass = classForWeight(weightKg);
-    const rate = await currentRateFor(vehicleClass);
-    if (!rate) throw new PricingError(`No rate card for ${vehicleClass}.`);
+    const rate = await currentRateFor(vehicleClass, countryCode);
+    if (!rate) throw new PricingError(`No rate card for ${vehicleClass} in ${countryCode}.`);
 
     // Only worth looking up once there are two points and enough distance for
     // terrain to be charged at all -- inside the city none of it applies.
     let terrainFactor = null;
     if (pickup && delivery && distanceKm != null) {
         const roadKm = distanceKm * Number(rate.road_distance_factor ?? 1);
-        const corridor = await corridorFor(pickup, delivery, roadKm);
+        const corridor = await corridorFor(pickup, delivery, roadKm, rate.country_code || 'RW');
         if (corridor) terrainFactor = corridor.terrainFactor;
     }
 
@@ -62,6 +70,11 @@ export async function distanceKmBetween(pickup, delivery) {
 
 // Which corridor a route runs through, and what its terrain costs.
 //
+// Scoped to a market. Corridors match on bearing, and a bearing is not unique
+// to a country -- eastbound out of Accra is not the Akagera plain, and without
+// this a Ghanaian route would be handed Rwanda's flat-terrain discount for a
+// basin two thousand kilometres away.
+//
 // Bearing comes from PostGIS rather than a hand-rolled great-circle formula --
 // ST_Azimuth is the same maths the rest of the system's spatial work uses, and
 // there is no reason to have two implementations that could disagree.
@@ -71,7 +84,7 @@ export async function distanceKmBetween(pickup, delivery) {
 // wider southern sweep it sits inside. Returns null when no corridor matches,
 // which means the rate card's own factor applies -- climbing, the safe default
 // in a country this hilly.
-export async function corridorFor(pickup, delivery, roadDistanceKm) {
+export async function corridorFor(pickup, delivery, roadDistanceKm, countryCode = 'RW') {
     if (!pickup || !delivery) return null;
 
     const { rows } = await pool.query(
@@ -83,12 +96,13 @@ export async function corridorFor(pickup, delivery, roadDistanceKm) {
          )
          SELECT c.name, c.terrain_fuel_factor, route.bearing
            FROM route_corridors c, route
-          WHERE route.bearing >= c.bearing_from_deg
+          WHERE c.country_code = $6
+            AND route.bearing >= c.bearing_from_deg
             AND route.bearing <  c.bearing_to_deg
             AND (c.max_distance_km IS NULL OR $5 <= c.max_distance_km)
           ORDER BY c.max_distance_km NULLS LAST
           LIMIT 1`,
-        [pickup.lng, pickup.lat, delivery.lng, delivery.lat, roadDistanceKm]
+        [pickup.lng, pickup.lat, delivery.lng, delivery.lat, roadDistanceKm, countryCode]
     );
 
     const row = rows[0];
@@ -130,11 +144,11 @@ export async function detentionForOrder(client, orderId, { arrivalStatus = 'ARRI
     if (!row || row.waited_minutes == null) return null;
 
     const waited = Math.max(0, Math.round(Number(row.waited_minutes)));
-    if (!row.pricing_rate_id) return { waitedMinutes: waited, detentionRwf: 0, chargeableMinutes: 0 };
+    if (!row.pricing_rate_id) return { waitedMinutes: waited, detentionAmount: 0, chargeableMinutes: 0 };
 
     const rateResult = await client.query('SELECT * FROM pricing_rates WHERE id = $1', [row.pricing_rate_id]);
     const rate = rateResult.rows[0];
-    if (!rate) return { waitedMinutes: waited, detentionRwf: 0, chargeableMinutes: 0 };
+    if (!rate) return { waitedMinutes: waited, detentionAmount: 0, chargeableMinutes: 0 };
 
     return detentionCharge(rate, waited);
 }
@@ -157,7 +171,7 @@ const BACKFILL_RADIUS_KM = 15;
 export async function backfillCreditForOrder(client, orderId) {
     const { rows } = await client.query(
         `WITH this_order AS (
-             SELECT o.id, o.return_leg_rwf, ts.trip_id,
+             SELECT o.id, o.return_leg_amount, ts.trip_id,
                     ST_SetSRID(ST_MakePoint(o.delivery_lng, o.delivery_lat), 4326) AS drop_point
                FROM orders o
                JOIN trip_stops ts ON ts.order_id = o.id AND ts.kind = 'DROP'
@@ -166,14 +180,14 @@ export async function backfillCreditForOrder(client, orderId) {
                -- refund a customer for an empty leg the driver still drove.
                JOIN trips t ON t.id = ts.trip_id AND t.status IN ('ACTIVE', 'COMPLETED')
               WHERE o.id = $1
-                AND o.return_leg_rwf IS NOT NULL
-                AND o.return_leg_rwf > 0
+                AND o.return_leg_amount IS NOT NULL
+                AND o.return_leg_amount > 0
                 AND o.delivery_lat IS NOT NULL
               LIMIT 1
          )
          SELECT other.order_id AS filled_by,
                 ST_DistanceSphere(other_point.geom, this_order.drop_point) / 1000 AS km_apart,
-                this_order.return_leg_rwf
+                this_order.return_leg_amount
            FROM this_order
            JOIN trip_stops other
              ON other.trip_id = this_order.trip_id
@@ -193,7 +207,7 @@ export async function backfillCreditForOrder(client, orderId) {
     return {
         filledByOrderId: row.filled_by,
         kmApart: Number(Number(row.km_apart).toFixed(2)),
-        creditRwf: Math.round(Number(row.return_leg_rwf)),
+        creditAmount: Math.round(Number(row.return_leg_amount)),
     };
 }
 

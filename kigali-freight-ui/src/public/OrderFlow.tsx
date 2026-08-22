@@ -287,7 +287,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                     {quote ? (
                                         <>
                                             <p className="mt-1 font-display text-2xl text-pub-onpaper tabular-nums">
-                                                {quote.totalRwf.toLocaleString()} RWF
+                                                {quote.totalAmount.toLocaleString()} RWF
                                             </p>
                                             {quote.isEstimate && (
                                                 <p className="mt-1 text-sm text-pub-onpaper-soft">{t.order.estimateNote}</p>
@@ -300,11 +300,11 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                                 cannot leave this promising
                                                 terms the system no longer
                                                 applies. */}
-                                            {quote.detentionPerHourRwf > 0 && (
+                                            {quote.detentionPerHour > 0 && (
                                                 <p className="mt-2 text-sm text-pub-onpaper-soft">
                                                     {t.order.waitingNotice
                                                         .replace('{minutes}', String(quote.freeWaitingMinutes))
-                                                        .replace('{rate}', quote.detentionPerHourRwf.toLocaleString())}
+                                                        .replace('{rate}', quote.detentionPerHour.toLocaleString())}
                                                 </p>
                                             )}
                                         </>

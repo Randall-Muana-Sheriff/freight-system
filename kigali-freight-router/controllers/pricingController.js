@@ -15,11 +15,11 @@ import { quote, PricingError } from '../services/pricingService.js';
 // effective_from and created_at are the record of when a card was written and
 // are not anyone's to edit.
 const EDITABLE = [
-    'base_fare_rwf', 'per_km_rwf', 'per_km_long_rwf', 'per_kg_rwf', 'minimum_fare_rwf',
-    'fuel_litres_per_100km', 'diesel_price_rwf_per_litre', 'road_distance_factor',
+    'base_fare', 'per_km', 'per_km_long', 'per_kg', 'minimum_fare',
+    'fuel_litres_per_100km', 'fuel_price_per_litre', 'road_distance_factor',
     'taper_after_km', 'return_leg_beyond_km', 'return_leg_share_pct', 'terrain_fuel_factor',
-    'platform_commission_pct', 'platform_minimum_fee_rwf',
-    'detention_free_minutes', 'detention_per_hour_rwf',
+    'platform_commission_pct', 'platform_minimum_fee',
+    'detention_free_minutes', 'detention_per_hour',
 ];
 
 // A sanity net, not a business opinion. These bounds exist to catch a typed
@@ -31,7 +31,7 @@ const BOUNDS = {
     terrain_fuel_factor: [1, 2],
     return_leg_share_pct: [0, 100],
     fuel_litres_per_100km: [1, 100],
-    diesel_price_rwf_per_litre: [100, 20000],
+    fuel_price_per_litre: [100, 20000],
     detention_free_minutes: [0, 480],
 };
 

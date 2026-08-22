@@ -108,19 +108,19 @@ export interface Order {
     // Money. Dispatch sees the whole breakdown; the public tracking page is
     // deliberately given the total alone, so these have no equivalent there.
     priced_vehicle_class?: string | null;
-    price_total_rwf?: string | number | null;
-    platform_fee_rwf?: string | number | null;
-    driver_net_rwf?: string | number | null;
+    price_total?: string | number | null;
+    platform_fee?: string | number | null;
+    driver_net?: string | number | null;
     price_distance_km?: string | number | null;
     // True while the price came from weight alone. A public order carries no
     // coordinates until it is placed, so its price is not real until then —
     // which makes this the dispatcher's cue that the row still needs placing.
     price_is_estimate?: boolean;
-    // Both are already folded into price_total_rwf. Kept separate so a total
+    // Both are already folded into price_total. Kept separate so a total
     // that changed after delivery carries its reason.
     detention_minutes?: number | null;
-    detention_rwf?: string | number | null;
-    backfill_credit_rwf?: string | number | null;
+    detention_amount?: string | number | null;
+    backfill_credit?: string | number | null;
     backfilled_by_order_id?: number | null;
 }
 
@@ -171,22 +171,22 @@ export interface ReturnLoadCandidate {
 export interface RateCard {
     id: number;
     vehicle_class: string;
-    base_fare_rwf: string | number;
-    per_km_rwf: string | number;
-    per_km_long_rwf: string | number | null;
-    per_kg_rwf: string | number;
-    minimum_fare_rwf: string | number;
+    base_fare: string | number;
+    per_km: string | number;
+    per_km_long: string | number | null;
+    per_kg: string | number;
+    minimum_fare: string | number;
     fuel_litres_per_100km: string | number;
-    diesel_price_rwf_per_litre: string | number;
+    fuel_price_per_litre: string | number;
     road_distance_factor: string | number;
     taper_after_km: string | number;
     return_leg_beyond_km: string | number;
     return_leg_share_pct: string | number;
     terrain_fuel_factor: string | number;
     platform_commission_pct: string | number;
-    platform_minimum_fee_rwf: string | number;
+    platform_minimum_fee: string | number;
     detention_free_minutes: number;
-    detention_per_hour_rwf: string | number | null;
+    detention_per_hour: string | number | null;
     effective_from: string;
     note: string | null;
 }

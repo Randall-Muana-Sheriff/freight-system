@@ -82,7 +82,7 @@ export const PublicOrderController = {
             return ok(res, {
                 currency: priced.currency,
                 vehicleClass: priced.vehicleClass,
-                totalRwf: priced.totalRwf,
+                totalAmount: priced.totalAmount,
                 isEstimate: priced.isEstimate,
                 distanceKm: priced.distanceKm,
                 minimumFareApplied: priced.minimumFareApplied,
@@ -90,7 +90,7 @@ export const PublicOrderController = {
                 // terms. Hardcoding "an hour" in the copy would quietly become
                 // a lie the day somebody edits the card.
                 freeWaitingMinutes: priced.freeWaitingMinutes,
-                detentionPerHourRwf: priced.detentionPerHourRwf,
+                detentionPerHour: priced.detentionPerHour,
             });
         } catch (error) {
             if (error instanceof PricingError) {
@@ -175,17 +175,17 @@ export const PublicOrderController = {
                              customer_name, customer_phone, customer_email,
                              pickup_address_text, delivery_address_text, special_instructions,
                              needed_by,
-                             pricing_rate_id, priced_vehicle_class, quoted_total_rwf,
-                             price_total_rwf, price_fuel_rwf, price_service_rwf,
-                             platform_fee_rwf, driver_net_rwf, price_distance_km, price_is_estimate)
+                             pricing_rate_id, priced_vehicle_class, quoted_total,
+                             price_total, price_fuel, price_service,
+                             platform_fee, driver_net, price_distance_km, price_is_estimate, currency)
                          VALUES ($1, $2, 'PENDING', 'public', $3, $4, $5, $6, $7, $8, $9, $10,
-                                 $11, $12, $13, $13, $14, $15, $16, $17, $18, $19)
+                                 $11, $12, $13, $13, $14, $15, $16, $17, $18, $19, $20)
                          RETURNING tracking_token AS "trackingToken"`,
                         [cargoType, weightKg, generateTrackingToken(), customerName, customerPhone,
                          customerEmail, pickup, delivery, instructions, neededBy,
-                         priced.pricingRateId, priced.vehicleClass, priced.totalRwf,
-                         priced.fuelRwf, priced.serviceRwf, priced.platformFeeRwf,
-                         priced.driverNetRwf, priced.distanceKm, priced.isEstimate]
+                         priced.pricingRateId, priced.vehicleClass, priced.totalAmount,
+                         priced.fuelAmount, priced.serviceAmount, priced.platformFee,
+                         priced.driverNet, priced.distanceKm, priced.isEstimate, priced.currency]
                     );
                     created = result.rows[0];
                 } catch (err) {
@@ -231,8 +231,8 @@ export const PublicOrderController = {
                         o.status, o.created_at AS "createdAt", o.updated_at AS "updatedAt",
                         o.pickup_address_text AS "pickupText", o.delivery_address_text AS "deliveryText",
                         o.origin_hub_name AS "originHub", u.full_name AS "driverName",
-                        o.price_total_rwf AS "priceRwf", o.price_is_estimate AS "priceIsEstimate",
-                        o.detention_rwf AS "detentionRwf"
+                        o.price_total AS "priceAmount", o.price_is_estimate AS "priceIsEstimate",
+                        o.detention_amount AS "detentionAmount"
                    FROM orders o
                    LEFT JOIN users u ON u.username = o.assigned_to
                   WHERE o.tracking_token = $1`,
@@ -305,8 +305,8 @@ export const PublicOrderController = {
                 pickup: order.pickupText || order.originHub,
                 delivery: order.deliveryText,
                 driverFirstName: order.driverName ? String(order.driverName).split(' ')[0] : null,
-                // The total and nothing else. platform_fee_rwf and
-                // driver_net_rwf are deliberately not selected above, for the
+                // The total and nothing else. platform_fee and
+                // driver_net are deliberately not selected above, for the
                 // same reason distance_from_target_m is not: what the
                 // platform keeps and what the driver is paid are the
                 // commercial terms between this business and its drivers, not
@@ -314,7 +314,7 @@ export const PublicOrderController = {
                 // see the split can negotiate against it or take it straight
                 // to the driver, and neither is a conversation this screen
                 // should start.
-                priceRwf: order.priceRwf === null ? null : Number(order.priceRwf),
+                priceAmount: order.priceAmount === null ? null : Number(order.priceAmount),
                 // An estimate has not had a distance applied yet, so the site
                 // must say so rather than presenting it as a settled price.
                 priceIsEstimate: order.priceIsEstimate,
@@ -322,7 +322,7 @@ export const PublicOrderController = {
                 // customer whose warehouse held the driver for two hours is
                 // owed the reason their bill went up, and the alternative is
                 // an unexplained number and a phone call.
-                detentionRwf: order.detentionRwf == null ? null : Number(order.detentionRwf),
+                detentionAmount: order.detentionAmount == null ? null : Number(order.detentionAmount),
                 placedAt: order.createdAt,
                 updatedAt: order.updatedAt,
                 timeline: history.rows,

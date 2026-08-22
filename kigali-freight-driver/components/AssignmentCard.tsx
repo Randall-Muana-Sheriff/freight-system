@@ -39,7 +39,7 @@ export function AssignmentCard({
   status,
   priority,
   note,
-  payRwf,
+  payAmount,
   payIsEstimate,
   isOffer,
   onPress,
@@ -51,7 +51,7 @@ export function AssignmentCard({
   status: string;
   priority: 'high' | 'normal' | 'low';
   note?: string | null;
-  payRwf?: number | null;
+  payAmount?: number | null;
   payIsEstimate?: boolean;
   isOffer?: boolean;
   onPress?: () => void;
@@ -108,10 +108,10 @@ export function AssignmentCard({
             <Text style={styles.offerText}>Offered — accept or decline</Text>
           </View>
         ) : null}
-        {payRwf != null ? (
+        {payAmount != null ? (
           <View style={styles.payRow}>
             <Text style={styles.payAmount}>
-              {payIsEstimate ? 'About ' : ''}{payRwf.toLocaleString()} RWF
+              {payIsEstimate ? 'About ' : ''}{payAmount.toLocaleString()} RWF
             </Text>
             <Text style={styles.payCaption}>to you</Text>
           </View>

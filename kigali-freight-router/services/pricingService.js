@@ -78,14 +78,14 @@ function requireFiniteNumber(value, label) {
 export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null }) {
     if (!rate) throw new PricingError('No rate card supplied.');
 
-    const baseFare = requireFiniteNumber(rate.base_fare_rwf, 'base_fare_rwf');
-    const perKm = requireFiniteNumber(rate.per_km_rwf, 'per_km_rwf');
-    const perKg = requireFiniteNumber(rate.per_kg_rwf, 'per_kg_rwf');
-    const minimumFare = requireFiniteNumber(rate.minimum_fare_rwf, 'minimum_fare_rwf');
+    const baseFare = requireFiniteNumber(rate.base_fare, 'base_fare');
+    const perKm = requireFiniteNumber(rate.per_km, 'per_km');
+    const perKg = requireFiniteNumber(rate.per_kg, 'per_kg');
+    const minimumFare = requireFiniteNumber(rate.minimum_fare, 'minimum_fare');
     const litresPer100 = requireFiniteNumber(rate.fuel_litres_per_100km, 'fuel_litres_per_100km');
-    const dieselPrice = requireFiniteNumber(rate.diesel_price_rwf_per_litre, 'diesel_price_rwf_per_litre');
+    const dieselPrice = requireFiniteNumber(rate.fuel_price_per_litre, 'fuel_price_per_litre');
     const commissionPct = requireFiniteNumber(rate.platform_commission_pct, 'platform_commission_pct');
-    const minimumFee = requireFiniteNumber(rate.platform_minimum_fee_rwf, 'platform_minimum_fee_rwf');
+    const minimumFee = requireFiniteNumber(rate.platform_minimum_fee, 'platform_minimum_fee');
 
     const weight = requireFiniteNumber(weightKg, 'weightKg');
     if (weight < 0) throw new PricingError('weightKg cannot be negative.');
@@ -113,9 +113,9 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
     // The city stretch and the stretch beyond it are different jobs and cost
     // different amounts, so they are charged separately rather than averaged.
     const taperAfter = optionalNumber(rate.taper_after_km, 'taper_after_km', Infinity);
-    const perKmLong = rate.per_km_long_rwf == null
+    const perKmLong = rate.per_km_long == null
         ? perKm
-        : requireFiniteNumber(rate.per_km_long_rwf, 'per_km_long_rwf');
+        : requireFiniteNumber(rate.per_km_long, 'per_km_long');
     const cityKm = Math.min(distance, taperAfter);
     const openRoadKm = Math.max(0, distance - taperAfter);
 
@@ -160,15 +160,27 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
     // money. The driver's side is what gives way last.
     const cappedFee = Math.min(fee, total);
 
+    // Rounded to whatever the currency actually has. RWF has no minor unit, so
+    // whole francs is right; cedis have pesewas and shillings have cents, and
+    // rounding those to whole units quietly overcharges the customer or
+    // underpays the driver on every job.
+    //
     // Rounded once, then the driver's share is what is left. Rounding total
     // and fee separately and deriving the net from the unrounded pair let the
-    // three disagree by a franc -- money that does not add up, which is the
-    // one thing a price breakdown may never do.
-    const totalRounded = round(total);
-    const feeRounded = round(cappedFee);
+    // three disagree by a unit -- money that does not add up, which is the one
+    // thing a price breakdown may never do.
+    const minorUnits = optionalNumber(rate.currency_minor_units, 'currency_minor_units', 0);
+    const step = 10 ** minorUnits;
+    const toMoney = (value) => Math.round(value * step) / step;
+
+    const totalRounded = toMoney(total);
+    const feeRounded = toMoney(cappedFee);
 
     return {
-        currency: 'RWF',
+        // From the card, not a constant. A market's rates and the currency
+        // they are in are the same fact, and hardcoding one of them here is
+        // how a Ghanaian total ends up labelled in francs.
+        currency: rate.currency || 'RWF',
         vehicleClass: rate.vehicle_class,
         pricingRateId: rate.id ?? null,
         isEstimate,
@@ -177,25 +189,25 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
         // how the two points were measured, not a fact about the journey.
         distanceKm: isEstimate ? null : Number(distance.toFixed(3)),
         weightKg: weight,
-        fuelRwf: round(fuel),
+        fuelAmount: toMoney(fuel),
         // Broken out so a driver asking why an upcountry job costs what it
         // does can be told, and so dispatch can see the empty leg rather than
         // wondering why the same distance priced differently.
-        returnLegRwf: round(fuelReturn),
+        returnLegAmount: toMoney(fuelReturn),
         returnsEmpty,
         openRoadKm: Number(openRoadKm.toFixed(3)),
         terrainFactor: effectiveTerrain,
-        serviceRwf: round(service),
-        totalRwf: totalRounded,
-        platformFeeRwf: feeRounded,
-        driverNetRwf: totalRounded - feeRounded,
+        serviceAmount: toMoney(service),
+        totalAmount: totalRounded,
+        platformFee: feeRounded,
+        driverNet: totalRounded - feeRounded,
         minimumFareApplied: subtotal < minimumFare,
         minimumFeeApplied: service * (commissionPct / 100) < minimumFee,
         // Not charged here -- detention is worked out at delivery, once the
         // wait is known. Carried on the quote so a customer can be told the
         // terms before they book rather than discovering them on the bill.
         freeWaitingMinutes: optionalNumber(rate.detention_free_minutes, 'detention_free_minutes', 60),
-        detentionPerHourRwf: round(optionalNumber(rate.detention_per_hour_rwf, 'detention_per_hour_rwf', 0)),
+        detentionPerHour: toMoney(optionalNumber(rate.detention_per_hour, 'detention_per_hour', 0)),
     };
 }
 
@@ -205,14 +217,14 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
  * is what the customer and driver are told, this is whether the job was
  * worth doing.
  */
-export function platformMargin(quoted, { smsCount = 2, smsCostRwf = 14, momoFeePct = 1.0 }) {
-    const sms = smsCount * smsCostRwf;
-    const momo = quoted.totalRwf * (momoFeePct / 100);
+export function platformMargin(quoted, { smsCount = 2, smsCost = 14, momoFeePct = 1.0 }) {
+    const sms = smsCount * smsCost;
+    const momo = quoted.totalAmount * (momoFeePct / 100);
     return {
-        platformFeeRwf: quoted.platformFeeRwf,
-        smsCostRwf: round(sms),
-        momoFeeRwf: round(momo),
-        netToPlatformRwf: round(quoted.platformFeeRwf - sms - momo),
+        platformFee: quoted.platformFee,
+        smsCost: round(sms),
+        momoFee: round(momo),
+        netToPlatform: round(quoted.platformFee - sms - momo),
     };
 }
 
@@ -234,13 +246,13 @@ export function detentionCharge(rate, waitedMinutes) {
     if (waited < 0) throw new PricingError('waitedMinutes cannot be negative.');
 
     const freeMinutes = optionalNumber(rate?.detention_free_minutes, 'detention_free_minutes', 60);
-    const perHour = optionalNumber(rate?.detention_per_hour_rwf, 'detention_per_hour_rwf', 0);
+    const perHour = optionalNumber(rate?.detention_per_hour, 'detention_per_hour', 0);
 
     const chargeable = Math.max(0, waited - freeMinutes);
     return {
         waitedMinutes: waited,
         freeMinutes,
         chargeableMinutes: chargeable,
-        detentionRwf: round((chargeable / 60) * perHour),
+        detentionAmount: round((chargeable / 60) * perHour),
     };
 }

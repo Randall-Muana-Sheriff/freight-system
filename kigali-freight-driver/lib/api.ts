@@ -63,14 +63,14 @@ export type DriverAssignment = {
   // of what lands with them -- which is what makes it the right number to
   // decide on. The customer's total and the platform's cut are deliberately
   // not on this endpoint.
-  driver_net_rwf?: string | number | null;
+  driver_net?: string | number | null;
   // True while the job was priced from weight alone, before a dispatcher
   // pinned it to the map. The pay is provisional until that happens and the
   // app has to say so rather than quote a figure that can still move.
   price_is_estimate?: boolean;
-  // Already inside driver_net_rwf. Sent separately so the app can say why
+  // Already inside driver_net. Sent separately so the app can say why
   // that figure moved rather than leaving the driver to guess.
-  detention_rwf?: string | number | null;
+  detention_amount?: string | number | null;
   // Set while a job is offered rather than assigned. An offer is work the
   // driver has not agreed to yet, which is the difference between being an
   // employee and being an independent operator with their own truck.

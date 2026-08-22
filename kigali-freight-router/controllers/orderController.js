@@ -114,12 +114,12 @@ export const OrderController = {
                     -- has to be the honest one -- it is already net of the
                     -- platform fee and already includes the fuel the run
                     -- will burn.
-                    driver_net_rwf,
+                    driver_net,
                     price_is_estimate,
-                    -- Already folded into driver_net_rwf; shown separately so
+                    -- Already folded into driver_net; shown separately so
                     -- a driver can see the wait was paid for rather than
                     -- wondering why the figure moved after they closed the job.
-                    detention_rwf
+                    detention_amount
                 FROM orders
                 WHERE LOWER(COALESCE(assigned_to, '')) = LOWER($1)
                   AND UPPER(COALESCE(status, 'PENDING')) NOT IN ('DELIVERED', 'CANCELLED')
@@ -232,17 +232,17 @@ export const OrderController = {
                     -- business that has to know whether a job is worth
                     -- running: price_is_estimate says whether this row still
                     -- needs placing on the map before the price is real, and
-                    -- platform_fee_rwf is the only place the operator can see
+                    -- platform_fee is the only place the operator can see
                     -- what the work actually earns them.
                     priced_vehicle_class,
-                    price_total_rwf,
+                    price_total,
                     price_is_estimate,
-                    platform_fee_rwf,
-                    driver_net_rwf,
+                    platform_fee,
+                    driver_net,
                     price_distance_km,
                     detention_minutes,
-                    detention_rwf,
-                    backfill_credit_rwf,
+                    detention_amount,
+                    backfill_credit,
                     backfilled_by_order_id
                 FROM orders
                 WHERE status = 'PENDING'
@@ -354,15 +354,16 @@ export const OrderController = {
                     delivery_geom,
                     pricing_rate_id,
                     priced_vehicle_class,
-                    quoted_total_rwf,
-                    price_total_rwf,
-                    price_fuel_rwf,
-                    price_service_rwf,
-                    platform_fee_rwf,
-                    driver_net_rwf,
+                    quoted_total,
+                    price_total,
+                    price_fuel,
+                    price_service,
+                    platform_fee,
+                    driver_net,
                     price_distance_km,
                     price_is_estimate,
-                    return_leg_rwf
+                    return_leg_amount,
+                    currency
                 )
                 VALUES (
                     $1,
@@ -380,19 +381,19 @@ export const OrderController = {
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
                     ST_SetSRID(ST_MakePoint($5, $6), 4326),
                     ST_SetSRID(ST_MakePoint($7, $8), 4326),
-                    $12, $13, $14, $14, $15, $16, $17, $18, $19, FALSE, $20
+                    $12, $13, $14, $14, $15, $16, $17, $18, $19, FALSE, $20, $21
                 )
                 RETURNING id, cargo_description, status, weight_kg, origin_hub_name, pickup_lng, pickup_lat, delivery_lng, delivery_lat, recipient_name, recipient_phone, priority,
-                          price_total_rwf, platform_fee_rwf, driver_net_rwf, price_distance_km, priced_vehicle_class, price_is_estimate;
+                          price_total, platform_fee, driver_net, price_distance_km, priced_vehicle_class, price_is_estimate;
             `;
 
             const result = await pool.query(query, [
                 cargo_description, weight_kg, hub.id, hub.name,
                 hub.lng, hub.lat, delivery_lng, delivery_lat,
                 recipient_name || null, recipient_phone || null, normalizedPriority,
-                priced.pricingRateId, priced.vehicleClass, priced.totalRwf,
-                priced.fuelRwf, priced.serviceRwf, priced.platformFeeRwf,
-                priced.driverNetRwf, priced.distanceKm, priced.returnLegRwf
+                priced.pricingRateId, priced.vehicleClass, priced.totalAmount,
+                priced.fuelAmount, priced.serviceAmount, priced.platformFee,
+                priced.driverNet, priced.distanceKm, priced.returnLegAmount, priced.currency
             ]);
 
             const newOrder = result.rows[0];
@@ -843,13 +844,13 @@ export const OrderController = {
                         await client.query(
                             `UPDATE orders SET
                                 pickup_detention_minutes = $2,
-                                pickup_detention_rwf = $3,
+                                pickup_detention_amount = $3,
                                 detention_minutes = COALESCE(detention_minutes, 0) + $2,
-                                detention_rwf = COALESCE(detention_rwf, 0) + $3,
-                                price_total_rwf = COALESCE(price_total_rwf, 0) + $3,
-                                driver_net_rwf = COALESCE(driver_net_rwf, 0) + $3
+                                detention_amount = COALESCE(detention_amount, 0) + $3,
+                                price_total = COALESCE(price_total, 0) + $3,
+                                driver_net = COALESCE(driver_net, 0) + $3
                               WHERE id = $1`,
-                            [id, waited.waitedMinutes, waited.detentionRwf]
+                            [id, waited.waitedMinutes, waited.detentionAmount]
                         );
                     }
                 } catch (err) {
@@ -1010,28 +1011,28 @@ export const OrderController = {
                 `UPDATE orders SET
                     status = 'DELIVERED',
                     dropoff_detention_minutes = COALESCE($2, dropoff_detention_minutes),
-                    dropoff_detention_rwf = COALESCE($3, dropoff_detention_rwf),
+                    dropoff_detention_amount = COALESCE($3, dropoff_detention_amount),
                     detention_minutes = COALESCE(detention_minutes, 0) + COALESCE($2, 0),
-                    detention_rwf = COALESCE(detention_rwf, 0) + COALESCE($3, 0),
+                    detention_amount = COALESCE(detention_amount, 0) + COALESCE($3, 0),
                     -- Added to the customer's total and passed to the driver
                     -- whole. No commission: this reimburses a driver's stolen
                     -- hour, it is not service the platform brokered, which is
                     -- the same reason fuel sits outside the fee.
-                    price_total_rwf = COALESCE(price_total_rwf, 0) + COALESCE($3, 0) - COALESCE($4, 0),
-                    driver_net_rwf = COALESCE(driver_net_rwf, 0) + COALESCE($3, 0) - COALESCE($4, 0),
+                    price_total = COALESCE(price_total, 0) + COALESCE($3, 0) - COALESCE($4, 0),
+                    driver_net = COALESCE(driver_net, 0) + COALESCE($3, 0) - COALESCE($4, 0),
                     -- The credit comes off the driver as well as the customer,
                     -- because the driver did not drive the empty leg either.
                     -- They are not out of pocket: the load that filled it is a
                     -- second fare on the same run, which is the whole reason
                     -- pairing is worth doing.
-                    backfill_credit_rwf = COALESCE($4, backfill_credit_rwf),
+                    backfill_credit = COALESCE($4, backfill_credit),
                     backfilled_by_order_id = COALESCE($5, backfilled_by_order_id),
                     updated_at = NOW()
                  WHERE id = $1
-                 RETURNING id, cargo_description, status, detention_minutes, detention_rwf,
-                           price_total_rwf, driver_net_rwf;`,
-                [id, detention?.waitedMinutes ?? null, detention?.detentionRwf ?? null,
-                 backfill?.creditRwf ?? null, backfill?.filledByOrderId ?? null]
+                 RETURNING id, cargo_description, status, detention_minutes, detention_amount,
+                           price_total, driver_net;`,
+                [id, detention?.waitedMinutes ?? null, detention?.detentionAmount ?? null,
+                 backfill?.creditAmount ?? null, backfill?.filledByOrderId ?? null]
             );
 
             await client.query(
@@ -1272,7 +1273,7 @@ export const OrderController = {
                     updated_at = NOW()
                  WHERE id = $1
                  RETURNING id, pickup_lat, pickup_lng, delivery_lat, delivery_lng, origin_hub_name,
-                           weight_kg, quoted_total_rwf;`,
+                           weight_kg, quoted_total;`,
                 [id, pickupLat, pickupLng, deliveryLat, deliveryLng, hub?.id ?? null, hub?.name ?? null]
             );
 
@@ -1283,7 +1284,7 @@ export const OrderController = {
             // This is the moment an estimate becomes a price. Until now the
             // order had only two free-text addresses, so it was priced on
             // class and weight alone; pinning it to the map is the first time
-            // a real distance exists. quoted_total_rwf is deliberately left
+            // a real distance exists. quoted_total is deliberately left
             // alone -- a customer who was shown one number and is charged
             // another is owed the original, and overwriting it would erase
             // the only record of what they agreed to.
@@ -1302,15 +1303,15 @@ export const OrderController = {
                 await pool.query(
                     `UPDATE orders SET
                         pricing_rate_id = $2, priced_vehicle_class = $3,
-                        price_total_rwf = $4, price_fuel_rwf = $5, price_service_rwf = $6,
-                        platform_fee_rwf = $7, driver_net_rwf = $8,
+                        price_total = $4, price_fuel = $5, price_service = $6,
+                        platform_fee = $7, driver_net = $8,
                         price_distance_km = $9, price_is_estimate = FALSE,
-                        return_leg_rwf = $10,
+                        return_leg_amount = $10,
                         updated_at = NOW()
                       WHERE id = $1`,
-                    [id, repriced.pricingRateId, repriced.vehicleClass, repriced.totalRwf,
-                     repriced.fuelRwf, repriced.serviceRwf, repriced.platformFeeRwf,
-                     repriced.driverNetRwf, repriced.distanceKm, repriced.returnLegRwf]
+                    [id, repriced.pricingRateId, repriced.vehicleClass, repriced.totalAmount,
+                     repriced.fuelAmount, repriced.serviceAmount, repriced.platformFee,
+                     repriced.driverNet, repriced.distanceKm, repriced.returnLegAmount]
                 );
             } catch (err) {
                 // Placing the order on the map is the operation the dispatcher
@@ -1376,9 +1377,9 @@ export const OrderController = {
                     o.customer_phone,
                     -- Same rule as the assignments list: the driver's own net,
                     -- never the customer total or the platform's cut.
-                    o.driver_net_rwf,
+                    o.driver_net,
                     o.price_is_estimate,
-                    o.detention_rwf,
+                    o.detention_amount,
                     dl.lat AS driver_lat,
                     dl.lng AS driver_lng,
                     EXTRACT(EPOCH FROM (NOW() - dl.updated_at)) AS telemetry_age_seconds,
@@ -1504,7 +1505,7 @@ export const OrderController = {
                     SET status = 'OFFERED', assigned_to = $1,
                         offer_expires_at = NOW() + ($3 || ' minutes')::interval, updated_at = NOW()
                   WHERE id = ANY($2)
-                  RETURNING id, cargo_description, status, offer_expires_at, driver_net_rwf`,
+                  RETURNING id, cargo_description, status, offer_expires_at, driver_net`,
                 [driverName, orderIds, String(minutes)]
             );
 
@@ -1544,7 +1545,7 @@ export const OrderController = {
                     SET status = 'ASSIGNED', offer_expires_at = NULL, updated_at = NOW()
                   WHERE id = $1 AND status = 'OFFERED' AND assigned_to = $2
                     AND (offer_expires_at IS NULL OR offer_expires_at > NOW())
-                  RETURNING id, cargo_description, status, driver_net_rwf`,
+                  RETURNING id, cargo_description, status, driver_net`,
                 [id, driverName]
             );
             if (taken.rows.length === 0) {

@@ -636,8 +636,8 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             });
         assert.equal(created.statusCode, 201, JSON.stringify(created.body));
         const orderId = created.body.data.order.id;
-        const quotedTotal = Number(created.body.data.order.price_total_rwf);
-        const quotedNet = Number(created.body.data.order.driver_net_rwf);
+        const quotedTotal = Number(created.body.data.order.price_total);
+        const quotedNet = Number(created.body.data.order.driver_net);
 
         // Plant an ARRIVED ninety minutes ago. Written straight to the log
         // because the point under test is the arithmetic on the gap, not the
@@ -658,7 +658,7 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(confirmed.statusCode, 200, JSON.stringify(confirmed.body));
 
         const after = await pool.query(
-            `SELECT detention_minutes, detention_rwf, price_total_rwf, driver_net_rwf, platform_fee_rwf
+            `SELECT detention_minutes, detention_amount, price_total, driver_net, platform_fee
                FROM orders WHERE id = $1`,
             [orderId]
         );
@@ -667,14 +667,14 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.ok(Number(row.detention_minutes) >= 89, `recorded ${row.detention_minutes} minutes for a 90 minute wait`);
         // An hour is free, so thirty minutes are chargeable at the Medium
         // Truck rate of 8,500 an hour.
-        assert.equal(Number(row.detention_rwf), 4250);
+        assert.equal(Number(row.detention_amount), 4250);
 
         // The customer pays it and the driver keeps all of it -- the platform
         // takes no commission on a driver's stolen hour, the same way it takes
         // none on their fuel.
-        assert.equal(Number(row.price_total_rwf), quotedTotal + 4250);
-        assert.equal(Number(row.driver_net_rwf), quotedNet + 4250);
-        assert.equal(Number(row.platform_fee_rwf), quotedTotal - quotedNet);
+        assert.equal(Number(row.price_total), quotedTotal + 4250);
+        assert.equal(Number(row.driver_net), quotedNet + 4250);
+        assert.equal(Number(row.platform_fee), quotedTotal - quotedNet);
     });
 
     // The pickup end, which needed an event the system did not have.
@@ -694,7 +694,7 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             });
         assert.equal(created.statusCode, 201, JSON.stringify(created.body));
         const orderId = created.body.data.order.id;
-        const quotedNet = Number(created.body.data.order.driver_net_rwf);
+        const quotedNet = Number(created.body.data.order.driver_net);
 
         await pool.query(`UPDATE orders SET status = 'ASSIGNED', assigned_to = $2 WHERE id = $1`, [orderId, driverPhone]);
 
@@ -722,15 +722,15 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(leaving.statusCode, 200, JSON.stringify(leaving.body));
 
         const row = (await pool.query(
-            `SELECT pickup_detention_minutes, pickup_detention_rwf, detention_rwf, driver_net_rwf, platform_fee_rwf
+            `SELECT pickup_detention_minutes, pickup_detention_amount, detention_amount, driver_net, platform_fee
                FROM orders WHERE id = $1`, [orderId]
         )).rows[0];
 
         assert.ok(Number(row.pickup_detention_minutes) >= 119, `recorded ${row.pickup_detention_minutes} minutes for a two hour wait`);
         // An hour free, so sixty chargeable minutes at the truck rate.
-        assert.equal(Number(row.pickup_detention_rwf), 8500);
-        assert.equal(Number(row.detention_rwf), 8500, 'the total carries the pickup end');
-        assert.equal(Number(row.driver_net_rwf), quotedNet + 8500, 'and the driver keeps all of it');
+        assert.equal(Number(row.pickup_detention_amount), 8500);
+        assert.equal(Number(row.detention_amount), 8500, 'the total carries the pickup end');
+        assert.equal(Number(row.driver_net), quotedNet + 8500, 'and the driver keeps all of it');
     });
 
     // The status is the driver's alone: only the person at the gate knows
@@ -769,10 +769,10 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(outbound.statusCode, 201, JSON.stringify(outbound.body));
         const outboundId = outbound.body.data.order.id;
 
-        const charged = (await pool.query('SELECT return_leg_rwf, price_total_rwf FROM orders WHERE id = $1', [outboundId])).rows[0];
-        assert.ok(Number(charged.return_leg_rwf) > 0, 'an upcountry job must be charged for the empty return');
-        const totalBefore = Number(charged.price_total_rwf);
-        const emptyLeg = Math.round(Number(charged.return_leg_rwf));
+        const charged = (await pool.query('SELECT return_leg_amount, price_total FROM orders WHERE id = $1', [outboundId])).rows[0];
+        assert.ok(Number(charged.return_leg_amount) > 0, 'an upcountry job must be charged for the empty return');
+        const totalBefore = Number(charged.price_total);
+        const emptyLeg = Math.round(Number(charged.return_leg_amount));
 
         // A second job collecting from where the first was dropped: the run
         // home is loaded.
@@ -812,13 +812,13 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(confirmed.statusCode, 200, JSON.stringify(confirmed.body));
 
         const after = (await pool.query(
-            `SELECT backfill_credit_rwf, backfilled_by_order_id, price_total_rwf FROM orders WHERE id = $1`,
+            `SELECT backfill_credit, backfilled_by_order_id, price_total FROM orders WHERE id = $1`,
             [outboundId]
         )).rows[0];
 
-        assert.equal(Number(after.backfill_credit_rwf), emptyLeg, 'the whole empty-leg charge comes back');
+        assert.equal(Number(after.backfill_credit), emptyLeg, 'the whole empty-leg charge comes back');
         assert.equal(Number(after.backfilled_by_order_id), backhaulId, 'and it records which job filled it');
-        assert.equal(Number(after.price_total_rwf), totalBefore - emptyLeg);
+        assert.equal(Number(after.price_total), totalBefore - emptyLeg);
     });
 
     // A job that never had an empty leg has nothing to give back.
@@ -831,8 +831,8 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
                 origin_hub_id: hubId, delivery_lng: 30.1186, delivery_lat: -1.9536,
             });
         const orderId = created.body.data.order.id;
-        const row = (await pool.query('SELECT return_leg_rwf FROM orders WHERE id = $1', [orderId])).rows[0];
-        assert.equal(Number(row.return_leg_rwf), 0, 'nothing inside Kigali runs home empty');
+        const row = (await pool.query('SELECT return_leg_amount FROM orders WHERE id = $1', [orderId])).rows[0];
+        assert.equal(Number(row.return_leg_amount), 0, 'nothing inside Kigali runs home empty');
     });
 
     // The licence that makes carrying goods for money legal. RURA issues it to
@@ -1240,11 +1240,11 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(tracked.statusCode, 200);
 
         const body = tracked.body.data;
-        assert.ok(Number(body.priceRwf) > 0, 'the customer must be told what it costs');
+        assert.ok(Number(body.priceAmount) > 0, 'the customer must be told what it costs');
         // No distance has been applied yet, so it must be presented as an estimate.
         assert.equal(body.priceIsEstimate, true);
 
-        for (const leak of ['platformFeeRwf', 'platform_fee_rwf', 'driverNetRwf', 'driver_net_rwf', 'priceServiceRwf', 'price_service_rwf']) {
+        for (const leak of ['platformFee', 'platform_fee', 'driverNet', 'driver_net', 'priceService', 'price_service']) {
             assert.equal(body[leak], undefined, `tracking leaked ${leak}`);
         }
     });

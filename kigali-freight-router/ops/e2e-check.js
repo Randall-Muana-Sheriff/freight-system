@@ -135,21 +135,21 @@ async function main() {
 
     const vanQuote = await api('/api/public/quote?weightKg=400&distanceKm=8.38');
     const van = vanQuote.data;
-    check('a job can be priced before anyone signs in', vanQuote.ok && van?.totalRwf > 0, JSON.stringify(vanQuote.error));
+    check('a job can be priced before anyone signs in', vanQuote.ok && van?.totalAmount > 0, JSON.stringify(vanQuote.error));
     check('weight picks the vehicle class', van?.vehicleClass === 'Light Van', `got ${van?.vehicleClass}`);
     check('the quote states the waiting terms', Number(van?.freeWaitingMinutes) > 0,
         'the booking form reads the allowance from here rather than hardcoding it');
 
     const truckQuote = await api('/api/public/quote?weightKg=3000&distanceKm=8.38');
     check('a heavier load prices higher and as a truck',
-        truckQuote.data?.vehicleClass === 'Medium Truck' && truckQuote.data?.totalRwf > van?.totalRwf,
-        `${truckQuote.data?.vehicleClass} at ${truckQuote.data?.totalRwf}`);
+        truckQuote.data?.vehicleClass === 'Medium Truck' && truckQuote.data?.totalAmount > van?.totalAmount,
+        `${truckQuote.data?.vehicleClass} at ${truckQuote.data?.totalAmount}`);
 
     // Distance has to cost something, and more than the same job across town:
     // this is what the road factor and the long-distance taper exist for.
     const farQuote = await api('/api/public/quote?weightKg=400&distanceKm=98');
     check('a longer run costs more than a short one',
-        farQuote.data?.totalRwf > van?.totalRwf, `${farQuote.data?.totalRwf} vs ${van?.totalRwf}`);
+        farQuote.data?.totalAmount > van?.totalAmount, `${farQuote.data?.totalAmount} vs ${van?.totalAmount}`);
 
     const badQuote = await api('/api/public/quote?weightKg=-5');
     check('a nonsense weight is refused rather than priced', !badQuote.ok, `status ${badQuote.status}`);
@@ -523,7 +523,7 @@ async function main() {
         const rates = await api('/api/pricing/rates', { token: adminToken });
         check('an admin can read the rate card', rates.ok && Array.isArray(rates.data?.rates) && rates.data.rates.length > 0,
             JSON.stringify(rates.error));
-        const diesel = Number(rates.data?.rates?.[0]?.diesel_price_rwf_per_litre);
+        const diesel = Number(rates.data?.rates?.[0]?.fuel_price_per_litre);
         check('the card carries a diesel price', Number.isFinite(diesel) && diesel > 0, `got ${diesel}`);
 
         const badRate = await api('/api/pricing/rates', {

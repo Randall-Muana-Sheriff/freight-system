@@ -217,25 +217,25 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                         than left to be worked out. An estimate is called one:
                         it means the row has not been placed yet and its price
                         is not yet real. */}
-                    {order.price_total_rwf != null ? (
+                    {order.price_total != null ? (
                         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-micro">
                             <span className="text-steel">Price</span>
                             <span className="font-mono tabular-nums text-carbon">
-                                {Number(order.price_total_rwf).toLocaleString()} RWF
+                                {Number(order.price_total).toLocaleString()} RWF
                             </span>
-                            {order.platform_fee_rwf != null ? (
+                            {order.platform_fee != null ? (
                                 <>
                                     <span className="text-steel">Fee</span>
                                     <span className="font-mono tabular-nums text-carbon">
-                                        {Number(order.platform_fee_rwf).toLocaleString()}
+                                        {Number(order.platform_fee).toLocaleString()}
                                     </span>
                                 </>
                             ) : null}
-                            {order.driver_net_rwf != null ? (
+                            {order.driver_net != null ? (
                                 <>
                                     <span className="text-steel">Driver</span>
                                     <span className="font-mono tabular-nums text-carbon">
-                                        {Number(order.driver_net_rwf).toLocaleString()}
+                                        {Number(order.driver_net).toLocaleString()}
                                     </span>
                                 </>
                             ) : null}
@@ -251,15 +251,15 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned }: Order
                                 needs a reason next to it, and "the warehouse
                                 held the driver" is a different conversation
                                 from "we charged you more". */}
-                            {Number(order.detention_rwf) > 0 ? (
+                            {Number(order.detention_amount) > 0 ? (
                                 <span className="font-mono tabular-nums text-hazard">
-                                    +{Number(order.detention_rwf).toLocaleString()} waiting
+                                    +{Number(order.detention_amount).toLocaleString()} waiting
                                     {order.detention_minutes != null ? ` (${order.detention_minutes}m)` : ''}
                                 </span>
                             ) : null}
-                            {Number(order.backfill_credit_rwf) > 0 ? (
+                            {Number(order.backfill_credit) > 0 ? (
                                 <span className="font-mono tabular-nums text-signal">
-                                    −{Number(order.backfill_credit_rwf).toLocaleString()} return filled
+                                    −{Number(order.backfill_credit).toLocaleString()} return filled
                                     {order.backfilled_by_order_id ? ` by #${order.backfilled_by_order_id}` : ''}
                                 </span>
                             ) : null}

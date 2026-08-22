@@ -343,12 +343,12 @@ export default function TripDetailScreen() {
               covering the run's fuel. Said again here rather than only on
               the list card, because this is the screen open while the work
               is actually being done. */}
-          {order.driver_net_rwf != null ? (
+          {order.driver_net != null ? (
             <View style={styles.infoBlock}>
               <Text style={styles.label}>You earn</Text>
               <Text style={styles.payValue}>
                 {order.price_is_estimate ? 'About ' : ''}
-                {Number(order.driver_net_rwf).toLocaleString()} RWF
+                {Number(order.driver_net).toLocaleString()} RWF
               </Text>
               {order.price_is_estimate ? (
                 <Text style={styles.payNote}>
@@ -359,9 +359,9 @@ export default function TripDetailScreen() {
                   went up after the job closed should say why -- otherwise the
                   driver is left working out whether they were paid for the
                   hour they spent at the gate. */}
-              {Number(order.detention_rwf) > 0 ? (
+              {Number(order.detention_amount) > 0 ? (
                 <Text style={styles.payNote}>
-                  Includes {Number(order.detention_rwf).toLocaleString()} RWF for waiting.
+                  Includes {Number(order.detention_amount).toLocaleString()} RWF for waiting.
                 </Text>
               ) : null}
             </View>
@@ -370,7 +370,7 @@ export default function TripDetailScreen() {
           {/* Blocks on this screen are separated by an explicit divider
               rather than by margins, so one inserted without a trailing
               divider sits flush against whatever follows it. */}
-          {order.driver_net_rwf != null ? <View style={styles.divider} /> : null}
+          {order.driver_net != null ? <View style={styles.divider} /> : null}
 
           <View style={styles.infoBlock}>
             <Text style={styles.label}>Cargo</Text>
@@ -491,8 +491,8 @@ export default function TripDetailScreen() {
             <View style={styles.nextStep}>
               <Text style={styles.nextStepEyebrow}>Offered to you</Text>
               <Text style={styles.offerPrompt}>
-                {order.driver_net_rwf != null
-                  ? `${Number(order.driver_net_rwf).toLocaleString()} RWF to you. Take this job?`
+                {order.driver_net != null
+                  ? `${Number(order.driver_net).toLocaleString()} RWF to you. Take this job?`
                   : 'Take this job?'}
               </Text>
               <View style={styles.offerRow}>
