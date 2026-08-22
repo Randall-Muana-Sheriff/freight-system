@@ -244,10 +244,51 @@ export const OrderController = {
                     detention_minutes,
                     detention_amount,
                     backfill_credit,
-                    backfilled_by_order_id
+                    backfilled_by_order_id,
+
+                    -- A control tower's queue is a list of deviations, not a
+                    -- diary. Sorted chronologically, the load that needs
+                    -- somebody sits wherever it happens to fall.
+                    --
+                    -- 0  unplaced: a public booking with no coordinates. It
+                    --    cannot be assigned, routed or priced firm -- it is
+                    --    not merely urgent, it is stuck, and nothing else in
+                    --    the queue can move until a dispatcher pins it.
+                    -- 1  overdue against what the customer was promised.
+                    -- 2  marked high priority.
+                    -- 3  everything else.
+                    CASE
+                        WHEN pickup_lat IS NULL OR delivery_lat IS NULL THEN 0
+                        WHEN (
+                            -- needed_by is a promise, not a date: 'today',
+                            -- 'tomorrow', 'this_week' or 'flexible'. Overdue
+                            -- therefore has to be derived from when the order
+                            -- was taken plus the window that was promised.
+                            (needed_by = 'today'     AND created_at::date < CURRENT_DATE)
+                         OR (needed_by = 'tomorrow'  AND created_at::date < CURRENT_DATE - 1)
+                         OR (needed_by = 'this_week' AND created_at < NOW() - INTERVAL '7 days')
+                        ) THEN 1
+                        WHEN priority = 'high' THEN 2
+                        ELSE 3
+                    END AS urgency_rank,
+
+                    -- Exposed separately so a row can be badged as late
+                    -- without the UI re-deriving the rule, and so a high
+                    -- priority order that is also late still reads as late.
+                    (
+                            (needed_by = 'today'     AND created_at::date < CURRENT_DATE)
+                         OR (needed_by = 'tomorrow'  AND created_at::date < CURRENT_DATE - 1)
+                         OR (needed_by = 'this_week' AND created_at < NOW() - INTERVAL '7 days')
+                    ) AS is_overdue,
+
+                    (pickup_lat IS NULL OR delivery_lat IS NULL) AS needs_placing
                 FROM orders
                 WHERE status = 'PENDING'
-                ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END, id DESC;
+                -- Sorted here rather than client-side so the first screenful
+                -- is the right screenful before a single row is rendered.
+                ORDER BY urgency_rank ASC,
+                         CASE priority WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,
+                         created_at ASC;
             `;
             const result = await pool.query(query);
             return ok(res, result.rows);
