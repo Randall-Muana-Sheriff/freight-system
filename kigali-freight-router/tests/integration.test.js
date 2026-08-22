@@ -10,6 +10,7 @@ import { getRedisClient, isRedisEnabled } from '../config/redisClient.js';
 import { resetMemoryRateLimits } from '../middleware/rateLimit.js';
 import { app, server, startServer, shutdownServices } from '../server.js';
 import { REQUIRED_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { normalizePhone } from '../utils/phone.js';
 
 // Matches driverAuthController.js's own hashCode() exactly — needed so this
 // test can plant a known OTP/invite code's hash directly via the DB and
@@ -19,6 +20,20 @@ function hashCode(code) {
     return crypto.createHash('sha256').update(code).digest('hex');
 }
 
+// Running this locally: it needs the same environment the router container
+// runs with, not what is in .env — .env holds POSTGRES_* for compose, while
+// the app reads DB_*. The quickest correct way is to take it from the
+// running container and redirect the two hostnames that only resolve inside
+// the compose network:
+//
+//   docker compose exec -T router printenv \
+//     | grep -E '^(DB_|JWT_SECRET|ADMIN_|R2_|AT_|MARKET_)' > /tmp/itenv
+//   sed -i -e 's/^DB_HOST=.*/DB_HOST=localhost/' \
+//          -e 's#^R2_ENDPOINT=http://minio:9000#R2_ENDPOINT=http://localhost:9000#' /tmp/itenv
+//   set -a; . /tmp/itenv; set +a; npm run test:integration
+//
+// Miss R2_* and thirteen tests fail on "Document storage is not configured",
+// which looks like a broken upload path rather than a missing variable.
 const requiredEnv = ['DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'JWT_SECRET'];
 const hasIntegrationEnv = requiredEnv.every((key) => Boolean(process.env[key]));
 // The admin/dispatcher auth model requires an existing admin to create
@@ -34,7 +49,24 @@ const uniqueId = Date.now();
 // nothing the run creates can predate it.
 const runStartedAt = new Date();
 const dispatcherUser = { username: `it_dispatcher_${uniqueId}`, password: 'TempPass123!' };
-const driverPhone = `+2507${String(uniqueId).slice(-8)}`;
+// A valid Rwandan mobile, not merely a plausible-looking one.
+//
+// This used to be `+2507${last 8 digits of the timestamp}`, which put a
+// digit from the clock where the network prefix goes. Only 72, 73, 77, 78
+// and 79 are real Rwandan mobile prefixes, so roughly half of all runs
+// generated a number libphonenumber correctly rejects — and since the whole
+// driver journey hangs off this one fixture, those runs failed 36 of 55
+// tests with ADMIN_INVITE_INVALID_PHONE twenty assertions downstream of the
+// actual cause. A suite that fails half the time gets read as flaky and
+// stops being trusted, which is how it went unnoticed.
+const driverPhone = `+25078${String(uniqueId).slice(-7)}`;
+// Checked here, against the same validator the API uses, so a future change
+// to what counts as reachable names itself at the top of the file instead of
+// surfacing as a 400 in an unrelated test.
+assert.ok(
+    normalizePhone(driverPhone),
+    `test fixture ${driverPhone} is not a valid mobile number — the suite cannot onboard a driver with it`
+);
 const driverPin = '4821';
 
 let adminToken = '';
