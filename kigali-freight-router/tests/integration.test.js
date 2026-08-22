@@ -1649,6 +1649,75 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(row.rows[0].handled_at, null, 'a new enquiry starts unhandled');
     });
 
+    // Saved views are private to the person who saved them, and this is the
+    // reason the table exists at all rather than localStorage: the dispatch
+    // desk is shared, so "my views" has to mean the account, not the browser.
+    // These assertions are the guarantee — if scoping ever regresses, one
+    // dispatcher starts seeing and deleting another's filters.
+    test('saved views belong to one dispatcher and are invisible to another', async () => {
+        const mine = await request(app).post('/api/saved-views')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ name: 'Overdue north', filter: { status: 'PENDING', area: 'north' } });
+        assert.equal(mine.statusCode, 201, JSON.stringify(mine.body));
+        const viewId = mine.body.data.id;
+
+        const owner = await request(app).get('/api/saved-views')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.ok(owner.body.data.some((v) => v.id === viewId), 'the owner sees their own view');
+
+        const stranger = await request(app).get('/api/saved-views')
+            .set('Authorization', `Bearer ${dispatcherToken}`);
+        assert.ok(!stranger.body.data.some((v) => v.id === viewId), "another user must not see it");
+
+        // 404 rather than 403 on purpose: forbidding it would confirm the id
+        // exists, which is a thing worth not saying to someone probing.
+        const steal = await request(app).delete(`/api/saved-views/${viewId}`)
+            .set('Authorization', `Bearer ${dispatcherToken}`);
+        assert.equal(steal.statusCode, 404);
+        assert.equal(steal.body.error.code, 'SAVED_VIEWS_NOT_FOUND');
+
+        const stillThere = await request(app).get('/api/saved-views')
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.ok(stillThere.body.data.some((v) => v.id === viewId), 'and must not delete it either');
+
+        // Saving over a name replaces it. A dispatcher saving "overdue" twice
+        // means the second one, not two rows wearing the same label.
+        const again = await request(app).post('/api/saved-views')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ name: 'Overdue north', filter: { status: 'PENDING', area: 'south' } });
+        assert.equal(again.statusCode, 200, 'replacing is not a create');
+        assert.equal(again.body.data.id, viewId, 'same row, not a duplicate');
+        assert.equal(again.body.data.filter.area, 'south');
+
+        const removed = await request(app).delete(`/api/saved-views/${viewId}`)
+            .set('Authorization', `Bearer ${adminToken}`);
+        assert.equal(removed.statusCode, 200);
+    });
+
+    test('a saved view refuses a filter it could not read back', async () => {
+        for (const filter of [[1, 2], null, 'north', 7]) {
+            const response = await request(app).post('/api/saved-views')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send({ name: 'Bad filter', filter });
+            assert.equal(response.statusCode, 400, `filter ${JSON.stringify(filter)} should be refused`);
+            assert.equal(response.body.error.code, 'SAVED_VIEWS_FILTER_INVALID');
+        }
+
+        const nameless = await request(app).post('/api/saved-views')
+            .set('Authorization', `Bearer ${adminToken}`).send({ name: '   ', filter: {} });
+        assert.equal(nameless.statusCode, 400);
+        assert.equal(nameless.body.error.code, 'SAVED_VIEWS_NAME_REQUIRED');
+
+        // The filter is opaque to the server, so nothing about its contents
+        // bounds it. Without this an authenticated client can use the table
+        // as storage.
+        const huge = await request(app).post('/api/saved-views')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ name: 'Huge', filter: { blob: 'z'.repeat(5000) } });
+        assert.equal(huge.statusCode, 400);
+        assert.equal(huge.body.error.code, 'SAVED_VIEWS_FILTER_TOO_LARGE');
+    });
+
     test('admin: suspending an account blocks login and survives as history', async () => {
         const users = await request(app).get('/api/users').set('Authorization', `Bearer ${adminToken}`);
         const target = users.body.data.find((u) => u.username === driverPhone);
