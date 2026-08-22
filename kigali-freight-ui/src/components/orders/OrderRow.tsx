@@ -13,6 +13,14 @@ interface OrderRowProps {
     onAssigned: () => void;
     selected: boolean;
     onToggleSelected: () => void;
+    /* 'row' is a dense line in the queue — identifying facts only, with the
+       controls in the detail pane. 'detail' is the same component permanently
+       open, which is what that pane renders. One component rather than two so
+       a control can never exist in one place and not the other. */
+    variant?: 'row' | 'detail';
+    /* Open in the detail pane, as opposed to ticked for a bulk action. */
+    active?: boolean;
+    onOpen?: () => void;
 }
 
 // A left-border accent rather than a second text badge next to the
@@ -34,7 +42,7 @@ const PRIORITY_BORDER: Record<'high' | 'normal' | 'low', string> = {
     low: 'border-l-steel/40',
 };
 
-export default function OrderRow({ order, drivers, jwtToken, onAssigned, selected, onToggleSelected }: OrderRowProps) {
+export default function OrderRow({ order, drivers, jwtToken, onAssigned, selected, onToggleSelected, variant = 'row', active = false, onOpen }: OrderRowProps) {
     const { alert } = useDialog();
     const { resolveDriverName } = useSocket();
     const {
@@ -50,13 +58,11 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
     const [returnLoads, setReturnLoads] = useState<ReturnLoadCandidate[] | null>(null);
     const [findingReturn, setFindingReturn] = useState(false);
     const [offering, setOffering] = useState(false);
-    // Collapsed by default. Against a real queue this row is ~190px tall, so
-    // 131 orders meant seeing roughly one and a half of them at a time behind
-    // a scrollbar. A dispatcher scanning for one load needs the list to be a
-    // list; the controls matter only for the row they have found. Dense
-    // summary, full card on selection — the master-detail shape every
-    // production dispatch board settles on.
-    const [expanded, setExpanded] = useState(false);
+    // The detail variant is always open; a queue row never is. The row's job
+    // is scanning, and the controls live in the pane beside it — which is what
+    // stops working one order from moving the rest of the queue under the
+    // dispatcher's cursor.
+    const expanded = variant === 'detail';
 
     // Offer rather than assign. The driver gets it as a decision they can
     // refuse, which is the only model that works for someone running their own
@@ -172,17 +178,19 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                 </label>
                 <button
                     type="button"
-                    onClick={() => setExpanded((v) => !v)}
-                    aria-expanded={expanded}
+                    onClick={onOpen}
+                    aria-current={active ? 'true' : undefined}
                     className="focus-ring min-w-0 flex-1 text-left"
                 >
                     <div className="flex items-center gap-1">
+                        {variant === 'row' ? (
                         <ChevronRight
                             size={12}
                             strokeWidth={3}
                             aria-hidden="true"
-                            className={`shrink-0 text-steel transition-transform ${expanded ? 'rotate-90' : ''}`}
+                            className={`shrink-0 transition-transform ${active ? 'rotate-90 text-route' : 'text-steel'}`}
                         />
+                        ) : null}
                         <span className="truncate text-paper font-bold text-data">{order.cargo_description}</span>
                     </div>
                     {/* Where it is going, not where it came from.

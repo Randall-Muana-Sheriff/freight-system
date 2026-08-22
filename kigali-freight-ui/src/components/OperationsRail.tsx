@@ -7,6 +7,7 @@
 // fleet. The watching half now lives in the Monitor workspace (MonitorRail),
 // and this column does one thing.
 import OrdersPanel from './OrdersPanel';
+import type { Order } from '../types';
 import ResizeHandle from './ResizeHandle';
 import { useMapInteraction } from '../context/MapInteractionContext';
 
@@ -14,6 +15,7 @@ interface OperationsRailProps {
     collapsed: boolean;
     onToggleCollapse: () => void;
     onStartResize: (e: React.MouseEvent) => void;
+    onOpenOrderChange?: (order: Order | null) => void;
 }
 
 // This column no longer carries a width of its own — it takes whatever the
@@ -22,7 +24,7 @@ interface OperationsRailProps {
 // Dashboard, which is the only place that can see all three columns at once;
 // the handle on this rail's inner edge sizes the map, which is the same
 // divider from the dispatcher's side of the screen.
-export default function OperationsRail({ collapsed, onToggleCollapse, onStartResize }: OperationsRailProps) {
+export default function OperationsRail({ collapsed, onToggleCollapse, onStartResize, onOpenOrderChange }: OperationsRailProps) {
     const { orderDeliveryTargetMode, setOrderDeliveryTargetMode, newOrderDeliveryCoords, clearNewOrderDeliveryCoords } = useMapInteraction();
 
     return (
@@ -41,6 +43,7 @@ export default function OperationsRail({ collapsed, onToggleCollapse, onStartRes
                         setPickTargetMode={setOrderDeliveryTargetMode}
                         pickedDeliveryCoords={newOrderDeliveryCoords}
                         clearPickedDeliveryCoords={clearNewOrderDeliveryCoords}
+                        onOpenOrderChange={onOpenOrderChange}
                     />
                 </aside>
             )}

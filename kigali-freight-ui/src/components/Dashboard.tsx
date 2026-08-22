@@ -6,6 +6,7 @@
 // MapInteractionContext — same state, same handlers, just no longer
 // passed as props through a component that never read them.
 import { useState } from 'react';
+import type { Order } from '../types';
 import { MapInteractionProvider, useMapInteraction } from '../context/MapInteractionContext';
 import { useResizableWidth } from '../hooks/useResizableWidth';
 import TopCommandBar from './TopCommandBar';
@@ -14,6 +15,7 @@ import SecondaryPanel from './SecondaryPanel';
 import FleetMap from './FleetMap';
 import ArrivalTimeline from './ArrivalTimeline';
 import ExceptionsHome from './ExceptionsHome';
+import OrderDetailPane from './orders/OrderDetailPane';
 import MonitorRail from './MonitorRail';
 
 // Two jobs, two screens.
@@ -70,6 +72,11 @@ function BoardLayout({ workspace, onSwitch }: { workspace: Workspace; onSwitch: 
         storageKey: 'operationsRailWidth', defaultWidth: 480, min: 260, max: 620, edge: 'right',
     });
 
+    // The order being worked on. It lives here rather than in the rail so the
+    // pane can sit between the queue and the map: the list stays put, the
+    // detail gets room, and geography is still in view while you work.
+    const [openOrder, setOpenOrder] = useState<Order | null>(null);
+
     if (workspace === 'monitor') {
         return (
             <div className="flex flex-1 overflow-hidden">
@@ -83,7 +90,17 @@ function BoardLayout({ workspace, onSwitch }: { workspace: Workspace; onSwitch: 
 
     return (
         <div className="flex flex-1 overflow-hidden">
-            <OperationsRail collapsed={railCollapsed} onToggleCollapse={toggleRail} onStartResize={startResize} />
+            <OperationsRail
+                collapsed={railCollapsed}
+                onToggleCollapse={toggleRail}
+                onStartResize={startResize}
+                onOpenOrderChange={setOpenOrder}
+            />
+            {openOrder ? (
+                <div className="w-[380px] shrink-0">
+                    <OrderDetailPane order={openOrder} onClose={() => setOpenOrder(null)} />
+                </div>
+            ) : null}
             {/* The centre column is no longer only the map. Freight is a
                 time business and the board had no time dimension at all,
                 so the arrivals axis sits above the geography — you read

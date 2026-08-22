@@ -369,6 +369,34 @@ export interface ExceptionReport {
     groups: ExceptionGroup[];
 }
 
+// A dispatcher's own named filters. Persisted per user rather than in
+// localStorage on purpose: a shared dispatch desk means one person's views
+// would otherwise appear under whoever signs in next, which reads as the board
+// changing by itself.
+//
+// POST is an upsert on the name — saving "Overdue north" twice replaces it and
+// returns the same id, because a dispatcher reusing a name means the second
+// one, not two rows wearing the same label. DELETE answers 404 for a view that
+// is not yours, deliberately indistinguishable from one that never existed.
+export interface SavedView {
+    id: number;
+    name: string;
+    filter: Record<string, unknown>;
+    updated_at?: string;
+}
+
+export async function fetchSavedViews(token: string) {
+    return apiFetch('/api/saved-views', { method: 'GET', token }) as Promise<SavedView[]>;
+}
+
+export async function saveSavedView(name: string, filter: Record<string, unknown>, token: string) {
+    return apiFetch('/api/saved-views', { method: 'POST', token, body: { name, filter } }) as Promise<SavedView>;
+}
+
+export async function deleteSavedView(id: number, token: string) {
+    return apiFetch(`/api/saved-views/${id}`, { method: 'DELETE', token });
+}
+
 export async function fetchExceptions(token: string) {
     return apiFetch('/api/exceptions', { method: 'GET', token }) as Promise<ExceptionReport>;
 }

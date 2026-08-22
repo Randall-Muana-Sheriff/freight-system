@@ -12,6 +12,7 @@ import { useSocket } from '../context/SocketContext';
 import BatchSuggestions from './orders/BatchSuggestions';
 import BulkActionBar from './orders/BulkActionBar';
 import BulkPlaceFlow from './orders/BulkPlaceFlow';
+import SavedViews from './orders/SavedViews';
 import OrderRow from './orders/OrderRow';
 import InFlightRow from './orders/InFlightRow';
 import { isAssignableDriver, type StaffUser, type LatLng, type Order } from '../types';
@@ -21,11 +22,14 @@ interface OrdersPanelProps {
     setPickTargetMode: (value: boolean) => void;
     pickedDeliveryCoords: LatLng | null;
     clearPickedDeliveryCoords: () => void;
+    /* The queue owns which order is open; the pane lives a level up in the
+       layout so it can sit beside the map rather than inside the rail. */
+    onOpenOrderChange?: (order: Order | null) => void;
 }
 
 const EMPTY_ORDER = { cargoDescription: '', weightKg: '', hubId: '', recipientName: '', recipientPhone: '', priority: 'normal' };
 
-export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedDeliveryCoords, clearPickedDeliveryCoords }: OrdersPanelProps) {
+export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedDeliveryCoords, clearPickedDeliveryCoords, onOpenOrderChange }: OrdersPanelProps) {
     const { jwtToken, userRole, activeOrders, inFlightOrders, savedHubs, refreshFeeds } = useSocket();
     const [drivers, setDrivers] = useState<StaffUser[]>([]);
     const [form, setForm] = useState(EMPTY_ORDER);
@@ -46,6 +50,10 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     // collapsing underneath it.
     const [selected, setSelected] = useState<Set<number>>(new Set());
     const [placingBatch, setPlacingBatch] = useState<Order[] | null>(null);
+    // Which order is open in the detail pane, and which row the keyboard is
+    // on. Held as ids rather than indexes so a refresh that reorders the
+    // queue cannot silently move the cursor onto a different load.
+    const [cursorId, setCursorId] = useState<number | null>(null);
 
     const loadDrivers = useCallback(async () => {
         try {
@@ -63,6 +71,13 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     useEffect(() => {
         setTimeout(() => { void loadDrivers(); }, 0);
     }, [loadDrivers]);
+
+    // Tell the layout which order is open. Resolved from the live list so a
+    // load that leaves the queue — assigned by someone else, say — closes the
+    // pane rather than stranding a stale copy in it.
+    useEffect(() => {
+        onOpenOrderChange?.(activeOrders.find((o) => o.id === cursorId) ?? null);
+    }, [cursorId, activeOrders, onOpenOrderChange]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -135,6 +150,35 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     });
 
     const selectedIds = [...selected];
+
+    // Keyboard navigation. A dispatcher lives at this desk all day, and
+    // reaching for the mouse to step down a queue is the kind of small tax
+    // that adds up over a shift. j/k rather than arrows so the list can be
+    // walked without leaving the home row, and because arrows are already
+    // scrolling the panel.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            const el = e.target as HTMLElement | null;
+            // Never steal a keystroke from something being typed into.
+            if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return;
+            if (e.metaKey || e.ctrlKey || e.altKey) return;
+            if (visibleOrders.length === 0) return;
+
+            const at = visibleOrders.findIndex((o) => o.id === cursorId);
+            const move = (delta: number) => {
+                e.preventDefault();
+                const next = at === -1 ? 0 : Math.min(visibleOrders.length - 1, Math.max(0, at + delta));
+                setCursorId(visibleOrders[next].id);
+            };
+
+            if (e.key === 'j') move(1);
+            else if (e.key === 'k') move(-1);
+            else if (e.key === 'x' && at !== -1) { e.preventDefault(); toggleOne(visibleOrders[at].id); }
+            else if (e.key === 'Escape') { e.preventDefault(); setCursorId(null); }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [visibleOrders, cursorId]);
     // Only the ones that can actually be placed. Offering "place 12" when
     // nine of them already have coordinates would walk a dispatcher through
     // re-pinning work that was already done.
@@ -263,6 +307,8 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 </div>
             )}
 
+            {activeOrders.length > 6 && <SavedViews filter={filter} onApply={setFilter} />}
+
             {placingBatch ? (
                 <BulkPlaceFlow
                     orders={placingBatch}
@@ -317,6 +363,8 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                         onAssigned={() => void refreshFeeds()}
                         selected={selected.has(order.id)}
                         onToggleSelected={() => toggleOne(order.id)}
+                        active={cursorId === order.id}
+                        onOpen={() => setCursorId(cursorId === order.id ? null : order.id)}
                     />
                 ))}
             </div>
