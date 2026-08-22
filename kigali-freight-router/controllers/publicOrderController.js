@@ -140,7 +140,7 @@ export const PublicOrderController = {
             // number and a driver number are stored in one comparable form.
             const customerPhone = normalizePhone(rawPhone);
             if (!customerPhone) {
-                return fail(res, { status: 400, code: 'INVALID_PHONE', message: 'That phone number does not look right. Use the 07… or +250… form.' });
+                return fail(res, { status: 400, code: 'INVALID_PHONE', message: 'That phone number does not look right. Use 07… or the full international number, and make sure it is a mobile we can text.' });
             }
 
             // The UNIQUE index is the real guarantee; retrying just avoids
@@ -347,7 +347,7 @@ export const PublicOrderController = {
             }
             const phone = normalizePhone(rawPhone);
             if (!phone) {
-                return fail(res, { status: 400, code: 'INVALID_PHONE', message: 'That phone number does not look right. Use the 07… or +250… form.' });
+                return fail(res, { status: 400, code: 'INVALID_PHONE', message: 'That phone number does not look right. Use 07… or the full international number, and make sure it is a mobile we can text.' });
             }
 
             const saved = await pool.query(

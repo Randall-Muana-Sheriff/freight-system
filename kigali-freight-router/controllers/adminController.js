@@ -184,7 +184,7 @@ export const AdminController = {
 
         const phone = normalizePhone(phoneNumber);
         if (!phone) {
-            return fail(res, { status: 400, code: 'ADMIN_INVITE_INVALID_PHONE', message: 'Enter a valid Rwandan mobile number.' });
+            return fail(res, { status: 400, code: 'ADMIN_INVITE_INVALID_PHONE', message: 'Enter a valid mobile number we can text — 07… or +250…, or the full international number.' });
         }
         if (typeof fullName !== 'string' || fullName.trim().length < 2 || fullName.trim().length > 255) {
             return fail(res, { status: 400, code: 'ADMIN_INVITE_INVALID_NAME', message: 'Full name must be 2 to 255 characters long.' });
@@ -770,7 +770,7 @@ export const AdminController = {
         }
         const normalized = normalizePhone(phoneNumber);
         if (!normalized) {
-            return fail(res, { status: 400, code: 'DISPATCH_CONTACT_INVALID', message: 'Enter a valid Rwandan mobile number.' });
+            return fail(res, { status: 400, code: 'DISPATCH_CONTACT_INVALID', message: 'Enter a valid mobile number we can text — 07… or +250…, or the full international number.' });
         }
         try {
             await pool.query('UPDATE system_settings SET dispatch_phone_number = $1 WHERE id = 1', [normalized]);

@@ -101,7 +101,7 @@ export const DriverAuthController = {
     requestOtp: async (req, res) => {
         const phone = normalizePhone(req.body?.phoneNumber);
         if (!phone) {
-            return fail(res, { status: 400, code: 'DRIVER_AUTH_INVALID_PHONE', message: 'Enter a valid Rwandan mobile number.' });
+            return fail(res, { status: 400, code: 'DRIVER_AUTH_INVALID_PHONE', message: 'Enter a valid mobile number we can text — 07… or +250…, or the full international number.' });
         }
 
         try {
