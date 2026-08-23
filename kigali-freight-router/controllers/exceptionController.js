@@ -1,7 +1,7 @@
 // What needs a human, gathered in one place.
 //
 // A dispatch board that opens on a queue asks the dispatcher to find the
-// problem. This is the other way round: nine sources of deviation, already
+// problem. This is the other way round: ten sources of deviation, already
 // computed elsewhere in the system, collected and ranked so the first thing
 // on screen is the thing that is wrong.
 //
@@ -21,6 +21,21 @@ import { logError } from '../utils/logger.js';
 const STALE_SECONDS = 60;
 const EXPIRY_WARNING_DAYS = 21;
 const ITEMS_PER_GROUP = 5;
+
+// How long an assigned job may sit with a silent phone before dispatch is
+// told about it.
+//
+// Chosen by the operator, not derived from anything, so here is the
+// reasoning for whoever revisits it. Too short and every job handed out
+// before a driver has picked up their phone raises an alarm, and a board
+// that cries wolf gets skimmed. Too long and a driver who never saw the job
+// is discovered when the customer rings. Thirty minutes is the operator's
+// judgement of how long a Kigali driver might reasonably not look at their
+// phone while still being on the job. It was decided on one day's
+// information, before any real driver had ever used the system, so it is a
+// starting position rather than a finding — expect to move it once there is
+// a week of real behaviour to look at.
+const ASSIGNED_DARK_MINUTES = 30;
 
 // Order is the ranking. Server-side deliberately: the UI inventing its own
 // would drift from what the rest of the system actually enforces, which is
@@ -87,6 +102,45 @@ const GROUPS = [
                WHERE o.sms_status IS NOT NULL AND o.sms_status <> 'Sent'
                  AND o.consumed_at IS NULL AND o.expires_at > NOW()
                ORDER BY o.created_at ASC`,
+    },
+    {
+        key: 'assigned_driver_dark',
+        label: 'Given a job, but their phone has never checked in',
+        severity: 'act',
+        // Not "this driver is late". The dispatcher cannot tell from here
+        // whether the driver is stuck in traffic or has never opened the app
+        // and does not know the job exists — and those need the same first
+        // move, which is to ring them rather than to wait.
+        //
+        // The gap this fills: stale_signal only looks at PICKED_UP and
+        // IN_TRANSIT. A driver who never opens the app cannot move a job to
+        // PICKED_UP, because that takes the app — so the one case where the
+        // driver may not know they have work was the one case no board could
+        // see.
+        //
+        // LEFT JOIN with a NULL check, not `updated_at < NOW() - interval`:
+        // a driver who has never reported has no driver_locations row at all,
+        // and an inner join or a plain age comparison silently excludes
+        // exactly the dark phones this exists to catch.
+        //
+        // The second half of the OR goes slightly beyond "never reported":
+        // a driver whose last fix predates the assignment is equally in the
+        // dark about this job, and the order not having moved for half an
+        // hour means a live phone would have reported since. Catching both
+        // is the same question asked properly.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Job') AS title,
+                     'Assigned to ' || COALESCE(o.assigned_to, 'a driver') ||
+                       ', who may not know they have it — ring them' AS subtitle,
+                     o.updated_at AS since, o.assigned_to AS driver
+                FROM orders o
+                LEFT JOIN driver_locations dl ON dl.driver_name = o.assigned_to
+               WHERE o.status = 'ASSIGNED'
+                 AND o.assigned_to IS NOT NULL
+                 AND o.updated_at < NOW() - make_interval(mins => $1)
+                 AND (dl.updated_at IS NULL OR dl.updated_at < o.updated_at)
+               ORDER BY o.updated_at ASC`,
+        params: [ASSIGNED_DARK_MINUTES],
     },
     {
         key: 'delivery_not_confirmed',

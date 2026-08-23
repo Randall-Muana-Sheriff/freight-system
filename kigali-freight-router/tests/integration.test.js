@@ -1699,6 +1699,64 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(afterPlacing.statusCode, 200, `placing should unblock assignment: ${JSON.stringify(afterPlacing.body)}`);
     });
 
+    // The gap this closes: stale_signal only looks at PICKED_UP and
+    // IN_TRANSIT. A driver who never opens the app cannot move a job to
+    // PICKED_UP — that takes the app — so the one case where a driver may not
+    // know they have work was the one case no board could see.
+    test('a job assigned to a silent phone reaches the exceptions board', async () => {
+        const create = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Dark driver cargo', weight_kg: 60,
+                origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+            });
+        assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+        const orderId = create.body.data.order.id;
+
+        const assign = await request(app).post('/api/orders/assign')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone });
+        assert.equal(assign.statusCode, 200, JSON.stringify(assign.body));
+
+        // Counts, not item membership. Items are capped at ITEMS_PER_GROUP and
+        // ordered oldest first, so a job created by this test is not
+        // necessarily among them — the count is the exact figure and the one
+        // worth asserting on.
+        const darkCount = async () => {
+            const response = await request(app).get('/api/exceptions')
+                .set('Authorization', `Bearer ${adminToken}`);
+            const group = response.body.data.groups.find((g) => g.key === 'assigned_driver_dark');
+            return { count: group ? group.count : 0, group };
+        };
+
+        // Just assigned, so it is inside the grace window and must stay quiet:
+        // a board that fires the moment a job is handed out is a board that
+        // gets skimmed past.
+        const before = await darkCount();
+
+        // Half an hour later, with a phone that has still said nothing.
+        await pool.query("UPDATE orders SET updated_at = NOW() - INTERVAL '31 minutes' WHERE id = $1", [orderId]);
+        await pool.query('DELETE FROM driver_locations WHERE driver_name = $1', [driverPhone]);
+
+        const surfaced = await darkCount();
+        assert.ok(surfaced.group, 'the group should exist once something qualifies');
+        assert.equal(surfaced.group.severity, 'act', 'ringing the driver is something to do now');
+        assert.equal(surfaced.count, before.count + 1, 'the dark job should be counted');
+
+        // A phone that HAS reported since the job was given out is not dark,
+        // whatever else may be true of it. This is the half a plain
+        // "updated_at < NOW() - interval" would get wrong.
+        await pool.query(
+            `INSERT INTO driver_locations (driver_name, lat, lng, geom, updated_at)
+             VALUES ($1, -1.95, 30.06, ST_SetSRID(ST_MakePoint(30.06, -1.95), 4326), NOW())
+             ON CONFLICT (driver_name) DO UPDATE SET updated_at = NOW()`,
+            [driverPhone]
+        );
+
+        const afterPing = await darkCount();
+        assert.equal(afterPing.count, before.count, 'one ping since the assignment is enough to clear it');
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');
