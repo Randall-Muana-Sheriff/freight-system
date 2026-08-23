@@ -92,7 +92,7 @@ export const fr: Strings = {
         tagline: 'Du fret à Kigali et dans tout le Rwanda, la position de chaque expédition visible par celui qui l’a envoyée.',
     },
     hero: {
-        headline: 'Du fret à travers Kigali, visible d’un bout à l’autre.',
+        headline: 'Du fret à travers Kigali, visible d’un bout à l’autre',
         lead:
             'Livraison le jour même dans la ville, et chargements complets partout au Rwanda. '
             + 'Commandez en moins d’une minute, sans compte, puis suivez la marchandise de '
@@ -101,7 +101,7 @@ export const fr: Strings = {
     },
     services: {
         eyebrow: 'Ce que nous transportons',
-        headline: 'Six façons de l’acheminer.',
+        headline: 'Six façons de l’acheminer',
         items: [
             { name: 'Livraison le jour même', spec: 'Jusqu’à 1 t · Kigali', body: 'Commandée avant midi, sur la route dans l’heure et suivie d’un bout à l’autre. Nos fourgons desservent tous les quartiers de la ville.' },
             { name: 'Fret en vrac', spec: '1 – 12 t · tout le pays', body: 'Charges palettisées ou en vrac, en camion ou en gros porteur, avec des chauffeurs qui chargent et arriment eux-mêmes plutôt que de vous regarder faire.' },
@@ -113,7 +113,7 @@ export const fr: Strings = {
     },
     pricing: {
         eyebrow: 'Ce que cela coûte',
-        headline: 'Notre grille tarifaire, en public.',
+        headline: 'Notre grille tarifaire, en public',
         intro:
             'Ici, le fret se négocie au téléphone : le prix dépend de qui le demande. Pas le nôtre. '
             + 'Chacun de nos devis est établi sur cette grille : un forfait de départ, la distance '
@@ -148,11 +148,11 @@ export const fr: Strings = {
             'Ce sont des exemples chiffrés, pas un devis. Le formulaire calcule le prix de votre '
             + 'course avant tout engagement, et un régulateur le confirme une fois l’enlèvement et '
             + 'la livraison pointés sur la carte.',
-        cta: 'Chiffrer ma livraison',
+        cta: 'Obtenir un devis',
     },
     explore: {
         eyebrow: 'Pour aller plus loin',
-        headline: 'Le reste.',
+        headline: 'Le reste',
         items: [
             { title: 'Tarifs', body: 'La grille complète : forfait de départ, au kilomètre, au kilogramme, plus trois courses réelles chiffrées de bout en bout.', cta: 'Voir les prix' },
             { title: 'Entreprises', body: 'Lignes régulières et lots complets, tarifés à la ligne plutôt qu’à la course, sur un seul compte.', cta: 'Lignes régulières' },
@@ -162,7 +162,7 @@ export const fr: Strings = {
     },
     journey: {
         eyebrow: 'Du début à la fin',
-        headline: 'Ce qui arrive à votre chargement.',
+        headline: 'Ce qui arrive à votre chargement',
         stops: [
             { name: 'Vous passez commande', body: 'Enlèvement, destination, nature de la marchandise. Sans compte, sans appel, et avec un prix avant tout engagement, jusqu’à douze tonnes. Au-delà, nous établissons le devis à la main.' },
             { name: 'Un régulateur la prend en charge', body: 'Chaque commande est confiée à un chauffeur par une personne, qui vous appelle en cas de doute. Rien ici ne s’expédie tout seul. Aucune marchandise ne part chez un chauffeur parce qu’une machine en a décidé ainsi.' },
@@ -173,7 +173,7 @@ export const fr: Strings = {
     },
     about: {
         eyebrow: 'Le système',
-        headline: 'Tout le monde regarde le même dossier.',
+        headline: 'Tout le monde regarde le même dossier',
         intro:
             'La plupart des transporteurs fonctionnent au téléphone et au carnet : ce qu’on vous dit dépend ' +
             'de qui vous demandez et de sa dernière vérification. Inzira est un seul système. Le téléphone du ' +
@@ -190,7 +190,7 @@ export const fr: Strings = {
     },
     business: {
         eyebrow: 'Pour les entreprises',
-        headline: 'Du fret que vous n’avez pas à commander chaque matin.',
+        headline: 'Du fret que vous n’avez pas à commander chaque matin',
         intro:
             'Une livraison ponctuelle se commande avec le formulaire ci-dessus. Acheminer la même '
             + 'chose sur la même route chaque semaine est un autre arrangement, et cela ne devrait '
@@ -207,7 +207,7 @@ export const fr: Strings = {
     },
     faq: {
         eyebrow: 'Avant de commander',
-        headline: 'Les questions à poser d’abord.',
+        headline: 'Les questions à poser d’abord',
         items: [
             {
                 q: 'Que se passe-t-il si ma marchandise est endommagée ou perdue ?',
@@ -242,7 +242,7 @@ export const fr: Strings = {
     },
     contact: {
         eyebrow: 'Parlez-nous',
-        headline: 'Dites-nous ce que vous transportez.',
+        headline: 'Dites-nous ce que vous transportez',
         body:
             'Une ligne à tarifer, un chargement que notre grille tarifaire ne couvre pas, ou une '
             + 'question avant de commander. Vous joignez une personne, pas une file d’attente, '
@@ -300,7 +300,7 @@ export const fr: Strings = {
         cityCountry: 'Kigali, Rwanda',
     },
     meta: {
-        titleOrder: 'Passer une commande',
+        titleOrder: 'Commander une livraison',
         titleTrack: 'Suivre une expédition',
         titlePrivacy: 'Politique de confidentialité',
         titleSupport: 'Assistance',

@@ -40,7 +40,7 @@ export const en = {
         whatWeMove: 'From an envelope to a full load',
         pricing: 'The rate card, published in full',
         forBusiness: 'Standing routes and bulk lanes',
-        theJourney: 'Order to signature, one step at a time',
+        theJourney: 'Booking to signature, one step at a time',
         theSystem: 'What driver, dispatcher and you each see',
         questions: 'Liability, payment, what we carry',
     },
@@ -50,7 +50,7 @@ export const en = {
         trackSubmit: 'Track',
         looking: 'Looking…',
         placing: 'Placing…',
-        placeOrder: 'Place the order',
+        placeOrder: 'Place the booking',
         showMeAround: 'Show me around',
         standingRoutes: 'Standing routes',
         staffSignIn: 'Staff sign in',
@@ -63,7 +63,7 @@ export const en = {
         title: 'Where is it?',
         eyebrow: 'Tracking',
         codeLabel: 'Tracking code',
-        finding: 'Finding your consignment',
+        finding: 'Finding your shipment',
         // Arriving here without a code — from the nav rather than from a
         // confirmation text — previously gave a heading, a field and nothing
         // else. This says where the code comes from and offers the way on.
@@ -80,7 +80,7 @@ export const en = {
         proofTitle: 'Proof of delivery',
         notYet: 'Not yet',
         milestones: {
-            received: 'Order received',
+            received: 'Booking received',
             receivedNote: 'With a dispatcher for checking.',
             assigned: 'Driver assigned',
             assignedNote: 'On a driver’s manifest.',
@@ -102,7 +102,7 @@ export const en = {
         getMoving: 'Get moving',
         company: 'Company',
         questions: 'Common questions',
-        tagline: 'Freight across Kigali and the rest of Rwanda, with the position of every consignment visible to the person who sent it.',
+        tagline: 'Freight across Kigali and the rest of Rwanda, with the position of every shipment visible to the person who sent it.',
     },
 
     // ── Landing-page copy ────────────────────────────────────────────
@@ -114,7 +114,7 @@ export const en = {
         // What the company does, said once. The page previously led with
         // "Track your cargo", which speaks to somebody already holding a code
         // and tells a first-time visitor nothing about the business.
-        headline: 'Freight across Kigali, visible the whole way.',
+        headline: 'Freight across Kigali, visible the whole way',
         // The headline names the city because that is the identity; the
         // lead is where the rest of the country gets said. The rate card
         // has priced long runs since August and the site claimed Kigali
@@ -127,7 +127,7 @@ export const en = {
     },
     services: {
         eyebrow: 'What we move',
-        headline: 'Six ways to get it there.',
+        headline: 'Six ways to get it there',
         items: [
             { name: 'Same-day delivery', spec: 'Up to 1 t \u00b7 Kigali', body: 'Booked before noon, on the road within the hour and tracked the whole way. The van fleet reaches every district in the city.' },
             { name: 'Bulk freight', spec: '1 \u2013 12 t \u00b7 nationwide', body: 'Palletised and loose loads in trucks and haulers, with drivers who load and secure the cargo themselves rather than watching you do it.' },
@@ -151,7 +151,7 @@ export const en = {
     // worse than publishing nothing, so if that card moves this moves with it.
     pricing: {
         eyebrow: 'What it costs',
-        headline: 'Our rate card, in public.',
+        headline: 'Our rate card, in public',
         intro:
             'Freight here is normally priced over the phone, which means the number depends on '
             + 'who is asking. Ours does not. Every quote we give is built from this card: a base '
@@ -186,7 +186,7 @@ export const en = {
             'These are worked examples rather than a quote. The booking form prices your actual job '
             + 'before you commit to anything, and a dispatcher confirms it once the pickup and '
             + 'drop-off are pinned.',
-        cta: 'Price your delivery',
+        cta: 'Get a quote',
     },
     // ── The hub ──────────────────────────────────────────────────────
     // The landing page stopped being the whole site. Pricing, the business
@@ -200,20 +200,20 @@ export const en = {
     // lengths agree, which is the part that would otherwise rot silently.
     explore: {
         eyebrow: 'Go deeper',
-        headline: 'The rest of it.',
+        headline: 'The rest of it',
         items: [
             { title: 'Pricing', body: 'The whole rate card: base fare, per kilometre, per kilogram, plus three real jobs priced end to end.', cta: 'See what it costs' },
             { title: 'For business', body: 'Standing routes and bulk lanes, rated per lane rather than per drop, on one account.', cta: 'Standing routes' },
-            { title: 'How it works', body: 'Order to signature step by step, and what the driver, the dispatcher and you each see.', cta: 'Start to finish' },
+            { title: 'How it works', body: 'Booking to signature step by step, and what the driver, the dispatcher and you each see.', cta: 'Start to finish' },
             { title: 'Common questions', body: 'Liability, payment, collection times, and what we will not carry.', cta: 'Read the answers' },
         ],
     },
     journey: {
         eyebrow: 'Start to finish',
-        headline: 'What happens to your cargo.',
+        headline: 'What happens to your cargo',
         stops: [
-            { name: 'You place the order', body: 'Pickup, destination, what it is. No account, no phone call, and a price before you commit to anything, up to twelve tonnes. Heavier than that we quote by hand.' },
-            { name: 'A dispatcher takes it on', body: 'Every order is put on a driver by a person, who rings you if anything is unclear. Nothing here dispatches itself. No cargo reaches a driver because a machine decided it should.' },
+            { name: 'You book it', body: 'Pickup, destination, what it is. No account, no phone call, and a price before you commit to anything, up to twelve tonnes. Heavier than that we quote by hand.' },
+            { name: 'A dispatcher takes it on', body: 'Every booking is put on a driver by a person, who rings you if anything is unclear. Nothing here dispatches itself. No cargo reaches a driver because a machine decided it should.' },
             { name: 'A driver takes it', body: 'A verified driver, chosen from the closest ones free. Their licence and their vehicle’s insurance have to be approved and still in date, or the system will not let your cargo onto their manifest at all.' },
             { name: 'You follow it', body: 'Your code shows the stage your cargo has reached: received, assigned, collected, delivered. It also gives the first name of the driver carrying it. Refresh it as often as you like.' },
             { name: 'Signed for at the door', body: 'Proof captured at handover and timestamped, either a photograph or a code read back by whoever received it. Either way the delivery is on record rather than remembered.' },
@@ -221,12 +221,12 @@ export const en = {
     },
     about: {
         eyebrow: 'The system',
-        headline: 'Everyone is looking at the same record.',
+        headline: 'Everyone is looking at the same record',
         intro:
             'Most freight runs on a phone and a notebook, so what you get told depends on who ' +
             'you ask and when they last checked. Inzira is one system instead. The driver\u2019s ' +
             'phone, the dispatcher\u2019s screen and your tracking page are three views of the same ' +
-            'consignment, and they update together.',
+            'shipment, and they update together.',
         views: [
             { title: 'What you see', body: 'Book with a name and a number. No account. You get a code that shows the stage your cargo is at, where it was collected from and where it is going, the driver\u2019s first name once one is assigned, and the proof taken at handover, either a photograph or a code read back by whoever received it.' },
             { title: 'What the driver carries', body: 'An app holding only their own jobs. It reports the vehicle\u2019s position while the shift is running, takes the proof at the door, and reports breakdowns and damage from the roadside. In a signal-dead corner of the city it holds the confirmation until the connection returns. It also moves the photograph out of the camera\u2019s scratch space into its own storage first, so the phone cannot quietly bin your proof of delivery while it waits.' },
@@ -245,7 +245,7 @@ export const en = {
     // Uber Freight organise the same offer.
     business: {
         eyebrow: 'For business',
-        headline: 'Freight you do not have to book every morning.',
+        headline: 'Freight you do not have to book every morning',
         intro:
             'A one-off delivery works from the form above. Moving the same thing along the same '
             + 'road every week is a different arrangement, and it should not be priced as though '
@@ -253,7 +253,7 @@ export const en = {
         offers: [
             { name: 'Standing routes', body: 'A lane between two fixed points running to a schedule you set. Agreed once, then it simply happens, and it is rated against the volume rather than the drop.' },
             { name: 'Bulk lanes', body: 'Regular full-vehicle movements, including the runs out of Kigali. Priced per lane once we know the weight, the frequency and the road.' },
-            { name: 'One account, one record', body: 'Every consignment on the account in one place rather than scattered across driver receipts, each with its tracking code and proof-of-delivery photograph attached to the line it belongs to. Payment stays per delivery by mobile money for now.' },
+            { name: 'One account, one record', body: 'Every shipment on the account in one place rather than scattered across driver receipts, each with its tracking code and proof-of-delivery photograph attached to the line it belongs to. Payment stays per delivery by mobile money for now.' },
         ],
         closing:
             'Tell us the shape of it: what moves, how often, and between where. We will come back '
@@ -273,7 +273,7 @@ export const en = {
     // evidence, so the answer says exactly that instead of apologising.
     faq: {
         eyebrow: 'Before you book',
-        headline: 'The questions worth asking first.',
+        headline: 'The questions worth asking first',
         items: [
             {
                 q: 'What happens if my cargo is damaged or lost?',
@@ -307,14 +307,14 @@ export const en = {
             },
             {
                 q: 'How soon will it be collected?',
-                a: 'You can place an order at any hour. The booking side of this never closes. Same-day work placed before noon is normally on the road within the hour. Anything later, or a full load leaving the city, is planned with you when the dispatcher rings to confirm, and that call comes between six in the morning and ten at night.',
+                a: 'You can book at any hour. The booking side of this never closes. Same-day work placed before noon is normally on the road within the hour. Anything later, or a full load leaving the city, is planned with you when the dispatcher rings to confirm, and that call comes between six in the morning and ten at night.',
             },
         ],
         closing: 'Anything not answered here, just ask. The phone is answered from six in the morning until ten at night, every day.',
     },
     contact: {
         eyebrow: 'Talk to us',
-        headline: 'Tell us what you move.',
+        headline: 'Tell us what you move',
         body:
             'A lane to price, a load our rate card does not cover, or a question before you ' +
             'book. This reaches a person rather than a queue, and we answer the same working day.',
@@ -327,7 +327,7 @@ export const en = {
         // three they are getting before they dial.
         hoursTitle: 'When we are open',
         hours: [
-            { label: 'Booking and tracking', time: 'Every hour, every day', note: 'The site takes orders, finds the driver and shows you how far along your cargo is, at any hour of any day of the year. Nothing here keeps office hours.' },
+            { label: 'Booking and tracking', time: 'Every hour, every day', note: 'The site takes bookings, finds the driver and shows you how far along your cargo is, at any hour of any day of the year. Nothing here keeps office hours.' },
             { label: 'Support', time: '6:00 \u2013 22:00, daily', note: 'A person on the phone, from the first loading of the morning to the last delivery running late.' },
             { label: 'Business accounts', time: 'Monday to Friday, 8:00 \u2013 17:00', note: 'Standing routes, bulk lanes and anything settled on account.' },
         ],
@@ -342,7 +342,7 @@ export const en = {
         estimateNote: 'An estimate from the weight alone. We confirm it once we have the pickup and drop-off pinned.',
         priceQuoting: 'Working it out…',
         eyebrow: 'Booking · no account needed',
-        received: 'Order received',
+        received: 'Booking received',
         collectFrom: 'Collect from',
         collectPlaceholder: 'Gikondo Industrial Zone, gate 3',
         deliverTo: 'Deliver to',
@@ -358,7 +358,7 @@ export const en = {
         namePlaceholder: 'Jean Mutabazi',
         phonePlaceholder: '0788 000 000',
         emailPlaceholder: 'you@company.rw',
-        failed: 'Could not place your order.',
+        failed: 'Could not place your booking.',
         codeCopied: 'Tracking code copied',
     },
     // ── Hero illustration ────────────────────────────────────────────
@@ -384,7 +384,7 @@ export const en = {
     // Translated too: a French visitor's browser tab and a French search
     // result should not be in English.
     meta: {
-        titleOrder: 'Place an order',
+        titleOrder: 'Book a delivery',
         titleTrack: 'Track shipment',
         titlePrivacy: 'Privacy policy',
         titleSupport: 'Support',
@@ -393,7 +393,7 @@ export const en = {
         titleBusiness: 'For business',
         titleFaq: 'Common questions',
         descOrder: 'Book freight across Kigali and nationwide in under a minute. Pickup, destination and cargo type. Priced from a published rate card, no account needed, and a tracking code by text as soon as it is placed.',
-        descTrack: 'Enter the code from your confirmation text to see which stage your Inzira consignment has reached, who is driving it, and the photograph taken at handover.',
+        descTrack: 'Enter the code from your confirmation text to see which stage your Inzira shipment has reached, who is driving it, and the photograph taken at handover.',
         descPrivacy: 'What the Inzira website and the Inzira Driver app collect, why, who it is shared with, and how to ask for your own data.',
         descSupport: 'Help with a delivery or the Inzira Driver app. Phone, email, and answers to the problems drivers hit most often.',
         descPricing: 'What freight costs in Kigali and across Rwanda, published in full: base fare, per kilometre and per kilogram for vans, trucks and haulers, with worked examples.',
@@ -470,7 +470,7 @@ export const en = {
         INVALID_PHONE: 'That does not look like a Rwandan mobile number.',
         INVALID_WEIGHT: 'Enter the weight in kilograms as a number.',
         WEIGHT_NEEDS_QUOTE: 'That load is heavier than we can price online. Tell us about it and we will come back with a number.',
-        ORDER_CREATE_FAILED: 'We could not place your order just now. Please try again.',
+        ORDER_CREATE_FAILED: 'We could not place your booking just now. Please try again.',
         TRACK_FAILED: 'We could not look that up just now. Please try again.',
         CONTACT_FAILED: 'We could not send your message just now. Please try again.',
         TOKEN_COLLISION: 'Something went wrong generating your tracking code. Please try again.',

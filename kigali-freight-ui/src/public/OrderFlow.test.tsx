@@ -102,7 +102,7 @@ describe('OrderFlow — when do you need it', () => {
         await user.click(screen.getByRole('button', { name: 'Continue' }));
         await fillContactStep(user);
         await user.click(screen.getByRole('button', { name: 'Continue' }));
-        await user.click(await screen.findByRole('button', { name: 'Place the order' }));
+        await user.click(await screen.findByRole('button', { name: 'Place the booking' }));
 
         expect(mockedSubmitOrder).toHaveBeenCalledWith(expect.objectContaining({ neededBy: 'today' }));
     });
@@ -122,7 +122,7 @@ describe('OrderFlow — when do you need it', () => {
         await user.click(screen.getByRole('button', { name: 'Continue' }));
         await fillContactStep(user);
         await user.click(screen.getByRole('button', { name: 'Continue' }));
-        await user.click(await screen.findByRole('button', { name: 'Place the order' }));
+        await user.click(await screen.findByRole('button', { name: 'Place the booking' }));
 
         expect(mockedSubmitOrder).toHaveBeenCalledWith(expect.objectContaining({ neededBy: undefined }));
     });

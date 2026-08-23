@@ -453,3 +453,49 @@ describe('the hub points somewhere', () => {
         for (const path of EXPLORE_PATHS) expect(served, `${path} is not a route`).toContain(path);
     });
 });
+
+describe('one word per thing', () => {
+    // The site had four words for the object a customer tracks — cargo,
+    // consignment, shipment, load — and two of them collided inside a single
+    // flow: "Track a shipment" led to "Finding your consignment" and then to
+    // "No shipment found with that code". Three screens, two words, one thing.
+    //
+    // The settled vocabulary is: cargo is the goods, shipment is the job you
+    // track, booking is the act of committing, quote is a price before you
+    // commit, and load stays in the trade register where it is the right word
+    // for a business shipper. This is the part of that a test can hold.
+    const strings = (obj: unknown): string[] =>
+        typeof obj === 'string' ? [obj]
+        : typeof obj === 'object' && obj !== null ? Object.values(obj).flatMap(strings)
+        : [];
+
+    it('has retired "consignment" from the customer-facing copy', () => {
+        // Correct international-freight English, and far too stiff for
+        // somebody sending 400kg across Kigali. It is also the word that
+        // caused the collision.
+        const offenders = strings(en).filter((v) => /consignment/i.test(v));
+        expect(offenders).toEqual([]);
+    });
+
+    it('does not put the dispatcher\'s word on the customer\'s screen', () => {
+        // "Order" is what the job is called inside the system, and it had
+        // leaked out: the booking form's eyebrow said "Booking · no account
+        // needed" while its success screen said "Order received".
+        const customerFacing = [
+            en.order.received,
+            en.track.milestones.received,
+            en.meta.titleOrder,
+            en.actions.placeOrder,
+            en.order.failed,
+        ];
+        for (const line of customerFacing) {
+            expect(line, `"${line}" still calls it an order`).not.toMatch(/\border/i);
+        }
+    });
+
+    it('offers a quote where a price is given before any commitment', () => {
+        // The pricing page shows a price with nothing owed, which is what a
+        // quote is, and it used to call that "Price your delivery".
+        expect(en.pricing.cta).toMatch(/quote/i);
+    });
+});
