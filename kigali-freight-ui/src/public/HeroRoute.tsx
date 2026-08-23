@@ -210,8 +210,19 @@ export function HeroRoute() {
                     <span className="data-label text-pub-signal">{t.hero_art.inTransit}</span>
                 </span>
                 <span className="data-label text-pub-onink-soft">Gikondo → Kimironko</span>
-                <span className="data-label text-pub-onink tabular-nums">{remaining} km to run</span>
-                <span className="data-label text-pub-onink-soft tabular-nums">ETA {etaMinutes} min</span>
+                {/* These two were the last English left in the hero when the
+                    site is read in French: "in transit" and "sample shipment"
+                    were translated around them, so the instrument was half in
+                    one language. Interpolated rather than concatenated,
+                    because word order around a number is not universal —
+                    French puts the distance before "restants" and the ETA
+                    after "Arrivée dans". */}
+                <span className="data-label text-pub-onink tabular-nums">
+                    {t.hero_art.kmToRun.replace('{km}', String(remaining))}
+                </span>
+                <span className="data-label text-pub-onink-soft tabular-nums">
+                    {t.hero_art.eta.replace('{minutes}', String(etaMinutes))}
+                </span>
                 {/* Said plainly. The map is a demonstration of the tracking
                     view, not a window onto somebody's real consignment. */}
                 <span className="data-label ml-auto text-pub-onink-soft/60">{t.hero_art.sampleShipment}</span>

@@ -156,6 +156,8 @@ export const fr: Strings = {
         alt: 'Illustration d’une expédition allant de Gikondo à Kimironko à travers le réseau de dépôts Inzira',
         inTransit: 'En transit',
         sampleShipment: 'Exemple d’expédition',
+        kmToRun: '{km} km restants',
+        eta: 'Arrivée dans {minutes} min',
     },
     misc: {
         closeTour: 'Fermer la visite',

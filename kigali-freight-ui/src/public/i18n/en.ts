@@ -163,6 +163,10 @@ export const en = {
         alt: 'Illustration of a shipment moving from Gikondo to Kimironko across the Inzira hub network',
         inTransit: 'In transit',
         sampleShipment: 'Sample shipment',
+        // Interpolated rather than concatenated, because word order around a
+        // number is not the same in every language.
+        kmToRun: '{km} km to run',
+        eta: 'ETA {minutes} min',
     },
     misc: {
         closeTour: 'Close the tour',

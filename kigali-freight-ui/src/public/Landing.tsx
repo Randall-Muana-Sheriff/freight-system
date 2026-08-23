@@ -186,8 +186,15 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
         <section className="relative z-20 -mt-12 px-8 sm:-mt-14 sm:px-12">
             <div className="mx-auto grid max-w-4xl gap-1.5 md:grid-cols-3 md:gap-2">
                 {cards.map((card) => (
+                    // flex-col/justify-start rather than relying on the
+                    // default: a button centres its content vertically, so in
+                    // French — where "Liaisons régulières, tarifées par
+                    // entreprise." wraps to two lines — the third card's title
+                    // rode 10px higher than its neighbours and the row of
+                    // three stopped lining up. Top-aligned, a longer
+                    // translation grows downwards and the titles stay level.
                     <button key={card.title} onClick={card.go}
-                        className={`focus-ring group bg-pub-paper px-5 py-6 text-center ${CARD} ${CARD_HOVER}`}>
+                        className={`focus-ring group flex flex-col items-center justify-start bg-pub-paper px-5 py-6 text-center ${CARD} ${CARD_HOVER}`}>
                         <CardIcon shape={card.icon} />
                         <h2 className="display-tight mt-4 text-base text-pub-onpaper">{card.title}</h2>
                         <p className="mt-1 text-[14px] leading-snug text-pub-onpaper-soft">{card.body}</p>

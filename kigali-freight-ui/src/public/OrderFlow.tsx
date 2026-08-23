@@ -16,6 +16,10 @@ const STEPS = ['cargo', 'contact', 'check'] as const;
 // freight is often doing it standing next to the cargo on a phone, where
 // both are easy to do by accident and retyping it all is the difference
 // between a booking and an abandoned one.
+// Same raised-card treatment the landing page uses for its service cards, so
+// a customer meets one card style across the site rather than two.
+const CARD = 'rounded-md card-float';
+
 const DRAFT_KEY = 'inzira.order.draft';
 
 type StoredDraft = { draft: OrderDraft; weightInput: string };
@@ -279,8 +283,14 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 that is what it is: no pickup or drop-off
                                 point exists yet, so nothing here has been
                                 priced against a real distance. */}
+                            {/* pub-paper-soft and pub-rule are not tokens — neither exists
+                                in index.css, so Tailwind emitted nothing for either class
+                                and this price card rendered with no background and no
+                                border at all: the most important number on the form,
+                                sitting as bare text on the page. It now uses the same
+                                raised-card treatment as the landing page's service cards. */}
                             {(quote || quoting) && (
-                                <div aria-live="polite" className="rounded-lg border border-pub-rule bg-pub-paper-soft px-4 py-3">
+                                <div aria-live="polite" className={`bg-pub-paper2 px-4 py-3 ${CARD}`}>
                                     <span className="data-label text-pub-onpaper-soft">
                                         {quote?.isEstimate === false ? t.order.price : t.order.priceEstimate}
                                     </span>
