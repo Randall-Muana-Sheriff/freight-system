@@ -11,7 +11,12 @@
 
 import { useSupportDoc } from './i18n';
 
-const EMAIL = 'sherifimran2000@gmail.com';
+// An address on the domain, not a personal inbox. It reaches the same person
+// — it is an alias forwarding to the Titan mailbox — but a customer whose
+// cargo has gone missing is being asked to trust a freight company, and a
+// gmail address on the page they reach at that moment costs exactly the
+// confidence the page exists to give.
+const EMAIL = 'support@inzira.systems';
 const PHONE = '+250 732 324 860';
 const PHONE_HREF = '+250732324860';
 

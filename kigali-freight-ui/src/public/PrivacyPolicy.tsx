@@ -93,9 +93,9 @@ export default function PrivacyPolicy() {
                     domain accepts mail. */}
                 <p>
                     {d.contact.bodyBefore}
-                    <a href="mailto:sherifimran2000@gmail.com"
+                    <a href="mailto:support@inzira.systems"
                         className="focus-ring font-medium text-pub-laterite underline underline-offset-4">
-                        sherifimran2000@gmail.com
+                        support@inzira.systems
                     </a>
                     {d.contact.bodyMiddle}
                     <a href="tel:+250732324860"
