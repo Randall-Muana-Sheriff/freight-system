@@ -461,6 +461,26 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(confirmed.statusCode, 200, JSON.stringify(confirmed.body));
         assert.equal(confirmed.body.data.order.status, 'DELIVERED');
 
+        // Not checked is not the same as checked and fine.
+        //
+        // The proximity check needs both a delivery point and a known driver
+        // position. This driver has never sent telemetry, so nothing was
+        // measured — and the row must say so. It used to say false, which
+        // reads as "we compared the positions and the driver was where they
+        // should be", a verification that never happened. A false negative in
+        // an audit trail is the kind of bug that gets worse with age: every
+        // run adds rows nobody can audit, and nothing looks wrong.
+        const check = await pool.query(
+            'SELECT distance_from_target_m, location_flagged FROM delivery_confirmations WHERE order_id = $1',
+            [lifecycleOrderId]
+        );
+        assert.equal(check.rows[0].distance_from_target_m, null, 'nothing was measured');
+        assert.equal(
+            check.rows[0].location_flagged, null,
+            'an unmeasured delivery must record "not checked", not "not flagged"'
+        );
+        assert.equal(confirmed.body.data.locationFlagged, null, 'and the API says so too');
+
         // And it lands in the driver's completed history.
         const completed = await request(app)
             .get('/api/orders/driver/completed')

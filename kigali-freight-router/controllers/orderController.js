@@ -1223,7 +1223,14 @@ export const OrderController = {
             // (no driver_locations row yet) is treated as "can't verify",
             // not "suspicious" — it doesn't flag anything.
             let distanceFromTargetM = null;
-            let locationFlagged = false;
+            // Null, not false. The check below only runs when there is a
+            // delivery point to measure against AND the driver has a known
+            // position; when either is missing nothing is checked, and
+            // saying "not flagged" would record a verification that never
+            // happened. An audit trail that cannot tell "we looked and it
+            // was fine" from "we never looked" is worse than one that admits
+            // the gap, because the gap stops being visible.
+            let locationFlagged = null;
             if (deliveryGeom) {
                 const proximityResult = await client.query(
                     `SELECT ST_DistanceSphere(geom, $2) AS distance_meters
