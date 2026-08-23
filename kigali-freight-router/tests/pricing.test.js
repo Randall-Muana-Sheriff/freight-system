@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { quote, platformMargin, detentionCharge, PricingError } from '../services/pricingService.js';
+import { quote, platformMargin, detentionCharge, PricingError,
+         needsManualQuote, MAX_SELF_SERVICE_KG, classForWeight } from '../services/pricingService.js';
 
 // The seeded Light Van card, as migrations/add_pricing.sql writes it.
 const VAN = {
@@ -342,4 +343,40 @@ test('a whole-unit currency is still rounded whole', () => {
     const q = quote(VAN, { weightKg: 200, distanceKm: 10 });
     assert.ok(Number.isInteger(q.totalAmount), `${q.totalAmount} is not a whole franc`);
     assert.ok(Number.isInteger(q.driverNet) && Number.isInteger(q.platformFee), '');
+});
+
+
+// The bug: the weight bands class anything over 8 tonnes as a Heavy Hauler
+// and price it confidently, while the heaviest vehicle on the fleet carries
+// 12. A 30-tonne booking got an instant, firm, undeliverable number. The
+// bands are left open-ended on purpose -- a dispatcher pricing a hand-quoted
+// 20-tonne job still needs the card -- so the line is drawn at the public
+// door instead, and this is where it is drawn.
+test('the fleet cap is what separates a quote from a conversation', () => {
+    assert.equal(needsManualQuote(MAX_SELF_SERVICE_KG), false, 'the cap itself is bookable');
+    assert.equal(needsManualQuote(MAX_SELF_SERVICE_KG - 1), false);
+    assert.equal(needsManualQuote(MAX_SELF_SERVICE_KG + 1), true);
+
+    // The weight that started this. Priced without complaint before.
+    assert.equal(needsManualQuote(30000), true);
+
+    // Strings arrive from a query string, so the numeric coercion matters.
+    assert.equal(needsManualQuote('30000'), true);
+    assert.equal(needsManualQuote('400'), false);
+});
+
+test('rubbish weights are left for the validator to reject, not claimed here', () => {
+    // Returning true for these would turn "that is not a number" into
+    // "talk to us about your load", which sends the customer down a path
+    // that cannot help them.
+    for (const bad of [undefined, null, '', 'heavy', NaN, Infinity]) {
+        assert.equal(needsManualQuote(bad), false, `${JSON.stringify(String(bad))} should not read as too heavy`);
+    }
+});
+
+test('the dispatcher can still price above the public cap', () => {
+    // The bands stay open-ended: a hand-quoted 20-tonne job has to land on
+    // a real rate card, or refusing it publicly would just move the problem
+    // into the dispatcher's screen.
+    assert.equal(classForWeight(MAX_SELF_SERVICE_KG + 8000), 'Heavy Hauler');
 });

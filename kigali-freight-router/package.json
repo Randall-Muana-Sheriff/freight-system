@@ -27,7 +27,9 @@
     "load:test": "node ops/load-test.js",
     "purge:auth-codes": "node ops/purge-expired-auth-codes.js",
     "purge:location-history": "node ops/purge-location-history.js",
-    "watchdog": "node ops/watchdog.js"
+    "watchdog": "node ops/watchdog.js",
+    "check:prices": "node ops/check-published-prices.js",
+    "check:fleet-capacity": "node ops/check-fleet-capacity.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

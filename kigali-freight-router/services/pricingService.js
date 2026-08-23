@@ -39,14 +39,40 @@ const round = (value) => Math.round(value);
 // Which rate card a job falls under. Neither the public booking form nor the
 // dispatcher's order form asks for a vehicle class -- a customer knows what
 // they are shipping, not what it needs to travel in -- so it is derived from
-// the weight they did give. The top band is open-ended because
-// isValidWeightKg caps an order at 50 tonnes, and everything from 8t to that
-// cap is a Heavy Hauler job.
+// the weight they did give. The top band stays open-ended on purpose: a
+// dispatcher entering a 20-tonne job that was quoted by hand still needs the
+// Heavy Hauler card to price it against, and refusing the class here would
+// only move the problem.
 export const WEIGHT_CLASS_BANDS = [
     { maxKg: 1000, vehicleClass: 'Light Van' },
     { maxKg: 8000, vehicleClass: 'Medium Truck' },
     { maxKg: Infinity, vehicleClass: 'Heavy Hauler' },
 ];
+
+// The heaviest load the site is allowed to price on its own.
+//
+// The bands above will happily class a 30-tonne load as a Heavy Hauler and
+// return a confident figure for it. The heaviest vehicle actually on the
+// fleet carries 12 tonnes, so that figure was a promise nothing could keep
+// -- quoted instantly, accepted, and then discovered to be undeliverable by
+// whichever dispatcher opened it. Above this line the public site stops
+// guessing and asks the customer to talk to us, which is what the published
+// rate card already tells them happens.
+//
+// This is a fleet fact, not a pricing one. If a larger vehicle is bought,
+// raise it; `npm run check:fleet-capacity` fails while it claims more than
+// the fleet can carry. Deliberately NOT read from the vehicles table at
+// request time: quotes that change because a lorry went in for repair are
+// worse than a number that is occasionally conservative.
+export const MAX_SELF_SERVICE_KG = 12000;
+
+/** Whether a load is beyond what the site may price without a person.
+ *  Non-numeric and out-of-range weights are somebody else's error to
+ *  report, so they are not claimed here. */
+export function needsManualQuote(weightKg) {
+    const n = Number(weightKg);
+    return Number.isFinite(n) && n > MAX_SELF_SERVICE_KG;
+}
 
 export function classForWeight(weightKg) {
     const n = Number(weightKg);

@@ -8,7 +8,7 @@ import { appendAuditLog } from '../services/auditLogService.js';
 import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../services/alertDispatchService.js';
 import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
-import { PricingError } from '../services/pricingService.js';
+import { PricingError, needsManualQuote, MAX_SELF_SERVICE_KG } from '../services/pricingService.js';
 import { priceJob } from '../services/pricingRepository.js';
 import { normalizePhone } from '../utils/phone.js';
 import { isValidWeightKg } from '../utils/validators.js';
@@ -50,6 +50,16 @@ function cleanText(value, max) {
     return trimmed ? trimmed.slice(0, max) : null;
 }
 
+// Above the fleet's capacity the site stops pricing and hands over to a
+// person. Shared by the quote endpoint and order creation: a figure the
+// quote is willing to show but the booking then refuses is worse than
+// either refusing on its own.
+const TOO_HEAVY = {
+    status: 400,
+    code: 'WEIGHT_NEEDS_QUOTE',
+    message: `Loads over ${MAX_SELF_SERVICE_KG / 1000} tonnes are quoted by hand. Tell us about the load and we will come back with a price.`,
+};
+
 export const PublicOrderController = {
     // GET /api/public/quote?weightKg=&distanceKm=
     //
@@ -68,6 +78,8 @@ export const PublicOrderController = {
             const weightKg = Number(req.query.weightKg);
             const hasDistance = req.query.distanceKm !== undefined && req.query.distanceKm !== '';
             const distanceKm = hasDistance ? Number(req.query.distanceKm) : null;
+
+            if (needsManualQuote(weightKg)) return fail(res, TOO_HEAVY);
 
             // Goes through priceJob, the same function order creation uses,
             // rather than picking a rate card here. The booking form has no
@@ -135,6 +147,7 @@ export const PublicOrderController = {
             if (!isValidWeightKg(weightKg)) {
                 return fail(res, { status: 400, code: 'INVALID_WEIGHT', message: 'Weight must be a positive number up to 50000 kg.' });
             }
+            if (needsManualQuote(weightKg)) return fail(res, TOO_HEAVY);
 
             // Same normaliser the driver invite/OTP flow uses, so a customer
             // number and a driver number are stored in one comparable form.
