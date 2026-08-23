@@ -1757,6 +1757,46 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(afterPing.count, before.count, 'one ping since the assignment is enough to clear it');
     });
 
+    // An estimate is not a bill. Until an order is placed there is no
+    // distance to price on, so the quote falls back to the minimum fare —
+    // measured 15 to 48 per cent below the real figure. Charging that at a
+    // customer's door takes the wrong amount, over a rail nobody enjoys
+    // reversing.
+    test('a delivery still on an estimated price cannot be charged', async () => {
+        const create = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Estimate guard cargo', weight_kg: 400,
+                origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+            });
+        assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+        const orderId = create.body.data.order.id;
+
+        // Put it in a chargeable state, but priced as an estimate — the shape
+        // a booking that was never placed arrives in.
+        await pool.query(
+            `UPDATE orders SET status = 'ARRIVED', price_is_estimate = TRUE,
+                    price_total = 15000, customer_phone = '+250788123456' WHERE id = $1`,
+            [orderId]
+        );
+
+        const response = await request(app).post(`/api/payments/orders/${orderId}/request`)
+            .set('Authorization', `Bearer ${adminToken}`).send({});
+
+        // Either refusal is correct and both are safe. What must never happen
+        // is a 202 — that would mean a customer's phone lit up asking them to
+        // approve the wrong amount.
+        assert.notEqual(response.statusCode, 200, 'an estimated price must never reach the customer');
+        assert.ok(
+            ['PAYMENT_PRICE_IS_ESTIMATE', 'PAYMENTS_NOT_CONFIGURED'].includes(response.body.error.code),
+            `unexpected refusal: ${JSON.stringify(response.body.error)}`
+        );
+
+        // And nothing was recorded against it either way.
+        const attempts = await pool.query('SELECT COUNT(*)::int AS n FROM payment_requests WHERE order_id = $1', [orderId]);
+        assert.equal(attempts.rows[0].n, 0, 'no payment attempt should exist for an unpriced job');
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');

@@ -67,8 +67,8 @@ export async function requestPaymentForOrder({ orderId, payFrom, requestedBy }) 
     }
 
     const { rows } = await pool.query(
-        `SELECT id, status, payment_status, customer_phone, price_total, currency,
-                cargo_description, tracking_token, assigned_to
+        `SELECT id, status, payment_status, customer_phone, price_total, price_is_estimate,
+                currency, cargo_description, tracking_token, assigned_to
            FROM orders WHERE id = $1`,
         [orderId]
     );
@@ -87,6 +87,23 @@ export async function requestPaymentForOrder({ orderId, payFrom, requestedBy }) 
     if (order.price_total === null) {
         throw new PaymentError('PAYMENT_NO_PRICE', 409,
             'This order has no settled price yet. Dispatch has to place it first.');
+    }
+    // An estimate is not a bill.
+    //
+    // Until an order is placed on the map there is no distance to price on,
+    // so the quote falls back to the minimum fare — which measured 15 to 48
+    // per cent below the real figure. Charging that at the door would take
+    // the wrong amount from a real customer, and mobile money is not a
+    // transaction anyone enjoys reversing.
+    //
+    // In practice the placement guard in orderController already stops an
+    // unplaced order reaching a driver, and placing one is what clears this
+    // flag. But that protection lives in another file and nothing here said
+    // it was being relied on. Money is the wrong place to depend on a rule
+    // enforced somewhere else, so it is checked again where it is spent.
+    if (order.price_is_estimate) {
+        throw new PaymentError('PAYMENT_PRICE_IS_ESTIMATE', 409,
+            'This delivery is still on an estimated price. Dispatch has to confirm the real price before it can be charged.');
     }
 
     const target = payFrom || order.customer_phone;
