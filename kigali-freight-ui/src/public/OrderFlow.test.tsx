@@ -206,40 +206,86 @@ describe('the cargo list when the server cannot be reached', () => {
 });
 
 describe('pinning both addresses is what makes the price real', () => {
-    // The whole reason the address fields changed. Without coordinates the
-    // server has no distance, every quote falls to the minimum fare, and the
-    // form shows 15,000 RWF for a 50kg parcel and an 800kg pallet alike.
+    // The whole reason the address fields changed. Without a route the server
+    // has no distance, every quote falls to the minimum fare, and the form
+    // shows 15,000 RWF for a 50kg parcel and an 800kg pallet alike.
     const KIMIRONKO = { label: 'Kimironko Market', lat: -1.944800, lng: 30.125600, source: 'hint' as const };
     const NYABUGOGO = { label: 'Nyabugogo', lat: -1.939800, lng: 30.043500, source: 'hint' as const };
 
-    it('sends a distance once both ends are pinned, and none before', async () => {
-        const mockedSearch = vi.mocked(searchPlaces);
-        mockedSearch.mockReset()
-            .mockImplementation(async (q: string) =>
-                /nyabu/i.test(q) ? [NYABUGOGO] : [KIMIRONKO]);
+    async function pinBothEnds(user: ReturnType<typeof userEvent.setup>) {
+        await user.type(screen.getByPlaceholderText('Gikondo Industrial Zone, gate 3'), 'nyabugogo');
+        await user.click(await screen.findByRole('option', { name: 'Nyabugogo' }));
+        await user.type(screen.getByPlaceholderText('Kimironko Market, shop 14'), 'kimironko');
+        await user.click(await screen.findByRole('option', { name: 'Kimironko Market' }));
+    }
 
+    beforeEach(() => {
+        // The form keeps its draft in sessionStorage so a refresh does not
+        // lose a half-filled booking. jsdom keeps that between tests in a
+        // file, so without this the previous test's addresses are restored
+        // into the next one — which is how this block first "failed" with a
+        // delivery address of "Kimironko Marketsomewhere unlisted".
+        sessionStorage.clear();
+        window.history.replaceState(null, '', '/order');
+        vi.mocked(searchPlaces).mockReset().mockImplementation(async (q: string) =>
+            /nyabu/i.test(q) ? [NYABUGOGO] : [KIMIRONKO]);
+    });
+
+    it('sends the route once both ends are pinned, and nothing before', async () => {
         const user = userEvent.setup();
         render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         await screen.findByPlaceholderText('150');
         await user.type(screen.getByPlaceholderText('150'), '400');
 
-        // Weight alone: no distance to send.
+        // Weight alone: no route to send, so the server prices on the floor.
         await waitFor(() => expect(mockedFetchQuote).toHaveBeenCalledWith(400, undefined));
 
         await user.type(screen.getByPlaceholderText('Gikondo Industrial Zone, gate 3'), 'nyabugogo');
         await user.click(await screen.findByRole('option', { name: 'Nyabugogo' }));
 
-        // One end pinned is still no distance — it takes two points.
-        expect(mockedFetchQuote).not.toHaveBeenCalledWith(400, expect.any(Number));
+        // One end pinned is still nothing — a distance needs two points, and
+        // half a pair would price against somewhere nobody chose.
+        expect(mockedFetchQuote).not.toHaveBeenCalledWith(400, expect.anything());
 
         await user.type(screen.getByPlaceholderText('Kimironko Market, shop 14'), 'kimironko');
         await user.click(await screen.findByRole('option', { name: 'Kimironko Market' }));
 
         await waitFor(() => {
-            const [, distance] = mockedFetchQuote.mock.calls.at(-1)!;
-            // PostGIS puts these two hubs 9.151km apart in a straight line.
-            // Not the road distance — the server applies its own factor.
-            expect(distance).toBeCloseTo(9.151, 1);
+            expect(mockedFetchQuote).toHaveBeenLastCalledWith(400, {
+                pickupLat: -1.939800, pickupLng: 30.043500,
+                deliveryLat: -1.944800, deliveryLng: 30.125600,
+            });
         });
     });
+
+    // The server refuses half a pair with PUBLIC_ORDER_COORDS_INCOMPLETE, so
+    // sending one would cost a customer their whole booking for the sake of a
+    // convenience they only half used.
+    it('books with no coordinates at all when only one end was pinned', async () => {
+        const user = userEvent.setup();
+        mockedSubmitOrder.mockResolvedValue('INZ-TESTCODE');
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+        await screen.findByPlaceholderText('150');
+
+        await user.type(screen.getByPlaceholderText('Gikondo Industrial Zone, gate 3'), 'nyabugogo');
+        await user.click(await screen.findByRole('option', { name: 'Nyabugogo' }));
+        vi.mocked(searchPlaces).mockResolvedValue([]);   // a place no geocoder knows
+        await user.type(screen.getByPlaceholderText('Kimironko Market, shop 14'), 'somewhere unlisted');
+        await user.click(await screen.findByRole('button', { name: 'General goods' }));
+        await user.type(screen.getByPlaceholderText('150'), '400');
+        await user.click(await screen.findByRole('button', { name: 'Continue' }));
+
+        await fillContactStep(user);
+        await user.click(await screen.findByRole('button', { name: 'Continue' }));
+        await user.click(await screen.findByRole('button', { name: 'Place the booking' }));
+
+        await waitFor(() => expect(mockedSubmitOrder).toHaveBeenCalled());
+        const sent = mockedSubmitOrder.mock.calls.at(-1)![0];
+        expect(sent.pickupLat, 'half a pair must not be sent').toBeUndefined();
+        expect(sent.deliveryLat).toBeUndefined();
+        // The addresses themselves still travel — the driver needs them.
+        expect(sent.pickupAddress).toBe('Nyabugogo');
+        expect(sent.deliveryAddress).toBe('somewhere unlisted');
+    });
 });
+

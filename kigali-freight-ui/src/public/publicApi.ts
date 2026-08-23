@@ -142,16 +142,32 @@ export interface Quote {
 // someone is still typing. Weight alone: the vehicle class comes from it
 // server-side, the same way the order itself is priced, so what is shown
 // here and what is stored on submit cannot drift apart.
+/** Where a job starts and ends, once the customer has picked both. */
+export interface QuoteRoute {
+    pickupLat: number;
+    pickupLng: number;
+    deliveryLat: number;
+    deliveryLng: number;
+}
+
 /** Prices a job.
  *
- *  `distanceKm` is the straight line between the two ends, NOT the road
- *  distance — the server applies its own road factor, and passing a road
- *  distance would have it multiplied a second time. Omitting it is what
- *  produces the minimum fare, which is why a booking with no pinned
- *  addresses is quoted low. */
-export async function fetchQuote(weightKg: number, distanceKm?: number): Promise<Quote> {
+ *  Without a route the server has no distance and falls back to the minimum
+ *  fare, which is why an unpinned booking is quoted 15-48% under what the
+ *  job costs. With one, the price is firm.
+ *
+ *  The route is sent as four coordinates rather than a distance, and the
+ *  server works the distance out. It used to accept a `distanceKm` the
+ *  caller computed, which meant anyone could ask for a cross-city job with
+ *  distanceKm=0.1 and be shown the minimum fare — a public endpoint should
+ *  not let the client set the input that decides the price. That parameter
+ *  is now ignored server-side, so computing it here would be dead work
+ *  producing a number nobody reads. */
+export async function fetchQuote(weightKg: number, route?: QuoteRoute): Promise<Quote> {
     const query = new URLSearchParams({ weightKg: String(weightKg) });
-    if (distanceKm !== undefined) query.set('distanceKm', String(distanceKm));
+    if (route) {
+        for (const [key, value] of Object.entries(route)) query.set(key, String(value));
+    }
     const response = await fetch(`${base()}/quote?${query}`);
     return parse<Quote>(response);
 }

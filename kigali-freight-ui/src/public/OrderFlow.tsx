@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { fetchCargoTypes, submitOrder, fetchQuote, type OrderDraft, type Quote } from './publicApi';
 import { useLanguage, useApiError } from './i18n';
 import { AddressField } from './AddressField';
-import { straightLineKm } from './straightLineKm';
 
 // Booking is paperwork, so it is styled as paperwork: daylight, ruled
 // fields, mono labels, no cards floating on a gradient. The restraint is
@@ -94,14 +93,19 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
     // failure: a price nobody can fetch should leave the form exactly as it
     // was before this feature existed, not put an error in front of someone
     // halfway through booking. The order still prices server-side on submit.
-    // Both ends pinned means the price can be real rather than a floor. One
-    // end pinned is worth nothing on its own — a distance needs two points —
-    // so this deliberately waits for the pair.
-    const pickup = draft.pickupLat !== undefined && draft.pickupLng !== undefined
-        ? { lat: draft.pickupLat, lng: draft.pickupLng } : null;
-    const dropoff = draft.deliveryLat !== undefined && draft.deliveryLng !== undefined
-        ? { lat: draft.deliveryLat, lng: draft.deliveryLng } : null;
-    const distanceKm = pickup && dropoff ? straightLineKm(pickup, dropoff) : undefined;
+    // Both ends or neither, which is also what the order endpoint enforces.
+    // Half a pair would price against a point nobody chose, and that is worse
+    // than the honest weight-only estimate — it looks firm and is not.
+    const route = draft.pickupLat !== undefined && draft.pickupLng !== undefined
+        && draft.deliveryLat !== undefined && draft.deliveryLng !== undefined
+        ? {
+            pickupLat: draft.pickupLat, pickupLng: draft.pickupLng,
+            deliveryLat: draft.deliveryLat, deliveryLng: draft.deliveryLng,
+        }
+        : undefined;
+    // Serialised so the effect below re-runs when the pins move, without
+    // taking a fresh object identity as a change on every render.
+    const routeKey = route ? Object.values(route).join(',') : '';
 
     useEffect(() => {
         const weight = Number(weightInput);
@@ -113,7 +117,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
         setQuoting(true);
         let cancelled = false;
         const timer = setTimeout(() => {
-            fetchQuote(weight, distanceKm)
+            fetchQuote(weight, route)
                 .then((result) => {
                     if (!cancelled) setQuote(result);
                 })
@@ -128,12 +132,14 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
             cancelled = true;
             clearTimeout(timer);
         };
-        // distanceKm belongs here as much as the weight does. Without it the
+        // The route belongs here as much as the weight does. Without it the
         // quote would never be re-fetched when the customer pins an address,
         // and the price would stay at the minimum fare no matter what they
         // picked — the exact bug this change exists to fix, reintroduced one
-        // line below the fix.
-    }, [weightInput, distanceKm]);
+        // line below the fix. Keyed by value rather than by object, or every
+        // render would look like a change and re-quote in a loop.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [weightInput, routeKey]);
 
     // The server owns this list and validates against it, so it is fetched
     // rather than hardcoded. But the dictionary is keyed by the very same
@@ -187,7 +193,17 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
         setSubmitting(true);
         setError(null);
         try {
-            setToken(await submitOrder({ ...draft, weightKg: Number(weightInput) }));
+            // Coordinates go both or neither, matching what the order
+            // endpoint enforces. A customer who picks a suggestion for the
+            // pickup and types the delivery out by hand would otherwise send
+            // half a pair and have the whole booking refused with
+            // PUBLIC_ORDER_COORDS_INCOMPLETE — a working booking lost to a
+            // partial convenience.
+            const { pickupLat, pickupLng, deliveryLat, deliveryLng, ...rest } = draft;
+            const pinned = route
+                ? { pickupLat, pickupLng, deliveryLat, deliveryLng }
+                : {};
+            setToken(await submitOrder({ ...rest, ...pinned, weightKg: Number(weightInput) }));
             // Placed, so the draft has served its purpose. Leaving a name and
             // phone number sitting in storage after the fact earns nothing.
             try {
