@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { OrderFlow } from './OrderFlow';
+import { OrderFlow, CARGO_FALLBACK } from './OrderFlow';
 import { fetchCargoTypes, submitOrder, fetchQuote } from './publicApi';
 import { LanguageProvider } from './i18n';
 
@@ -28,7 +28,9 @@ const mockedFetchQuote = vi.mocked(fetchQuote);
 async function fillCargoStep(user: ReturnType<typeof userEvent.setup>) {
     await user.type(screen.getByPlaceholderText('Gikondo Industrial Zone, gate 3'), 'Gikondo');
     await user.type(screen.getByPlaceholderText('Kimironko Market, shop 14'), 'Kimironko');
-    await user.selectOptions(screen.getByRole('combobox'), 'General goods');
+    // Cargo type is a chip row now, matching the "when do you need it"
+    // row below it, so this is a press rather than a select.
+    await user.click(screen.getByRole('button', { name: 'General goods', pressed: false }));
     await user.type(screen.getByPlaceholderText('150'), '150');
 }
 
@@ -130,5 +132,71 @@ describe('OrderFlow — when do you need it', () => {
     it('does not promise the answer will be honoured', async () => {
         render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
         expect(await screen.findByText(/confirm what.s possible when they call/i)).toBeInTheDocument();
+    });
+});
+
+describe('cargo type as a chip row', () => {
+    // It was a <select> that opened on "Choose…", sitting directly above a
+    // row of chips asking the same kind of question. One screen, two patterns,
+    // and the select was the worse one: the first tap bought the customer
+    // nothing.
+    it('lets a mis-tap be undone, the way the row below it does', async () => {
+        const user = userEvent.setup();
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+
+        const chip = await screen.findByRole('button', { name: 'General goods' });
+        await user.click(chip);
+        expect(chip).toHaveAttribute('aria-pressed', 'true');
+
+        // Pressing the chosen one again clears it. The select could not do
+        // this at all once a real option had been picked.
+        await user.click(chip);
+        expect(chip).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('keeps one choice at a time', async () => {
+        const user = userEvent.setup();
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+
+        const goods = await screen.findByRole('button', { name: 'General goods' });
+        const perishables = await screen.findByRole('button', { name: 'Perishables' });
+
+        await user.click(goods);
+        await user.click(perishables);
+
+        expect(perishables).toHaveAttribute('aria-pressed', 'true');
+        expect(goods, 'two cargo types cannot both be chosen').toHaveAttribute('aria-pressed', 'false');
+    });
+});
+
+describe('the cargo list when the server cannot be reached', () => {
+    // The fallback exists because an empty list stopped being visible. As a
+    // <select> it still rendered "Choose…"; as chips it renders nothing, and
+    // a cargo type is required — so a failed fetch left a customer with a
+    // Continue button that never enabled and no field to blame.
+    it('matches the dictionary, which is the list a translator edits', async () => {
+        const { en } = await import('./i18n/en');
+        // t.cargo is keyed by identifier, which is the whole reason those keys
+        // are English strings. If the two drift, the fallback would offer a
+        // type the server rejects, or a chip with no label.
+        expect([...CARGO_FALLBACK].sort()).toEqual(Object.keys(en.cargo).sort());
+    });
+
+    it('still offers every type when the request fails outright', async () => {
+        mockedFetchCargoTypes.mockReset().mockRejectedValue(new Error('offline'));
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+
+        for (const type of CARGO_FALLBACK) {
+            expect(await screen.findByRole('button', { name: type })).toBeTruthy();
+        }
+    });
+
+    it('does not render an empty chip row when the server answers with nothing', async () => {
+        // A 200 with an empty array is the same dead end as a failure, and it
+        // is the likelier of the two after a bad migration.
+        mockedFetchCargoTypes.mockReset().mockResolvedValue([]);
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+
+        expect(await screen.findByRole('button', { name: 'General goods' })).toBeTruthy();
     });
 });

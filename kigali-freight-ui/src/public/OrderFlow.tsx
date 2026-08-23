@@ -10,6 +10,17 @@ import { useLanguage, useApiError } from './i18n';
 // Dictionary keys, not labels — the three step names translate too.
 const STEPS = ['cargo', 'contact', 'check'] as const;
 
+// What the cargo chips fall back to when the server cannot be reached.
+//
+// These are identifiers, not labels — the API validates the string it is
+// sent, so the English text is the value and only the display is translated.
+// Kept in step with CARGO_TYPES in the router; a test asserts it matches the
+// dictionary, which is the copy of this list that a translator touches.
+export const CARGO_FALLBACK = [
+    'General goods', 'Retail stock', 'Construction materials',
+    'Perishables', 'Documents', 'Fragile / high-value', 'Other',
+];
+
 // The step lives in the URL and the draft in sessionStorage, so a refresh
 // mid-booking — or a back button pressed out of habit — returns someone to
 // the form as they left it rather than to an empty one. Someone booking
@@ -108,8 +119,20 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
         };
     }, [weightInput]);
 
+    // The server owns this list and validates against it, so it is fetched
+    // rather than hardcoded. But the dictionary is keyed by the very same
+    // identifiers — that is why t.cargo's keys are English strings — so it
+    // is a usable last resort when the request fails.
+    //
+    // Falling back matters more than it used to. An empty list once meant an
+    // empty <select>, which still showed "Choose…" and looked like a field.
+    // As a chip row it renders nothing whatsoever, and since a cargo type is
+    // required, the customer would be left with a Continue button that never
+    // enables and no visible reason why.
     useEffect(() => {
-        fetchCargoTypes().then(setCargoTypes).catch(() => setCargoTypes([]));
+        fetchCargoTypes()
+            .then((types) => setCargoTypes(types.length > 0 ? types : CARGO_FALLBACK))
+            .catch(() => setCargoTypes(CARGO_FALLBACK));
     }, []);
 
     const cargoValid = draft.pickupAddress.trim() && draft.deliveryAddress.trim() && draft.cargoType && Number(weightInput) > 0;
@@ -254,23 +277,46 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                                 <input className={field} value={draft.deliveryAddress} placeholder={t.order.deliverPlaceholder}
                                     onChange={(e) => setDraft({ ...draft, deliveryAddress: e.target.value })} />
                             </label>
-                            <div className="grid gap-7 sm:grid-cols-2">
-                                <label className="block">
-                                    <span className="data-label text-pub-onpaper-soft">{t.order.whatIsIt}</span>
-                                    <select className={field} value={draft.cargoType}
-                                        onChange={(e) => setDraft({ ...draft, cargoType: e.target.value })}>
-                                        <option value="">{t.order.choose}</option>
-                                        {cargoTypes.map((type) => (
-                                            // value stays the server's English
-                                            // identifier; only the label is
-                                            // translated, and an unknown type
-                                            // falls back to showing itself.
-                                            <option key={type} value={type}>
-                                                {t.cargo[type as keyof typeof t.cargo] ?? type}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
+                            <div className="grid gap-7">
+                                {/* Chips, not a <select>. "When do you need it"
+                                    directly below this was already a row of
+                                    chips, so one screen was asking the same
+                                    kind of question two different ways — and
+                                    the select was the worse of the two: it
+                                    opens on "Choose…", which is a tap that
+                                    buys the customer nothing.
+
+                                    A fieldset with aria-pressed buttons rather
+                                    than radios, matching the row below it, so
+                                    the two read and behave identically.
+
+                                    The value stays the server's English
+                                    identifier; only the label is translated,
+                                    and an unknown type falls back to showing
+                                    itself rather than vanishing. */}
+                                <fieldset className="block">
+                                    <legend className="data-label text-pub-onpaper-soft">{t.order.whatIsIt}</legend>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {cargoTypes.map((type) => {
+                                            const chosen = draft.cargoType === type;
+                                            return (
+                                                <button
+                                                    key={type}
+                                                    type="button"
+                                                    aria-pressed={chosen}
+                                                    onClick={() => setDraft({ ...draft, cargoType: chosen ? '' : type })}
+                                                    className={`focus-ring rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                                                        chosen
+                                                            ? 'border-pub-laterite bg-pub-laterite text-pub-onink'
+                                                            : 'border-pub-onpaper/25 text-pub-onpaper-soft hover:border-pub-onpaper/50 hover:text-pub-onpaper'
+                                                    }`}
+                                                >
+                                                    {t.cargo[type as keyof typeof t.cargo] ?? type}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </fieldset>
                                 <label className="block">
                                     <span className="data-label text-pub-onpaper-soft">{t.order.weight}</span>
                                     <input type="number" min="1" className={field} value={weightInput} placeholder={t.order.weightPlaceholder}

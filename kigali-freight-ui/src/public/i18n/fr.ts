@@ -381,7 +381,7 @@ export const fr: Strings = {
     },
 
     steps: {
-        heading: 'Où va-t-elle ?',
+        heading: 'Que transportons-nous ?',
         cargo: 'Marchandise',
         contact: 'Contact',
         check: 'Vérification',

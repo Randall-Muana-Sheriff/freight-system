@@ -483,7 +483,7 @@ export const en = {
     // Worth noting rather than quietly fixing: "no matches" from a search
     // is only as trustworthy as the pattern behind it.
     steps: {
-        heading: 'Where’s it going?',
+        heading: 'What are we moving?',
         cargo: 'Cargo',
         contact: 'Contact',
         check: 'Check',
