@@ -26,16 +26,31 @@ export const CARD_HOVER = 'card-float-lift';
 export const CARD_DARK = 'rounded-md card-float-dark';
 export const BLOCK = 'mx-auto max-w-6xl overflow-hidden rounded-lg';
 
-export function SectionHead({ eyebrow, headline, onPaper = true, className = '' }: {
-    eyebrow: string; headline: string; onPaper?: boolean; className?: string;
+/** A section's eyebrow and headline.
+ *
+ *  `level` exists because these sections stopped being sections. Written for
+ *  bands inside the landing page, where the hero is the h1 and everything
+ *  below it is correctly an h2 — but four of them are now pages of their own,
+ *  and a page whose largest heading is an h2 has no h1 at all. That is silent
+ *  in every way that matters: it looks identical, and it costs a screen-reader
+ *  user the heading they navigate by and a search engine the strongest signal
+ *  it has about what the page is for. Which was the whole argument for
+ *  splitting these onto pages.
+ *
+ *  So the page that leads with a section says so, and the level follows.
+ *  Styling is identical either way — this is about what the markup means,
+ *  not what it looks like. */
+export function SectionHead({ eyebrow, headline, onPaper = true, className = '', level = 2 }: {
+    eyebrow: string; headline: string; onPaper?: boolean; className?: string; level?: 1 | 2;
 }) {
+    const Heading = level === 1 ? 'h1' : 'h2';
     return (
         <div className={className}>
             <p className={`data-label mb-5 ${onPaper ? 'text-pub-laterite' : 'text-pub-laterite-soft'}`}>{eyebrow}</p>
-            <h2 className={`display-wide text-[clamp(2rem,4.5vw,3.2rem)] ${onPaper ? 'text-pub-onpaper' : 'text-pub-onink'}`}
+            <Heading className={`display-wide text-[clamp(2rem,4.5vw,3.2rem)] ${onPaper ? 'text-pub-onpaper' : 'text-pub-onink'}`}
                 style={{ textWrap: 'balance' } as React.CSSProperties}>
                 {headline}
-            </h2>
+            </Heading>
         </div>
     );
 }

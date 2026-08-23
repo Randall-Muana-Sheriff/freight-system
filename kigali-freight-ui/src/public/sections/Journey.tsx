@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n';
 import { SECTION, BLOCK, SectionHead } from './kit';
 
-export function JourneySection() {
+export function JourneySection({ leads = false }: { leads?: boolean }) {
     const { t } = useLanguage();
     return (
         <>
@@ -10,7 +10,7 @@ export function JourneySection() {
             <section id="how" className={SECTION}>
                 <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-3xl">
-                    <SectionHead eyebrow={t.journey.eyebrow} headline={t.journey.headline} className="mb-14" />
+                    <SectionHead level={leads ? 1 : 2} eyebrow={t.journey.eyebrow} headline={t.journey.headline} className="mb-14" />
                     <ol className="relative">
                         <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-3 w-px bg-pub-onpaper/20" />
                         {t.journey.stops.map((stop, index) => (

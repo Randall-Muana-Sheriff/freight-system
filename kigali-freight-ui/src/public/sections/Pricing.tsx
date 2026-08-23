@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n';
 import { SECTION, BLOCK, CARD_DARK, SectionHead } from './kit';
 
-export function PricingSection({ onNavigate }: { onNavigate: (path: string) => void }) {
+export function PricingSection({ onNavigate, leads = false }: { onNavigate: (path: string) => void; leads?: boolean }) {
     const { t } = useLanguage();
     return (
         <>
@@ -20,7 +20,7 @@ export function PricingSection({ onNavigate }: { onNavigate: (path: string) => v
                 <div className={`${BLOCK} bg-pub-ink px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-6xl">
                     <div className="mb-12 max-w-2xl">
-                        <SectionHead eyebrow={t.pricing.eyebrow} headline={t.pricing.headline} onPaper={false} />
+                        <SectionHead level={leads ? 1 : 2} eyebrow={t.pricing.eyebrow} headline={t.pricing.headline} onPaper={false} />
                         <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{t.pricing.intro}</p>
                     </div>
 

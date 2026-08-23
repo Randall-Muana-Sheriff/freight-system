@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n';
 import { SECTION, BLOCK, CARD, SectionHead } from './kit';
 
-export function BusinessSection() {
+export function BusinessSection({ leads = false }: { leads?: boolean }) {
     const { t } = useLanguage();
     return (
         <>
@@ -13,7 +13,7 @@ export function BusinessSection() {
                 <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-6xl">
                     <div className="mb-12 max-w-2xl">
-                        <SectionHead eyebrow={t.business.eyebrow} headline={t.business.headline} />
+                        <SectionHead level={leads ? 1 : 2} eyebrow={t.business.eyebrow} headline={t.business.headline} />
                         <p className="mt-6 text-lg leading-relaxed text-pub-onpaper-soft">{t.business.intro}</p>
                     </div>
 

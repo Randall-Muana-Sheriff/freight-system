@@ -9,7 +9,7 @@ import { ContactSection } from './sections/Contact';
 export default function BusinessPage() {
     return (
         <>
-            <BusinessSection />
+            <BusinessSection leads />
             <ContactSection />
         </>
     );

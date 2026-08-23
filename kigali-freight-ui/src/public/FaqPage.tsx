@@ -8,7 +8,7 @@ import { FaqSection } from './sections/Faq';
 export default function FaqPage() {
     return (
         <>
-            <FaqSection />
+            <FaqSection leads />
         </>
     );
 }

@@ -1,7 +1,7 @@
 import { useLanguage } from '../i18n';
 import { SECTION, BLOCK, SectionHead } from './kit';
 
-export function FaqSection() {
+export function FaqSection({ leads = false }: { leads?: boolean }) {
     const { t } = useLanguage();
     return (
         <>
@@ -16,7 +16,7 @@ export function FaqSection() {
             <section id="faq" className={SECTION}>
                 <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
                 <div className="mx-auto max-w-5xl">
-                    <SectionHead eyebrow={t.faq.eyebrow} headline={t.faq.headline} className="mb-12 max-w-2xl" />
+                    <SectionHead level={leads ? 1 : 2} eyebrow={t.faq.eyebrow} headline={t.faq.headline} className="mb-12 max-w-2xl" />
 
                     {/* Columns rather than a two-column grid. In a grid every
                         row is as tall as its tallest cell, and the liability

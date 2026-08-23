@@ -10,7 +10,7 @@ import { SystemSection } from './sections/System';
 export default function HowItWorksPage() {
     return (
         <>
-            <JourneySection />
+            <JourneySection leads />
             <SystemSection />
         </>
     );

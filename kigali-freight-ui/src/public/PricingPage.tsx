@@ -10,7 +10,7 @@ import { PricingSection } from './sections/Pricing';
 export default function PricingPage({ onNavigate }: { onNavigate: (path: string) => void }) {
     return (
         <>
-            <PricingSection onNavigate={onNavigate} />
+            <PricingSection onNavigate={onNavigate} leads />
         </>
     );
 }
