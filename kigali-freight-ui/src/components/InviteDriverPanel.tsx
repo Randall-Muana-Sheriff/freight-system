@@ -79,7 +79,7 @@ export default function InviteDriverPanel() {
         setResettingId(driverId);
         try {
             await resetDriverPin(driverId, jwtToken);
-            setResetMsg('PIN reset — the driver will set a new one at their next sign-in.');
+            setResetMsg('PIN reset. The driver will set a new one at their next sign-in.');
         } catch (err) {
             setError((err as Error).message);
         } finally {
@@ -168,8 +168,8 @@ export default function InviteDriverPanel() {
                     }`}>
                         <div className={result.smsSent ? 'font-bold text-tarp' : 'font-bold text-hazard'}>
                             {result.smsSent
-                                ? `Driver invited — ${result.staffId}`
-                                : `Driver invited — ${result.staffId} — but the text did not send`}
+                                ? `Driver invited · ${result.staffId}`
+                                : `Driver invited · ${result.staffId}, but the text did not send`}
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -194,7 +194,7 @@ export default function InviteDriverPanel() {
                         <div className="text-micro text-steel">
                             {result.smsSent
                                 ? `Also texted to ${result.phoneNumber}.`
-                                : `Nothing was delivered to ${result.phoneNumber}. Read this code to the driver or send it yourself — they cannot sign in without it.`}
+                                : `Nothing was delivered to ${result.phoneNumber}. Read this code to the driver or send it yourself. They cannot sign in without it.`}
                         </div>
                     </div>
                 )}

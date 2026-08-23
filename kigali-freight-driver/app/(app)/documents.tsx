@@ -181,7 +181,7 @@ export default function DocumentsScreen() {
               </Text>
               <Text style={styles.summaryDetail}>
                 {verified
-                  ? "All required documents are approved — you're clear to receive assignments."
+                  ? "All required documents are approved. You're clear to receive assignments."
                   : `${checklist?.filter((d) => d.status === 'approved').length ?? 0} of ${checklist?.length ?? 5} documents approved. You won't receive assignments until all are approved.`}
               </Text>
             </View>

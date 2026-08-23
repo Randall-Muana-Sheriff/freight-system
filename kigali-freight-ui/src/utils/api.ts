@@ -29,9 +29,19 @@ if (!API_BASE) {
 
 export class HttpError extends Error {
     status: number;
-    constructor(message: string, status: number) {
+    /** The server's machine-readable error code, where it sent one.
+     *
+     *  Carried because a status alone cannot tell two refusals apart: an
+     *  assignment blocked because the order has never been placed on the map
+     *  and one blocked because the driver's insurance has lapsed are both
+     *  409s needing completely different things from the dispatcher. The
+     *  server's own message is good enough to display; the code is what lets
+     *  the screen offer the fix rather than only describe the problem. */
+    code: string | null;
+    constructor(message: string, status: number, code: string | null = null) {
         super(message);
         this.status = status;
+        this.code = code;
     }
 }
 
@@ -52,7 +62,7 @@ async function parseResponse(res: Response): Promise<unknown> {
         if (res.status === 401 || res.status === 403) {
             unauthorizedHandler?.();
         }
-        throw new HttpError(message, res.status);
+        throw new HttpError(message, res.status, payload?.error?.code ?? payload?.code ?? null);
     }
 
     if (acceptedResponse && payload == null) {

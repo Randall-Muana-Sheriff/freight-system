@@ -214,7 +214,7 @@ export function AuthFlow() {
   const onPinConfirmComplete = async (pin: string) => {
     if (pin !== firstPin) {
       setPinError(true);
-      setToast({ icon: 'alert-circle-outline', message: "PINs don't match — try again.", tone: 'warning' });
+      setToast({ icon: 'alert-circle-outline', message: "PINs don't match. Try again.", tone: 'warning' });
       setTimeout(() => {
         setPinError(false);
         setPinValue('');

@@ -142,8 +142,19 @@ export interface RecentDelivery {
     photo_url: string;
     cargo_description?: string;
     confirmed_at: string;
-    location_flagged?: boolean;
-    distance_from_target_m?: number;
+    /** Whether the confirmation happened away from the delivery point.
+     *
+     *  Three states, not two. NULL means no check ran at all — there was no
+     *  reference point to measure against, because the order was never
+     *  placed on the map or the driver's phone never reported a position.
+     *  It used to be a plain boolean, so "nobody checked" was stored and
+     *  drawn identically to "checked and fine": a silent false negative in
+     *  an audit trail, which is the kind that gets worse the longer it runs.
+     *
+     *  distance_from_target_m is written if and only if the check ran, so
+     *  a null distance and a null flag always travel together. */
+    location_flagged?: boolean | null;
+    distance_from_target_m?: number | null;
 }
 
 export interface DriverSuggestion {

@@ -44,7 +44,7 @@ function overallLocationStatus(diagnostics: Diagnostics | null) {
     return {
       label: 'Location is off',
       tone: 'bad' as Tone,
-      detail: "Your phone's Location/GPS is switched off system-wide — dispatch can't see you until it's back on, even though the app itself is allowed to use it.",
+      detail: "Your phone's Location/GPS is switched off system-wide. Dispatch can't see you until it's back on, even though the app itself is allowed to use it.",
     };
   }
   const blocked = diagnostics.foregroundStatus === 'denied' || diagnostics.backgroundStatus === 'denied';
@@ -289,7 +289,7 @@ export default function ProfileScreen() {
       const result = await sendTestLocationPing(token);
       await loadDiagnostics();
       if (result.ok) {
-        setPingToast({ icon: 'checkmark-circle-outline', message: `Sent — dispatch now sees you at ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.`, tone: 'success' });
+        setPingToast({ icon: 'checkmark-circle-outline', message: `Sent. Dispatch now sees you at ${result.lat.toFixed(4)}, ${result.lng.toFixed(4)}.`, tone: 'success' });
       } else {
         setPingToast({ icon: 'alert-circle-outline', message: result.error, tone: 'error' });
       }
@@ -313,7 +313,7 @@ export default function ProfileScreen() {
         tone: 'error',
         message: biometricEnabled
           ? 'Could not turn off unlock with biometrics.'
-          : 'Could not turn on biometric unlock — your device may not have it set up.',
+          : 'Could not turn on biometric unlock. Your device may not have it set up.',
       });
     } finally {
       setTogglingBiometric(false);
@@ -405,7 +405,7 @@ export default function ProfileScreen() {
         ) : (
           <View style={styles.emptyInline}>
             <Ionicons name="car-outline" size={20} color={theme.colors.muted} />
-            <Text style={styles.emptyInlineText}>No vehicle assigned yet — contact dispatch to get one.</Text>
+            <Text style={styles.emptyInlineText}>No vehicle assigned yet. Contact dispatch to get one.</Text>
           </View>
         )}
       </Card>
@@ -616,7 +616,7 @@ export default function ProfileScreen() {
             {updateCheck.status === 'checking'
               ? 'checking…'
               : updateCheck.status === 'error'
-                ? `failed — ${updateCheck.message}`
+                ? `failed: ${updateCheck.message}`
                 : updateCheck.status === 'installing'
                   ? 'downloading and installing…'
                   : updateCheck.isAvailable

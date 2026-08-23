@@ -137,7 +137,7 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
                     {hubTargetMode
                         ? 'Click the map for hub location...'
                         : effectiveCoords
-                        ? `Location set (${effectiveCoords[0].toFixed(4)}, ${effectiveCoords[1].toFixed(4)}) — click to change`
+                        ? `Location set (${effectiveCoords[0].toFixed(4)}, ${effectiveCoords[1].toFixed(4)}). Click to change`
                         : 'Pick location on map'}
                 </button>
                 <button

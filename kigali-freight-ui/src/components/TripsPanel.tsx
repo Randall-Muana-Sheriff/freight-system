@@ -160,7 +160,7 @@ export default function TripsPanel() {
     const assign = async (trip: Trip) => {
         const username = await prompt({
             title: 'Assign this run',
-            body: `Type the driver's phone number exactly as it appears in the roster.\n\n${drivers.map((d) => `${d.fullName || d.username} — ${d.username}`).join('\n')}`,
+            body: `Type the driver's phone number exactly as it appears in the roster.\n\n${drivers.map((d) => `${d.fullName || d.username} · ${d.username}`).join('\n')}`,
             placeholder: '+2507…',
             required: true,
         });
@@ -309,7 +309,7 @@ export default function TripsPanel() {
                                         {stop.address_text
                                             || (stop.lat != null && stop.lng != null
                                                 ? `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}`
-                                                : 'No location — place it on the map')}
+                                                : 'No location. Place it on the map')}
                                     </span>
                                     <span className="block text-micro font-mono text-steel truncate">{stop.cargo_description}</span>
                                     {stop.failure_reason && (

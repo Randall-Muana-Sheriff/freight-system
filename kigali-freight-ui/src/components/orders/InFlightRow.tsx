@@ -85,7 +85,7 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
                     type="button"
                     onClick={() => void handleUnassign()}
                     disabled={busy}
-                    title="Unassign — send back to dispatch queue"
+                    title="Unassign. Sends it back to the dispatch queue"
                     className="shrink-0 flex items-center gap-1 bg-panel border border-rust/40 text-rust font-bold rounded px-2 text-micro uppercase disabled:opacity-50"
                 >
                     <Undo2 size={10} strokeWidth={2.5} />

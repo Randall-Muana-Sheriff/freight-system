@@ -105,7 +105,7 @@ export function AssignmentCard({
         {isOffer ? (
           <View style={styles.offerRow}>
             <Ionicons name="help-circle-outline" size={12} color={theme.colors.gold} />
-            <Text style={styles.offerText}>Offered — accept or decline</Text>
+            <Text style={styles.offerText}>Offered. Accept or decline</Text>
           </View>
         ) : null}
         {payAmount != null ? (

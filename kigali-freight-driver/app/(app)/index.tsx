@@ -200,7 +200,7 @@ export default function DashboardScreen() {
         tone: 'error',
         message: onShift
           ? 'Could not end your shift. Check your connection and try again.'
-          : 'Could not start your shift — location may be off or permission denied.',
+          : 'Could not start your shift. Location may be off, or permission denied.',
       });
     } finally {
       await checkShift();

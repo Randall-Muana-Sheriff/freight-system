@@ -22,7 +22,7 @@ const KIND_LABEL: Record<TripStop['kind'], string> = { PICKUP: 'Collect', DROP: 
 function describeStop(stop: TripStop) {
     if (stop.address_text) return stop.address_text;
     if (stop.lat != null && stop.lng != null) return `${stop.lat.toFixed(4)}, ${stop.lng.toFixed(4)}`;
-    return 'No location — call dispatch';
+    return 'No location. Call dispatch';
 }
 
 const FAILURE_REASONS = [

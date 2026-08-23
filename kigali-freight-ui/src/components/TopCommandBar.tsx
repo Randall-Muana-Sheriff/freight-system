@@ -1,6 +1,7 @@
 // src/components/TopCommandBar.tsx
 import { useState, useEffect, type ComponentType } from 'react';
-import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck, Copy, Check, Bell, Image as ImageIcon } from 'lucide-react';
+import { LogOut, PlugZap, Unplug, KeyRound, ChevronDown, Radio, Package, AlertTriangle, Truck, ShieldCheck, Copy, Check, Bell, Image as ImageIcon, CircleDashed } from 'lucide-react';
+import { proofLocation, proofLocationTitle } from './proofLocation';
 import { useSocket } from '../context/SocketContext';
 import { apiFetch, fetchMyAccount, enrollMfa, confirmMfa, disableMfa, type MfaEnrollResult } from '../utils/api';
 import { classifyFreshness, useNow } from '../utils/telemetryFreshness';
@@ -363,13 +364,24 @@ function NotificationBell() {
                                     <div className="space-y-1 pt-2 border-t border-line/10">
                                         <div className="text-micro text-steel uppercase tracking-wider font-mono">Recent deliveries &middot; proof of delivery</div>
                                         <div className="space-y-1">
-                                            {recentDeliveries.map((d) => (
-                                                <div key={d.id} className={`flex justify-between items-center p-1.5 rounded border text-micro ${d.location_flagged ? 'bg-hazard/10 border-hazard/40' : 'bg-ink/60 border-line/10'}`}>
+                                            {recentDeliveries.map((d) => {
+                                                const where = proofLocation(d);
+                                                return (
+                                                <div key={d.id} className={`flex justify-between items-center p-1.5 rounded border text-micro ${where === 'flagged' ? 'bg-hazard/10 border-hazard/40' : 'bg-ink/60 border-line/10'}`}>
                                                     <div className="min-w-0">
                                                         <div className="text-paper truncate max-w-[160px] flex items-center gap-1">
-                                                            {d.location_flagged && (
-                                                                <span title={`Confirmed ${Math.round(d.distance_from_target_m || 0)}m from the delivery point`}>
+                                                            {where === 'flagged' && (
+                                                                <span title={proofLocationTitle(d)}>
                                                                     <AlertTriangle size={10} strokeWidth={2.5} className="text-hazard shrink-0" />
+                                                                </span>
+                                                            )}
+                                                            {/* Quiet on purpose. Nothing is wrong with this
+                                                                delivery; we simply cannot vouch for where it
+                                                                happened, and a second alarm colour here would
+                                                                teach dispatchers to skip the real one. */}
+                                                            {where === 'unchecked' && (
+                                                                <span title={proofLocationTitle(d)}>
+                                                                    <CircleDashed size={10} strokeWidth={2} className="text-steel shrink-0" />
                                                                 </span>
                                                             )}
                                                             #{d.order_id} {d.cargo_description}
@@ -391,7 +403,8 @@ function NotificationBell() {
                                                         <OrderHistoryToggle orderId={d.order_id} jwtToken={jwtToken} />
                                                     </div>
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}

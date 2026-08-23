@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Send, Navigation, MapPin, CornerUpLeft, HelpCircle, ChevronRight } from 'lucide-react';
 import { assignOrders, offerOrders, fetchNearestDrivers, fetchReturnLoads, placeOrderOnMap, setOrderPriority } from '../../utils/api';
+import { describeAssignFailure } from './assignFailure';
 import { useMapInteraction } from '../../context/MapInteractionContext';
 import { useSocket } from '../../context/SocketContext';
 import { describeDriverChecks, type Order, type StaffUser, type DriverSuggestion, type ReturnLoadCandidate } from '../../types';
@@ -151,7 +152,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
             await assignOrders([order.id], selectedDriver, jwtToken);
             onAssigned();
         } catch (err) {
-            void alert({ title: 'Could not assign the order', body: (err as Error).message || 'Failed to assign order.', tone: 'danger' });
+            void alert(describeAssignFailure(err, 'assign'));
         } finally {
             setAssigning(false);
         }
@@ -229,7 +230,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                         value={priority}
                         disabled={changingPriority}
                         onChange={(e) => void handlePriority(e.target.value)}
-                        title="Change priority — the dispatch queue sorts on this"
+                        title="Change priority. The dispatch queue sorts on this"
                         aria-label={`Priority for ${order.cargo_description}`}
                         className={`bg-panel border rounded px-1 py-0.5 text-micro font-mono font-bold uppercase disabled:opacity-50 ${
                             priority === 'high' ? 'border-rust/50 text-rust'
@@ -376,7 +377,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
             {returnLoads ? (
                 <div className="text-micro font-mono">
                     {returnLoads.length === 0 ? (
-                        <span className="text-carbon">Nothing to collect near the drop — this one runs home empty.</span>
+                        <span className="text-carbon">Nothing to collect near the drop, so this one runs home empty.</span>
                     ) : (
                         <span className="text-tarp">
                             Return load:{' '}
@@ -410,7 +411,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                         const checks = describeDriverChecks(d);
                         return (
                             <option key={d.id} value={d.username}>
-                                {d.fullName || d.username}{checks ? ` — ${checks}` : ''}
+                                {d.fullName || d.username}{checks ? ` · ${checks}` : ''}
                             </option>
                         );
                     })}
@@ -450,7 +451,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                     type="button"
                     onClick={() => void handleOffer()}
                     disabled={offering || !selectedDriver}
-                    title="Offer this job — the driver can accept or turn it down"
+                    title="Offer this job. The driver can accept or turn it down"
                     className="shrink-0 flex items-center gap-1 bg-panel border border-line/15 text-carbon rounded px-2 text-micro uppercase disabled:opacity-50"
                 >
                     <HelpCircle size={10} strokeWidth={2.5} />

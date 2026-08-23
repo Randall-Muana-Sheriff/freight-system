@@ -116,10 +116,6 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
         }
     };
 
-    if (userRole !== 'admin' && userRole !== 'dispatcher') {
-        return null;
-    }
-
     // Matches what a dispatcher actually has in front of them when someone
     // rings: a cargo description, a hub, a name, or the tracking code off a
     // confirmation text.
@@ -173,6 +169,16 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     // Only the ones that can actually be placed. Offering "place 12" when
     // nine of them already have coordinates would walk a dispatcher through
     // re-pinning work that was already done.
+    // Below every hook, not above them. This used to sit near the top, which
+    // meant a viewer without dispatch rights returned before the keyboard
+    // effect was ever reached — so the component rendered a different number
+    // of hooks depending on who was looking at it. React only tolerates that
+    // while the role never changes; the moment one did, the hook order moved
+    // under it and the panel would tear down mid-render.
+    if (userRole !== 'admin' && userRole !== 'dispatcher') {
+        return null;
+    }
+
     const selectedUnplaced = activeOrders.filter(
         (o) => selected.has(o.id) && o.source === 'public' && o.pickup_lat == null,
     );
@@ -268,7 +274,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                     }`}
                 >
                     <MapPin size={11} strokeWidth={2.5} />
-                    {pickTargetMode ? 'Click the map for delivery point...' : pickedDeliveryCoords ? 'Delivery point set — click to change' : 'Pick delivery point on map'}
+                    {pickTargetMode ? 'Click the map for delivery point...' : pickedDeliveryCoords ? 'Delivery point set. Click to change' : 'Pick delivery point on map'}
                 </button>
                 <button
                     type="submit"
@@ -338,7 +344,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 dispatcher's monitor instead of a fixed sliver. */}
             <div className="max-h-[46vh] min-h-24 overflow-y-auto space-y-1.5">
                 {activeOrders.length === 0 && (
-                    <div className="text-steel text-center py-2 text-data">No pending orders — dispatch queue is clear.</div>
+                    <div className="text-steel text-center py-2 text-data">No pending orders. The dispatch queue is clear.</div>
                 )}
                 {activeOrders.length > 0 && visibleOrders.length === 0 && (
                     <div className="py-2 text-center text-data text-steel">

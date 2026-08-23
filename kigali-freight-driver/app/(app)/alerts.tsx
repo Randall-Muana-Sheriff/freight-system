@@ -25,7 +25,7 @@ export default function AlertsScreen() {
 
       <View style={styles.statusRow}>
         <View style={[styles.statusDot, connected ? styles.statusDotLive : styles.statusDotIdle]} />
-        <Text style={styles.statusText}>{connected ? "Connected — you'll get updates in real time" : 'Reconnecting…'}</Text>
+        <Text style={styles.statusText}>{connected ? "Connected. You'll get updates in real time" : 'Reconnecting…'}</Text>
       </View>
 
       {events.length > 0 ? (

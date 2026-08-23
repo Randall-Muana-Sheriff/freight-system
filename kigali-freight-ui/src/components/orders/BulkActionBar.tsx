@@ -12,6 +12,7 @@
 import { useState } from 'react';
 import { Send, Clock, X, MapPin } from 'lucide-react';
 import { assignOrders, offerOrders } from '../../utils/api';
+import { describeAssignFailure } from './assignFailure';
 import { useDialog } from '../DialogProvider';
 import type { StaffUser } from '../../types';
 
@@ -63,11 +64,7 @@ export default function BulkActionBar({ selectedIds, drivers, jwtToken, placeabl
             onClear();
             onDone();
         } catch (err) {
-            void alert({
-                title: kind === 'assign' ? 'Could not assign those loads' : 'Could not offer those loads',
-                body: (err as Error).message || 'Please try again.',
-                tone: 'danger',
-            });
+            void alert(describeAssignFailure(err, kind));
         } finally {
             setBusy(null);
         }

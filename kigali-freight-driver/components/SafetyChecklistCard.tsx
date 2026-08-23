@@ -90,7 +90,7 @@ export function SafetyChecklistCard() {
         setToast({
           icon: 'checkmark-circle-outline',
           tone: 'success',
-          message: 'Fault reported — dispatch has been notified.',
+          message: 'Fault reported. Dispatch has been notified.',
         });
         // Pull the banner again so the fault they just raised joins the ones
         // already on the vehicle, rather than appearing only on next visit.

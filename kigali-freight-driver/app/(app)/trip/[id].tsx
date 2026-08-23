@@ -256,7 +256,7 @@ export default function TripDetailScreen() {
       setToast({
         icon: 'alert-circle-outline',
         tone: 'error',
-        message: 'Could not open the camera. Try again — the delivery is not confirmed yet.',
+        message: 'Could not open the camera. Try again. The delivery is not confirmed yet.',
       });
     }
   };
@@ -276,7 +276,7 @@ export default function TripDetailScreen() {
       setToast({
         icon: 'alert-circle-outline',
         tone: 'error',
-        message: 'Could not open your photo library. Try again — the delivery is not confirmed yet.',
+        message: 'Could not open your photo library. Try again. The delivery is not confirmed yet.',
       });
     }
   };

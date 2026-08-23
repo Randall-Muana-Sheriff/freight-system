@@ -107,7 +107,7 @@ export default function KioskDevicesPanel() {
                     Kiosk displays
                 </h3>
                 <p className="text-steel text-[10.5px] leading-relaxed font-sans">
-                    Generate a link for a wall-mounted screen — control room, dispatch desk, warehouse. It shows the live
+                    Generate a link for a wall-mounted screen: control room, dispatch desk, warehouse. It shows the live
                     fleet map and status with no login and no way to change anything. Open the link once on that screen's
                     browser; it stays signed in from then on.
                 </p>
@@ -149,7 +149,7 @@ export default function KioskDevicesPanel() {
                                 {copied ? 'Copied' : 'Copy'}
                             </button>
                         </div>
-                        <div className="text-steel text-micro font-sans">This link won&apos;t be shown again — open it on the display now, or copy it somewhere safe.</div>
+                        <div className="text-steel text-micro font-sans">This link won&apos;t be shown again. Open it on the display now, or copy it somewhere safe.</div>
                     </div>
                 )}
             </div>

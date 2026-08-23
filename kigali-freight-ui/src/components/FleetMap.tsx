@@ -170,7 +170,7 @@ export default function FleetMap() {
                       <div className="text-slate-600 font-bold">Speed: {asset.velocityKmh} km/h</div>
                     )}
                     <div className="text-micro text-slate-400 mt-1">
-                      {isSelected ? 'Trail shown — click marker again to hide' : 'Click marker to show movement trail'}
+                      {isSelected ? 'Trail shown. Click the marker again to hide' : 'Click marker to show movement trail'}
                     </div>
                   </div>
                 </Popup>

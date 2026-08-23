@@ -87,9 +87,9 @@ function buildSuccessToast(result: IncidentReportResult): Toast {
   if (result.severity === 'high') {
     // The report still sent successfully — "warning" here means "this is
     // urgent, pay attention," not "something went wrong."
-    return { icon: 'alert-circle', message: 'Report sent — marked urgent, dispatch has been alerted.', tone: 'warning', note };
+    return { icon: 'alert-circle', message: 'Report sent. Marked urgent, and dispatch has been alerted.', tone: 'warning', note };
   }
-  return { icon: 'checkmark-circle-outline', message: 'Report sent — dispatch has been notified.', tone: 'success', note };
+  return { icon: 'checkmark-circle-outline', message: 'Report sent. Dispatch has been notified.', tone: 'success', note };
 }
 
 export default function IncidentsScreen() {
@@ -353,7 +353,7 @@ export default function IncidentsScreen() {
         setDescription('');
         setPhoto(null);
         setShowErrors(false);
-        setToast({ icon: 'cloud-offline-outline', message: "Saved offline — it'll send as soon as you're back in range.", tone: 'info' });
+        setToast({ icon: 'cloud-offline-outline', message: "Saved offline. It'll send as soon as you're back in range.", tone: 'info' });
         // Queued counts as sent from the driver's side: they are done, and
         // the report leaves when there is signal.
         setJustSent(true);
@@ -420,7 +420,7 @@ export default function IncidentsScreen() {
           }}
         >
           <Ionicons name="camera-outline" size={18} color={theme.colors.primary} />
-          <Text style={styles.photoAttachText}>Attach a photo — we&apos;ll help draft the report</Text>
+          <Text style={styles.photoAttachText}>Attach a photo and we&apos;ll help draft the report</Text>
         </TouchableOpacity>
       )}
 
@@ -482,7 +482,7 @@ export default function IncidentsScreen() {
           {justSent ? 'Report sent' : sending ? 'Sending…' : 'Send report'}
         </Text>
       </TouchableOpacity>
-      <Text style={styles.microcopy}>Works offline — we&apos;ll send it as soon as you&apos;re back in range.</Text>
+      <Text style={styles.microcopy}>Works offline. We&apos;ll send it as soon as you&apos;re back in range.</Text>
 
       <View style={styles.divider} />
 

@@ -136,7 +136,7 @@ export default function CompliancePanel() {
                 now, which is why it is stated as a consequence rather than
                 as a status. */}
             {expired.length > 0 && (
-                <Group label="Lapsed — driver cannot be assigned" tone="text-rust" issues={expired} />
+                <Group label="Lapsed (cannot be assigned)" tone="text-rust" issues={expired} />
             )}
             {soon.length > 0 && (
                 <Group label={`Within ${report.warningDays} days`} tone="text-steel" issues={soon} />

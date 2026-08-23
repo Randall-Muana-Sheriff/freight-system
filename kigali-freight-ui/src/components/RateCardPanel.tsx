@@ -22,7 +22,7 @@ import type { RateCard } from '../types';
 const FIELD_GROUPS: { title: string; hint: string; fields: { key: keyof RateCard; label: string; suffix?: string }[] }[] = [
     {
         title: 'Fuel',
-        hint: 'The figure that moves. RURA sets the diesel price nationally — change it here the day it changes there.',
+        hint: 'The figure that moves. RURA sets the diesel price nationally. Change it here the day it changes there.',
         fields: [
             { key: 'fuel_price_per_litre', label: 'Diesel price', suffix: 'RWF / litre' },
             { key: 'fuel_litres_per_100km', label: 'Consumption', suffix: 'L / 100km' },
@@ -206,7 +206,7 @@ export default function RateCardPanel() {
                 ))}
 
                 <label className="block max-w-xl">
-                    <span className="data-label text-steel">Why — kept on the card</span>
+                    <span className="data-label text-steel">Why (kept on the card)</span>
                     <input
                         type="text"
                         value={note}
@@ -240,7 +240,7 @@ export default function RateCardPanel() {
                             ? 'Saving…'
                             : changeCount === 0
                                 ? 'Change a figure to supersede'
-                                : `Supersede ${active} — ${changeCount} change${changeCount === 1 ? '' : 's'}`}
+                                : `Supersede ${active} · ${changeCount} change${changeCount === 1 ? '' : 's'}`}
                     </button>
                     {current?.note ? (
                         <p className="text-data text-steel">Card in force: {current.note}</p>

@@ -127,7 +127,7 @@ export default function DriverDocumentReview() {
             ? await prompt({
                 title: 'Why is this being rejected?',
                 body: 'The driver sees this, so say what they need to fix.',
-                placeholder: 'e.g. Photo is blurred — the expiry date is unreadable',
+                placeholder: 'e.g. Photo is blurred, the expiry date is unreadable',
                 confirmLabel: 'Reject',
                 tone: 'danger',
                 required: true,
@@ -376,7 +376,7 @@ export default function DriverDocumentReview() {
                                                     disabled={decidingId === doc.id}
                                                     onClick={() => void handleRevoke(doc.id, resolveDriverName(username), LABELS[type])}
                                                     className="bg-rust/15 hover:bg-rust/25 text-rust rounded p-1 disabled:opacity-50"
-                                                    title="Revoke approval — send back for re-verification"
+                                                    title="Revoke approval and send it back for re-verification"
                                                 >
                                                     <RotateCcw size={11} strokeWidth={3} />
                                                 </button>
