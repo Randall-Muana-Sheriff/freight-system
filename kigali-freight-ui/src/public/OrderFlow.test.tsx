@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderFlow, CARGO_FALLBACK } from './OrderFlow';
-import { fetchCargoTypes, submitOrder, fetchQuote } from './publicApi';
+import { fetchCargoTypes, submitOrder, fetchQuote, searchPlaces } from './publicApi';
 import { LanguageProvider } from './i18n';
 
 // These components read their labels from the language context and throw
@@ -13,6 +13,7 @@ vi.mock('./publicApi', () => ({
     fetchCargoTypes: vi.fn(),
     submitOrder: vi.fn(),
     fetchQuote: vi.fn(),
+    searchPlaces: vi.fn(),
 }));
 
 const mockedFetchCargoTypes = vi.mocked(fetchCargoTypes);
@@ -66,7 +67,10 @@ describe('OrderFlow — when do you need it', () => {
         expect(await screen.findByText('11,000 RWF')).toBeInTheDocument();
         expect(screen.getByText(/Estimated price/i)).toBeInTheDocument();
         expect(screen.getByText(/We confirm it once we have the pickup/i)).toBeInTheDocument();
-        expect(mockedFetchQuote).toHaveBeenCalledWith(400);
+        // No distance, because neither address has been pinned. This is the
+        // case that produces the minimum fare, and it is why an unpinned
+        // booking is quoted 15-48% under what the job actually costs.
+        expect(mockedFetchQuote).toHaveBeenCalledWith(400, undefined);
     });
 
     // The price is a convenience, not a precondition. If quoting fails the
@@ -198,5 +202,44 @@ describe('the cargo list when the server cannot be reached', () => {
         render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
 
         expect(await screen.findByRole('button', { name: 'General goods' })).toBeTruthy();
+    });
+});
+
+describe('pinning both addresses is what makes the price real', () => {
+    // The whole reason the address fields changed. Without coordinates the
+    // server has no distance, every quote falls to the minimum fare, and the
+    // form shows 15,000 RWF for a 50kg parcel and an 800kg pallet alike.
+    const KIMIRONKO = { label: 'Kimironko Market', lat: -1.944800, lng: 30.125600, source: 'hint' as const };
+    const NYABUGOGO = { label: 'Nyabugogo', lat: -1.939800, lng: 30.043500, source: 'hint' as const };
+
+    it('sends a distance once both ends are pinned, and none before', async () => {
+        const mockedSearch = vi.mocked(searchPlaces);
+        mockedSearch.mockReset()
+            .mockImplementation(async (q: string) =>
+                /nyabu/i.test(q) ? [NYABUGOGO] : [KIMIRONKO]);
+
+        const user = userEvent.setup();
+        render(inProvider(<OrderFlow onNavigate={vi.fn()} />));
+        await screen.findByPlaceholderText('150');
+        await user.type(screen.getByPlaceholderText('150'), '400');
+
+        // Weight alone: no distance to send.
+        await waitFor(() => expect(mockedFetchQuote).toHaveBeenCalledWith(400, undefined));
+
+        await user.type(screen.getByPlaceholderText('Gikondo Industrial Zone, gate 3'), 'nyabugogo');
+        await user.click(await screen.findByRole('option', { name: 'Nyabugogo' }));
+
+        // One end pinned is still no distance — it takes two points.
+        expect(mockedFetchQuote).not.toHaveBeenCalledWith(400, expect.any(Number));
+
+        await user.type(screen.getByPlaceholderText('Kimironko Market, shop 14'), 'kimironko');
+        await user.click(await screen.findByRole('option', { name: 'Kimironko Market' }));
+
+        await waitFor(() => {
+            const [, distance] = mockedFetchQuote.mock.calls.at(-1)!;
+            // PostGIS puts these two hubs 9.151km apart in a straight line.
+            // Not the road distance — the server applies its own factor.
+            expect(distance).toBeCloseTo(9.151, 1);
+        });
     });
 });

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { fetchCargoTypes, submitOrder, fetchQuote, type OrderDraft, type Quote } from './publicApi';
 import { useLanguage, useApiError } from './i18n';
+import { AddressField } from './AddressField';
+import { straightLineKm } from './straightLineKm';
 
 // Booking is paperwork, so it is styled as paperwork: daylight, ruled
 // fields, mono labels, no cards floating on a gradient. The restraint is
@@ -92,6 +94,15 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
     // failure: a price nobody can fetch should leave the form exactly as it
     // was before this feature existed, not put an error in front of someone
     // halfway through booking. The order still prices server-side on submit.
+    // Both ends pinned means the price can be real rather than a floor. One
+    // end pinned is worth nothing on its own — a distance needs two points —
+    // so this deliberately waits for the pair.
+    const pickup = draft.pickupLat !== undefined && draft.pickupLng !== undefined
+        ? { lat: draft.pickupLat, lng: draft.pickupLng } : null;
+    const dropoff = draft.deliveryLat !== undefined && draft.deliveryLng !== undefined
+        ? { lat: draft.deliveryLat, lng: draft.deliveryLng } : null;
+    const distanceKm = pickup && dropoff ? straightLineKm(pickup, dropoff) : undefined;
+
     useEffect(() => {
         const weight = Number(weightInput);
         if (!Number.isFinite(weight) || weight <= 0) {
@@ -102,7 +113,7 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
         setQuoting(true);
         let cancelled = false;
         const timer = setTimeout(() => {
-            fetchQuote(weight)
+            fetchQuote(weight, distanceKm)
                 .then((result) => {
                     if (!cancelled) setQuote(result);
                 })
@@ -117,7 +128,12 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [weightInput]);
+        // distanceKm belongs here as much as the weight does. Without it the
+        // quote would never be re-fetched when the customer pins an address,
+        // and the price would stay at the minimum fare no matter what they
+        // picked — the exact bug this change exists to fix, reintroduced one
+        // line below the fix.
+    }, [weightInput, distanceKm]);
 
     // The server owns this list and validates against it, so it is fetched
     // rather than hardcoded. But the dictionary is keyed by the very same
@@ -267,16 +283,36 @@ export function OrderFlow({ onNavigate }: { onNavigate: (path: string) => void }
                 <div className="mt-12 grid gap-7">
                     {step === 0 ? (
                         <>
-                            <label className="block">
-                                <span className="data-label text-pub-onpaper-soft">{t.order.collectFrom}</span>
-                                <input className={field} value={draft.pickupAddress} placeholder={t.order.collectPlaceholder}
-                                    onChange={(e) => setDraft({ ...draft, pickupAddress: e.target.value })} />
-                            </label>
-                            <label className="block">
-                                <span className="data-label text-pub-onpaper-soft">{t.order.deliverTo}</span>
-                                <input className={field} value={draft.deliveryAddress} placeholder={t.order.deliverPlaceholder}
-                                    onChange={(e) => setDraft({ ...draft, deliveryAddress: e.target.value })} />
-                            </label>
+                            {/* Picking a suggestion attaches coordinates, which
+                                is what lets the quote below use a real
+                                distance instead of falling to the minimum
+                                fare. Typing free text and ignoring the list
+                                still books — it just books at the old,
+                                weight-only estimate. */}
+                            <AddressField
+                                label={t.order.collectFrom}
+                                placeholder={t.order.collectPlaceholder}
+                                value={draft.pickupAddress}
+                                className={field}
+                                onChange={(text, place) => setDraft({
+                                    ...draft,
+                                    pickupAddress: text,
+                                    pickupLat: place?.lat,
+                                    pickupLng: place?.lng,
+                                })}
+                            />
+                            <AddressField
+                                label={t.order.deliverTo}
+                                placeholder={t.order.deliverPlaceholder}
+                                value={draft.deliveryAddress}
+                                className={field}
+                                onChange={(text, place) => setDraft({
+                                    ...draft,
+                                    deliveryAddress: text,
+                                    deliveryLat: place?.lat,
+                                    deliveryLng: place?.lng,
+                                })}
+                            />
                             <div className="grid gap-7">
                                 {/* Chips, not a <select>. "When do you need it"
                                     directly below this was already a row of

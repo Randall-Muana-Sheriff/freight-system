@@ -38,9 +38,31 @@ export interface TrackedShipment {
     } | null;
 }
 
+/** One place a customer can pick from as they type an address.
+ *
+ *  `source` says where the answer came from: 'hint' is a place the system
+ *  already knows and answers instantly, 'geocoder' is a lookup. It is shown
+ *  to nobody — it is here so the form can prefer a known place over a
+ *  geocoder guess when both match. */
+export interface PlaceSuggestion {
+    label: string;
+    lat: number;
+    lng: number;
+    source: 'hint' | 'geocoder';
+}
+
 export interface OrderDraft {
     pickupAddress: string;
     deliveryAddress: string;
+    /** Set only when the customer picked a suggestion rather than typing
+     *  free text. Optional on purpose: somebody on a bad connection, or
+     *  naming a place the geocoder has never heard of, must still be able
+     *  to book. Without these the booking behaves exactly as it did before
+     *  — priced from weight alone, and placed by a dispatcher later. */
+    pickupLat?: number;
+    pickupLng?: number;
+    deliveryLat?: number;
+    deliveryLng?: number;
     cargoType: string;
     weightKg: number;
     specialInstructions?: string;
@@ -120,9 +142,34 @@ export interface Quote {
 // someone is still typing. Weight alone: the vehicle class comes from it
 // server-side, the same way the order itself is priced, so what is shown
 // here and what is stored on submit cannot drift apart.
-export async function fetchQuote(weightKg: number): Promise<Quote> {
-    const response = await fetch(`${base()}/quote?weightKg=${encodeURIComponent(weightKg)}`);
+/** Prices a job.
+ *
+ *  `distanceKm` is the straight line between the two ends, NOT the road
+ *  distance — the server applies its own road factor, and passing a road
+ *  distance would have it multiplied a second time. Omitting it is what
+ *  produces the minimum fare, which is why a booking with no pinned
+ *  addresses is quoted low. */
+export async function fetchQuote(weightKg: number, distanceKm?: number): Promise<Quote> {
+    const query = new URLSearchParams({ weightKg: String(weightKg) });
+    if (distanceKm !== undefined) query.set('distanceKm', String(distanceKm));
+    const response = await fetch(`${base()}/quote?${query}`);
     return parse<Quote>(response);
+}
+
+/** Places matching what the customer has typed so far.
+ *
+ *  Returns nothing rather than throwing when the lookup fails. An address
+ *  box that cannot suggest is a mild loss — the customer types it out and
+ *  the booking still works — but one that throws mid-keystroke would take
+ *  the form down with it. */
+export async function searchPlaces(query: string, signal?: AbortSignal): Promise<PlaceSuggestion[]> {
+    try {
+        const response = await fetch(`${base()}/geocode?q=${encodeURIComponent(query)}`, { signal });
+        const result = await parse<{ results?: PlaceSuggestion[] }>(response);
+        return result?.results ?? [];
+    } catch {
+        return [];
+    }
 }
 
 export async function submitOrder(draft: OrderDraft): Promise<string> {
