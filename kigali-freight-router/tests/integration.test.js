@@ -1797,6 +1797,101 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(attempts.rows[0].n, 0, 'no payment attempt should exist for an unpriced job');
     });
 
+    // The pricing bug with an address cause.
+    //
+    // A booking arrives as two lines of free text, nobody turns it into
+    // coordinates until a dispatcher does, and until then the quote has no
+    // distance to price on — so it falls to the minimum fare. Measured on the
+    // real rate card that is 15 to 48 per cent below the true figure, and the
+    // customer is anchored on the low number before being asked for the real
+    // one at their door.
+    test('a booking with both ends pinned is priced on a real distance', async () => {
+        await resetPublicRateLimits();
+        const asText = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Nyabugogo taxi park', deliveryAddress: 'Kimironko Market, shop 14',
+            cargoType: 'General goods', weightKg: 400,
+            customerName: 'Unpinned Booking', customerPhone: '0788556201',
+        });
+        assert.equal(asText.statusCode, 201, JSON.stringify(asText.body));
+
+        await resetPublicRateLimits();
+        const pinned = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Nyabugogo taxi park', deliveryAddress: 'Kimironko Market, shop 14',
+            cargoType: 'General goods', weightKg: 400,
+            customerName: 'Pinned Booking', customerPhone: '0788556202',
+            pickupLat: -1.9441, pickupLng: 30.0619, deliveryLat: -1.9498, deliveryLng: 30.1263,
+        });
+        assert.equal(pinned.statusCode, 201, JSON.stringify(pinned.body));
+
+        const rows = await pool.query(
+            `SELECT customer_name, price_total, price_is_estimate, price_distance_km, pickup_lat
+               FROM orders WHERE tracking_token = ANY($1)`,
+            [[asText.body.data.trackingToken, pinned.body.data.trackingToken]]
+        );
+        const unpinned = rows.rows.find((r) => r.customer_name === 'Unpinned Booking');
+        const placed = rows.rows.find((r) => r.customer_name === 'Pinned Booking');
+
+        assert.equal(unpinned.price_is_estimate, true, 'no coordinates means no distance means an estimate');
+        assert.equal(unpinned.price_distance_km, null);
+
+        assert.equal(placed.price_is_estimate, false, 'pinned at booking is a firm price, not an estimate');
+        assert.ok(Number(placed.price_distance_km) > 0, 'and it was priced on a real distance');
+        assert.ok(placed.pickup_lat !== null, 'the order arrives already placed');
+
+        // The whole point: the same job, priced honestly, costs more than the
+        // minimum fare it used to fall back to.
+        assert.ok(
+            Number(placed.price_total) > Number(unpinned.price_total),
+            `a real distance should price above the minimum fare: ${placed.price_total} vs ${unpinned.price_total}`
+        );
+    });
+
+    // Coordinates from a public form are not coordinates from a dispatcher's
+    // map click. Each refusal has to name its own cause: one message for all
+    // three read as "not in Rwanda" even when the problem was a missing half.
+    test('public coordinates are checked, and each refusal says why', async () => {
+        const cases = [
+            ['PUBLIC_ORDER_COORDS_OUT_OF_AREA',
+                { pickupLat: -1.29, pickupLng: 36.82, deliveryLat: -1.30, deliveryLng: 36.83 }],
+            ['PUBLIC_ORDER_COORDS_INCOMPLETE',
+                { pickupLat: -1.9441, pickupLng: 30.0619 }],
+            ['PUBLIC_ORDER_COORDS_MALFORMED',
+                { pickupLat: 'north', pickupLng: 30.06, deliveryLat: -1.95, deliveryLng: 30.1 }],
+        ];
+        for (const [expected, coords] of cases) {
+            await resetPublicRateLimits();
+            const response = await request(app).post('/api/public/orders').send({
+                pickupAddress: 'Nyabugogo', deliveryAddress: 'Kimironko',
+                cargoType: 'General goods', weightKg: 100,
+                customerName: 'Coord Guard', customerPhone: '0788556203', ...coords,
+            });
+            assert.equal(response.statusCode, 400, `${expected} should be a 400`);
+            assert.equal(response.body.error.code, expected);
+        }
+
+        const stored = await pool.query("SELECT COUNT(*)::int AS n FROM orders WHERE customer_name = 'Coord Guard'");
+        assert.equal(stored.rows[0].n, 0, 'a refused booking must not be stored');
+    });
+
+    test('address suggestions answer from cache before reaching the geocoder', async () => {
+        const tooShort = await request(app).get('/api/public/geocode?q=ki');
+        assert.equal(tooShort.statusCode, 200);
+        assert.deepEqual(tooShort.body.data.results, [], 'two letters match half of Kigali');
+
+        const suggestions = await request(app).get('/api/public/geocode?q=gikondo');
+        assert.equal(suggestions.statusCode, 200);
+        const results = suggestions.body.data.results;
+        assert.ok(results.length > 0, 'a known place should suggest something');
+        // One place offered once. Several cached tokens resolve to the same
+        // point, and offering a customer three identical lines to choose
+        // between is not a choice.
+        assert.equal(new Set(results.map((r) => r.label)).size, results.length, 'no duplicate places');
+        for (const r of results) {
+            assert.ok(['hint', 'geocoder'].includes(r.source));
+            assert.ok(Number.isFinite(r.lat) && Number.isFinite(r.lng));
+        }
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');

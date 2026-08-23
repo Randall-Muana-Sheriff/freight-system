@@ -3,6 +3,7 @@
 // rather than a backstop behind a login.
 import express from 'express';
 import { PublicOrderController } from '../controllers/publicOrderController.js';
+import { PublicGeocodeController } from '../controllers/publicGeocodeController.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 
 const router = express.Router();
@@ -21,12 +22,22 @@ const publicTrackLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 120, keyPref
 
 const publicContactLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 5, keyPrefix: 'public-contact' });
 
+// Tighter than the dispatcher's 30 a minute, because this one faces the
+// public and sits on top of a service Nominatim lets us use on the
+// understanding that we keep to one request a second. A person typing an
+// address with a sane debounce sends a handful; anything past twenty a
+// minute from one address is a broken frontend or somebody using us as a
+// free geocoding proxy, and both should be stopped before they reach
+// Nominatim rather than after.
+const publicGeocodeLimit = rateLimit({ windowMs: 60 * 1000, max: 20, keyPrefix: 'public-geocode' });
+
 router.get('/cargo-types', publicTrackLimit, PublicOrderController.getCargoTypes);
 // Read-only pricing. Shares the tracking limiter rather than the far
 // stricter order limiter: quoting is something a visitor does repeatedly
 // while adjusting weight or vehicle, and it writes nothing.
 router.get('/quote', publicTrackLimit, PublicOrderController.getQuote);
 router.post('/orders', publicOrderLimit, PublicOrderController.createOrder);
+router.get('/geocode', publicGeocodeLimit, PublicGeocodeController.suggest);
 router.get('/track/:token', publicTrackLimit, PublicOrderController.trackOrder);
 router.post('/contact', publicContactLimit, PublicOrderController.submitContact);
 

@@ -9,9 +9,9 @@ import { dispatchExternalAlert, escapeAlertText, ALERT_CATEGORY } from '../servi
 import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
 import { PricingError, needsManualQuote, MAX_SELF_SERVICE_KG } from '../services/pricingService.js';
-import { priceJob } from '../services/pricingRepository.js';
+import { distanceKmBetween, priceJob } from '../services/pricingRepository.js';
 import { normalizePhone } from '../utils/phone.js';
-import { isValidWeightKg } from '../utils/validators.js';
+import { isValidWeightKg, isWithinMarket } from '../utils/validators.js';
 import { toSignedUrl } from '../config/r2Client.js';
 
 // Ambiguity-free alphabet: no O/0, I/1, S/5. These codes get read aloud
@@ -60,6 +60,41 @@ const TOO_HEAVY = {
     message: `Loads over ${MAX_SELF_SERVICE_KG / 1000} tonnes are quoted by hand. Tell us about the load and we will come back with a price.`,
 };
 
+// Both ends, or neither, or a refusal.
+//
+// A booking with only one end pinned would price on a distance measured from
+// a point nobody chose, which is worse than the honest estimate it would
+// otherwise get -- so a half-placed booking is treated as unplaced rather
+// than half-trusted.
+// Returns coordinates, or null for a plain-text booking, or a refusal that
+// says which of the three things went wrong. One message for all three read
+// as "not in Rwanda" even when the real problem was a missing half or a word
+// where a number should be, which sends somebody to re-pick a map location
+// that was never the issue.
+function coordinatePair(body) {
+    const raw = ['pickupLat', 'pickupLng', 'deliveryLat', 'deliveryLng']
+        .map((k) => (body?.[k] === undefined || body?.[k] === null || body?.[k] === '' ? null : Number(body[k])));
+    const [pickupLat, pickupLng, deliveryLat, deliveryLng] = raw;
+
+    if (raw.every((n) => n === null)) return null;
+
+    if (raw.some((n) => n !== null && !Number.isFinite(n))) {
+        return { error: 'PUBLIC_ORDER_COORDS_MALFORMED',
+            message: 'Those map locations could not be read. Pick them again, or leave them out.' };
+    }
+    if (raw.some((n) => n === null)) {
+        // Half a pair prices on a distance measured from a point nobody
+        // chose, which is worse than the honest estimate it would get.
+        return { error: 'PUBLIC_ORDER_COORDS_INCOMPLETE',
+            message: 'Pick both the pickup and the delivery on the map, or neither.' };
+    }
+    if (!isWithinMarket(pickupLat, pickupLng) || !isWithinMarket(deliveryLat, deliveryLng)) {
+        return { error: 'PUBLIC_ORDER_COORDS_OUT_OF_AREA',
+            message: 'We only deliver within Rwanda. Pick locations inside the country, or leave them out.' };
+    }
+    return { pickupLat, pickupLng, deliveryLat, deliveryLng };
+}
+
 export const PublicOrderController = {
     // GET /api/public/quote?weightKg=&distanceKm=
     //
@@ -76,17 +111,46 @@ export const PublicOrderController = {
     async getQuote(req, res) {
         try {
             const weightKg = Number(req.query.weightKg);
-            const hasDistance = req.query.distanceKm !== undefined && req.query.distanceKm !== '';
-            const distanceKm = hasDistance ? Number(req.query.distanceKm) : null;
-
             if (needsManualQuote(weightKg)) return fail(res, TOO_HEAVY);
+
+            // Distance is derived here from the two points, never taken from
+            // the caller.
+            //
+            // This endpoint used to accept distanceKm as a query parameter,
+            // which was wrong twice over. It let the client decide an input
+            // that sets the price — anyone could ask for a quote with
+            // distanceKm=0.1 and be shown the minimum fare for a cross-city
+            // job — and it put the same calculation in two places, which is
+            // how the site and the server end up disagreeing about what a
+            // delivery costs.
+            //
+            // The straight line is the right thing to compute: priceJob
+            // applies road_distance_factor itself, because a Kigali road runs
+            // about 1.6 times the crow's flight and charging the straight
+            // line undercharges every job.
+            const place = coordinatePair(req.query);
+            if (place?.error) {
+                return fail(res, { status: 400, code: place.error, message: place.message });
+            }
+            const distanceKm = place
+                ? await distanceKmBetween(
+                    { lat: place.pickupLat, lng: place.pickupLng },
+                    { lat: place.deliveryLat, lng: place.deliveryLng })
+                : null;
 
             // Goes through priceJob, the same function order creation uses,
             // rather than picking a rate card here. The booking form has no
             // vehicle-class selector -- the class is derived from weight -- so
             // choosing a card any other way would let the site show a price
             // that the order then stores differently.
-            const priced = await priceJob({ weightKg, distanceKm });
+            const priced = await priceJob({
+                weightKg,
+                distanceKm,
+                ...(place ? {
+                    pickup: { lat: place.pickupLat, lng: place.pickupLng },
+                    delivery: { lat: place.deliveryLat, lng: place.deliveryLng },
+                } : {}),
+            });
 
             // The customer is told the total and nothing else. What the
             // platform keeps and what the driver nets are on the same
@@ -124,6 +188,26 @@ export const PublicOrderController = {
         try {
             const pickup = cleanText(req.body?.pickupAddress, LIMITS.address);
             const delivery = cleanText(req.body?.deliveryAddress, LIMITS.address);
+
+            // Coordinates, when the customer picked a suggestion rather than
+            // just typing. Optional on purpose: somebody on a bad connection,
+            // or naming a place the geocoder has never heard of, must still
+            // be able to book. Without them this degrades to exactly what it
+            // did before -- free text, placed by a dispatcher later.
+            //
+            // Validated rather than trusted, and against Rwanda rather than
+            // the globe. These arrive from an endpoint anyone can call, and
+            // isValidLat alone would happily accept a Kigali delivery pinned
+            // to the middle of the Pacific, which would then flow through to
+            // a distance, a price and a driver's map.
+            //
+            // Both ends or neither. A half-placed order prices on a distance
+            // measured from a point nobody chose, which is worse than the
+            // honest estimate it would otherwise get.
+            const place = coordinatePair(req.body);
+            if (place?.error) {
+                return fail(res, { status: 400, code: place.error, message: place.message });
+            }
             const cargoType = cleanText(req.body?.cargoType, LIMITS.cargo);
             const customerName = cleanText(req.body?.customerName, LIMITS.name);
             const rawPhone = cleanText(req.body?.customerPhone, LIMITS.phone);
@@ -167,7 +251,24 @@ export const PublicOrderController = {
             // a firm price when a dispatcher places the order.
             let priced;
             try {
-                priced = await priceJob({ weightKg, distanceKm: null });
+                // With both ends pinned there is a real distance, so the
+                // customer sees the price they will actually be asked for.
+                // Without them it is class and weight only, flagged as an
+                // estimate -- which is the case that quoted 15 to 48 per cent
+                // low, because every such job fell back to the minimum fare.
+                const distanceKm = place
+                    ? await distanceKmBetween(
+                        { lat: place.pickupLat, lng: place.pickupLng },
+                        { lat: place.deliveryLat, lng: place.deliveryLng })
+                    : null;
+                priced = await priceJob({
+                    weightKg,
+                    distanceKm,
+                    ...(place ? {
+                        pickup: { lat: place.pickupLat, lng: place.pickupLng },
+                        delivery: { lat: place.deliveryLat, lng: place.deliveryLng },
+                    } : {}),
+                });
             } catch (err) {
                 if (err instanceof PricingError) {
                     return fail(res, {
@@ -188,17 +289,26 @@ export const PublicOrderController = {
                              customer_name, customer_phone, customer_email,
                              pickup_address_text, delivery_address_text, special_instructions,
                              needed_by,
+                             pickup_lat, pickup_lng, delivery_lat, delivery_lng,
+                             pickup_coordinates, delivery_coordinates, pickup_geom, delivery_geom,
                              pricing_rate_id, priced_vehicle_class, quoted_total,
                              price_total, price_fuel, price_service,
                              platform_fee, driver_net, price_distance_km, price_is_estimate, currency)
                          VALUES ($1, $2, 'PENDING', 'public', $3, $4, $5, $6, $7, $8, $9, $10,
+                                 $21::numeric, $22::numeric, $23::numeric, $24::numeric,
+                                 CASE WHEN $21::numeric IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($22, $21), 4326) END,
+                                 CASE WHEN $23::numeric IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($24, $23), 4326) END,
+                                 CASE WHEN $21::numeric IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($22, $21), 4326) END,
+                                 CASE WHEN $23::numeric IS NULL THEN NULL ELSE ST_SetSRID(ST_MakePoint($24, $23), 4326) END,
                                  $11, $12, $13, $13, $14, $15, $16, $17, $18, $19, $20)
                          RETURNING tracking_token AS "trackingToken"`,
                         [cargoType, weightKg, generateTrackingToken(), customerName, customerPhone,
                          customerEmail, pickup, delivery, instructions, neededBy,
                          priced.pricingRateId, priced.vehicleClass, priced.totalAmount,
                          priced.fuelAmount, priced.serviceAmount, priced.platformFee,
-                         priced.driverNet, priced.distanceKm, priced.isEstimate, priced.currency]
+                         priced.driverNet, priced.distanceKm, priced.isEstimate, priced.currency,
+                         place?.pickupLat ?? null, place?.pickupLng ?? null,
+                         place?.deliveryLat ?? null, place?.deliveryLng ?? null]
                     );
                     created = result.rows[0];
                 } catch (err) {

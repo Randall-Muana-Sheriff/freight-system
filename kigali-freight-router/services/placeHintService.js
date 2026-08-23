@@ -114,3 +114,44 @@ export async function unresolvedTokensForBacklog() {
     const alreadyTried = new Set(known.map((r) => r.token));
     return tokens.filter((t) => !alreadyTried.has(t));
 }
+
+// Places we already know, matched on what somebody has typed so far.
+//
+// Read-only from the public path, deliberately. A booking form could
+// otherwise write a row for every keystroke — "k", "ki", "kim" — filling an
+// ops table with fragments nobody asked about and handing an anonymous
+// caller a way to grow it without limit. Rows get here from the warm sweep
+// over real order addresses; this only reads them.
+//
+// The value is that a Kigali booking form asks for the same twenty places
+// all day, and after the first time each one is answered from Postgres in a
+// millisecond instead of a throttled second from Nominatim.
+export async function searchHints(query, { limit = 5 } = {}) {
+    const token = normalizeToken(query);
+    if (token.length < 3) return [];
+
+    // DISTINCT ON the label, not the token.
+    //
+    // Several tokens resolve to one place: "gikondo", "gikondo depot gate 3"
+    // and "gikondo industrial zone" all backed off to the same point, so a
+    // naive prefix search offered a customer the same address three times and
+    // asked them to choose between identical lines. The shortest token wins,
+    // because it is the one that named the place rather than a delivery
+    // inside it.
+    const { rows } = await pool.query(
+        `SELECT DISTINCT ON (label) label, lat, lng, token
+           FROM place_hints
+          WHERE lat IS NOT NULL AND token LIKE $1 || '%'
+          ORDER BY label, length(token) ASC
+          LIMIT $2`,
+        [token, limit]
+    );
+    return rows
+        .sort((a, b) => a.token.length - b.token.length)
+        .map((r) => ({
+            label: r.label,
+            lat: Number(r.lat),
+            lng: Number(r.lng),
+            source: 'hint',
+        }));
+}
