@@ -1452,6 +1452,14 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         const row = queue.body.data.find((o) => o.tracking_token === token);
         assert.ok(row, 'customer order should be in the dispatch queue');
 
+        // A public booking arrives as free text, and an unplaced order can no
+        // longer be dispatched — so placing it is now part of the journey this
+        // test walks, exactly as it is for a real dispatcher.
+        const place = await request(app).patch(`/api/orders/${row.id}/place`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ pickupLat: -1.9797, pickupLng: 30.0772, deliveryLat: -1.9498, deliveryLng: 30.1263 });
+        assert.equal(place.statusCode, 200, JSON.stringify(place.body));
+
         const assign = await request(app).post('/api/orders/assign')
             .set('Authorization', `Bearer ${adminToken}`)
             .send({ orderIds: [row.id], driverName: driverPhone });
@@ -1621,6 +1629,54 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             .send({ orderIds: [id], priority: 'urgent' });
         assert.equal(bad.statusCode, 400);
         assert.equal(bad.body.error.code, 'ORDERS_PRIORITY_INVALID');
+    });
+
+    // A public booking arrives as two lines of free text. Until a dispatcher
+    // pins it, nobody has confirmed the address exists — and three things
+    // fail quietly behind an unplaced dispatch: it cannot be distance-ranked,
+    // it stays priced as an estimate because repricing only happens on
+    // placement, and confirmDelivery's location check is skipped, recording
+    // the delivery as "not flagged" when the truth is "not checked".
+    //
+    // Assignment used to allow it. Three orders in a real database had reached
+    // a driver with no coordinates at all before this guard existed.
+    test('an unplaced booking cannot be sent to a driver by any route', async () => {
+        await resetPublicRateLimits();
+        const create = await request(app).post('/api/public/orders').send({
+            pickupAddress: 'Somewhere nobody has pinned', deliveryAddress: 'Nor here',
+            cargoType: 'General goods', weightKg: 100,
+            customerName: 'Unplaced Test', customerPhone: '0788556190',
+        });
+        assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+        const queue = await request(app).get('/api/orders/active')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const row = queue.body.data.find((o) => o.tracking_token === create.body.data.trackingToken);
+        assert.equal(row.pickup_lat, null, 'a public booking starts unplaced');
+
+        // Both routes an order can travel to reach a driver, or the guard on
+        // one is simply a way round to the other.
+        for (const [path, body] of [
+            ['/api/orders/assign', { orderIds: [row.id], driverName: driverPhone }],
+            ['/api/orders/offer', { orderIds: [row.id], driverName: driverPhone, minutes: 10 }],
+        ]) {
+            const response = await request(app).post(path)
+                .set('Authorization', `Bearer ${adminToken}`).send(body);
+            assert.equal(response.statusCode, 409, `${path} should refuse an unplaced order`);
+            assert.equal(response.body.error.code, 'ORDERS_ASSIGN_UNPLACED', `${path} refused for the wrong reason`);
+            assert.match(response.body.error.message, /place it on the map/i);
+        }
+
+        // And it goes through the moment it is placed, so the guard is a
+        // sequencing rule rather than a wall.
+        const placed = await request(app).patch(`/api/orders/${row.id}/place`)
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ pickupLat: -1.9536, pickupLng: 30.0606, deliveryLat: -1.9706, deliveryLng: 30.1044 });
+        assert.equal(placed.statusCode, 200, JSON.stringify(placed.body));
+
+        const afterPlacing = await request(app).post('/api/orders/assign')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [row.id], driverName: driverPhone });
+        assert.equal(afterPlacing.statusCode, 200, `placing should unblock assignment: ${JSON.stringify(afterPlacing.body)}`);
     });
 
     test('public: a contact enquiry is stored and raises an alert', async () => {

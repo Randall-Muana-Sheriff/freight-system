@@ -71,6 +71,34 @@ const ARRIVAL_STATUSES = ['AT_PICKUP', 'ARRIVED'];
 // shouldn't block a driver from closing out a real delivery.
 const DELIVERY_LOCATION_FLAG_METERS = 500;
 
+// An order is not ready for a driver until somebody has said where it goes.
+//
+// Placing it is what turns two lines of free text into a location, a distance
+// and a real price. Dispatching an unplaced one sends a driver to an address
+// nobody confirmed exists, and three other things fail quietly behind it: the
+// order cannot be distance-ranked, it stays priced as an estimate for ever
+// because repricing only happens on placement, and confirmDelivery's location
+// check is skipped -- recording the delivery as "not flagged" when the truth
+// is "not checked", which looks identical afterwards.
+//
+// This only ever catches public bookings. Dispatcher-created orders derive
+// pickup from their hub and require a delivery point at creation, so they are
+// placed by construction.
+function unplacedAmong(rows) {
+    return rows.filter((r) => r.pickup_lat === null || r.delivery_lat === null).map((r) => r.id);
+}
+
+function unplacedFailure(ids) {
+    const list = ids.map((id) => `#${id}`).join(', ');
+    return {
+        status: 409,
+        code: 'ORDERS_ASSIGN_UNPLACED',
+        message: ids.length === 1
+            ? `Order ${list} has no confirmed pickup and delivery point yet. Place it on the map before sending it to a driver.`
+            : `These orders have no confirmed pickup and delivery point yet: ${list}. Place them on the map before sending them to a driver.`,
+    };
+}
+
 // A refusal that names itself, so placing many orders can report which one
 // failed and why without each failure being an HTTP response.
 class PlacementError extends Error {
@@ -647,7 +675,7 @@ export const OrderController = {
             }
 
             // Select matching pending orders using a FOR UPDATE lock to freeze rows until transaction completes
-            const verificationQuery = `SELECT id, weight_kg FROM orders WHERE id = ANY($1) AND status = 'PENDING' FOR UPDATE;`;
+            const verificationQuery = `SELECT id, weight_kg, pickup_lat, delivery_lat FROM orders WHERE id = ANY($1) AND status = 'PENDING' FOR UPDATE;`;
             const verificationResult = await client.query(verificationQuery, [orderIds]);
 
             if (verificationResult.rows.length !== orderIds.length) {
@@ -657,6 +685,12 @@ export const OrderController = {
                     code: 'ORDERS_ASSIGN_CONFLICT',
                     message: 'Assignment conflict. One or more orders were altered by another session.',
                 });
+            }
+
+            const unplaced = unplacedAmong(verificationResult.rows);
+            if (unplaced.length > 0) {
+                await client.query('ROLLBACK');
+                return fail(res, unplacedFailure(unplaced));
             }
 
             // Capacity check — only enforced when the vehicle actually has a
@@ -772,7 +806,7 @@ export const OrderController = {
             await client.query('BEGIN');
 
             const currentResult = await client.query(
-                `SELECT id, status, assigned_to, weight_kg FROM orders WHERE id = $1 FOR UPDATE;`,
+                `SELECT id, status, assigned_to, weight_kg, pickup_lat, delivery_lat FROM orders WHERE id = $1 FOR UPDATE;`,
                 [id]
             );
             if (currentResult.rows.length === 0) {
@@ -780,6 +814,16 @@ export const OrderController = {
                 return fail(res, { status: 404, code: 'ORDERS_NOT_FOUND', message: 'Order record not found.' });
             }
             const order = currentResult.rows[0];
+
+            // A reassignment still puts the order in front of a driver, so it
+            // is gated too. This is also the one path that can catch an order
+            // dispatched before this rule existed: reassigning it now refuses
+            // until somebody places it, which is the right nudge.
+            const unplacedReassign = unplacedAmong([order]);
+            if (unplacedReassign.length > 0) {
+                await client.query('ROLLBACK');
+                return fail(res, unplacedFailure(unplacedReassign));
+            }
 
             if (order.status !== 'ASSIGNED') {
                 await client.query('ROLLBACK');
@@ -1722,7 +1766,7 @@ export const OrderController = {
             // Locked, and only from PENDING. Two dispatchers working the same
             // queue must not be able to offer one job to two drivers.
             const locked = await client.query(
-                `SELECT id FROM orders WHERE id = ANY($1) AND status = 'PENDING' FOR UPDATE`,
+                `SELECT id, pickup_lat, delivery_lat FROM orders WHERE id = ANY($1) AND status = 'PENDING' FOR UPDATE`,
                 [orderIds]
             );
             if (locked.rows.length !== orderIds.length) {
@@ -1732,6 +1776,15 @@ export const OrderController = {
                     code: 'ORDERS_NOT_OFFERABLE',
                     message: 'One of those is no longer waiting to be offered — someone may have taken it already.',
                 });
+            }
+
+            // Same rule as assignment. An offer is the other way an order
+            // reaches a driver, so it has to be the same gate or it is a way
+            // round the first one.
+            const unplacedOffers = unplacedAmong(locked.rows);
+            if (unplacedOffers.length > 0) {
+                await client.query('ROLLBACK');
+                return fail(res, unplacedFailure(unplacedOffers));
             }
 
             const updated = await client.query(
