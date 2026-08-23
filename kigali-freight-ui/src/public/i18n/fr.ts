@@ -40,6 +40,9 @@ export const fr: Strings = {
         eyebrow: 'Suivi',
         codeLabel: 'Code de suivi',
         finding: 'Recherche de votre expédition',
+        idleTitle: 'Le code se trouve dans votre SMS de confirmation.',
+        idleBody: 'Il ressemble à INZ-XXXXXXXX et arrive par SMS dès qu’une commande est passée. Sans compte, et sans rien à quoi se connecter.',
+        idleNoCode: 'Vous n’avez encore rien commandé ?',
         collectFrom: 'Enlèvement à',
         deliverTo: 'Livraison à',
         driver: 'Chauffeur',
@@ -74,6 +77,7 @@ export const fr: Strings = {
         tagline: 'Du fret dans tout Kigali, avec la position de chaque expédition visible par celui qui l’a envoyée.',
     },
     hero: {
+        headline: 'Du fret à travers Kigali, visible d’un bout à l’autre.',
         trackPrompt: 'Suivez votre marchandise',
     },
     services: {

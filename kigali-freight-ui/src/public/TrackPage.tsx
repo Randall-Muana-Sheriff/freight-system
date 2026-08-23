@@ -98,6 +98,24 @@ export function TrackPage({ initialCode, onNavigate }: { initialCode: string; on
                     </div>
                 ) : null}
 
+                {/* Nothing asked for yet. Arriving from the nav rather than
+                    from a confirmation text used to give a heading, a field and
+                    roughly 300px of empty page before the footer — a dead end
+                    for the one visitor who does not already know what a code
+                    is. Says where the code comes from, and offers the way on
+                    for somebody who has not booked at all. */}
+                {!shipment && !error && !loading ? (
+                    <div className="mt-10 max-w-xl border-l-2 border-pub-onink/15 pl-5">
+                        <p className="text-[17px] text-pub-onink">{t.track.idleTitle}</p>
+                        <p className="mt-2 text-[15px] leading-relaxed text-pub-onink-soft">{t.track.idleBody}</p>
+                        <p className="mt-6 data-label text-pub-onink-soft">{t.track.idleNoCode}</p>
+                        <button onClick={() => onNavigate('/order')}
+                            className="focus-ring mt-2 rounded-md bg-pub-laterite px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
+                            {t.actions.book}
+                        </button>
+                    </div>
+                ) : null}
+
                 {shipment ? (
                     <div className="mt-12">
                         <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b border-pub-onink/15 pb-6">

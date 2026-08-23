@@ -260,38 +260,50 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                         half-empty hero and no diagram in it. */}
                     <div className="relative z-10 grid gap-10 md:grid-cols-[1fr_1fr] md:items-center md:gap-12">
                     <div>
-                        {/* One thing to do, said once. The hero previously
-                            carried an eyebrow, a headline and a paragraph
-                            above these controls, which meant three pieces of
-                            copy competing with the only two actions on the
-                            page. */}
+                        {/* What the business does, then the two things you
+                            can do about it.
+
+                            This led with "Track your cargo" and made booking
+                            the outlined secondary, on the reasoning that people
+                            arriving with a code outnumber people arriving to
+                            book. That is a fair bet for an established carrier
+                            and the wrong one here: nobody holds a code yet, so
+                            every visitor is a first-time one being shown a
+                            control they cannot use and no statement of what is
+                            being sold.
+
+                            Still one line of copy, not three — the previous
+                            author was right that a headline, an eyebrow and a
+                            paragraph would crowd the only two actions here. */}
                         <h1 className="display-hero text-[clamp(1.9rem,4.4vw,3.1rem)] text-pub-onink">
-                            {t.hero.trackPrompt}
+                            {t.hero.headline}
                         </h1>
 
-                        <form data-tour="track"
-                            onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
-                            className="mt-6 flex flex-col gap-2 sm:flex-row">
-                            <label htmlFor="hero-track" className="sr-only">{t.track.codeLabel}</label>
-                            {/* A filled field rather than the underline used
-                                elsewhere on the site: this is the hero's
-                                subject now, not one control among several. */}
-                            <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)}
-                                placeholder={t.misc.codePlaceholder}
-                                className="focus-ring min-w-0 flex-1 rounded-md border border-pub-onink/20 bg-pub-ink2 px-4 py-3.5 font-mono text-sm uppercase text-pub-onink placeholder:text-pub-onink-soft/50 focus:border-pub-onink/50 focus:outline-none" />
-                            <button type="submit"
-                                className="focus-ring rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
-                                {t.actions.trackSubmit}
-                            </button>
-                        </form>
-
-                        {/* Secondary to tracking: someone arriving with a code
-                            in hand outnumbers someone arriving to book, and
-                            the card below repeats this anyway. */}
                         <button data-tour="book" onClick={() => onNavigate('/order')}
-                            className="focus-ring mt-4 rounded-md border border-pub-onink/25 px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:border-pub-onink hover:bg-pub-onink/5">
+                            className="focus-ring mt-7 rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                             {t.actions.book}
                         </button>
+
+                        {/* Tracking keeps its own field rather than becoming a
+                            link: someone who does hold a code should not have
+                            to load another page to use it. Demoted, not
+                            hidden. */}
+                        <div data-tour="track" className="mt-8 border-t border-pub-onink/15 pt-5">
+                            <label htmlFor="hero-track" className="data-label text-pub-onink-soft">
+                                {t.misc.haveACode}
+                            </label>
+                            <form
+                                onSubmit={(e) => { e.preventDefault(); if (code.trim()) onNavigate(`/track?code=${encodeURIComponent(code.trim())}`); }}
+                                className="mt-2 flex flex-col gap-2 sm:flex-row">
+                                <input id="hero-track" value={code} onChange={(e) => setCode(e.target.value)}
+                                    placeholder={t.misc.codePlaceholder}
+                                    className="focus-ring min-w-0 flex-1 rounded-md border border-pub-onink/20 bg-pub-ink2 px-4 py-3 font-mono text-sm uppercase text-pub-onink placeholder:text-pub-onink-soft/50 focus:border-pub-onink/50 focus:outline-none" />
+                                <button type="submit"
+                                    className="focus-ring rounded-md border border-pub-onink/25 px-6 py-3 text-sm font-semibold text-pub-onink transition-colors hover:border-pub-onink hover:bg-pub-onink/5">
+                                    {t.actions.trackSubmit}
+                                </button>
+                            </form>
+                        </div>
                     </div>
 
                     <div className="hidden md:block">

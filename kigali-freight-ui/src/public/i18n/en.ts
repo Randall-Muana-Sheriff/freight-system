@@ -39,6 +39,12 @@ export const en = {
         eyebrow: 'Tracking',
         codeLabel: 'Tracking code',
         finding: 'Finding your consignment',
+        // Arriving here without a code — from the nav rather than from a
+        // confirmation text — previously gave a heading, a field and nothing
+        // else. This says where the code comes from and offers the way on.
+        idleTitle: 'The code is in your confirmation text.',
+        idleBody: 'It looks like INZ-XXXXXXXX and arrives by SMS the moment a booking is placed. No account, and nothing to sign in to.',
+        idleNoCode: 'Not booked anything yet?',
         collectFrom: 'Collect from',
         deliverTo: 'Deliver to',
         driver: 'Driver',
@@ -79,6 +85,10 @@ export const en = {
     // list of services would read as an error, and "all six or none" is
     // also the natural unit for whoever is doing the writing.
     hero: {
+        // What the company does, said once. The page previously led with
+        // "Track your cargo", which speaks to somebody already holding a code
+        // and tells a first-time visitor nothing about the business.
+        headline: 'Freight across Kigali, visible the whole way.',
         trackPrompt: 'Track your cargo',
     },
     services: {
