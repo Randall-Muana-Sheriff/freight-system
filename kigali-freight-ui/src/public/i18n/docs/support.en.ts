@@ -10,14 +10,21 @@ export const supportEn = {
     title: 'Support',
     intro:
         'Something wrong with a delivery, or with the Inzira Driver app? Reach us ' +
-        'directly — during working hours the phone is faster than email, and if cargo ' +
-        'is on a truck right now, call.',
+        'directly. The phone is answered from six in the morning until ten at night, ' +
+        'every day of the week, and if cargo is on a truck right now, call rather ' +
+        'than write.',
     phoneLabel: 'Phone',
     emailLabel: 'Email',
+    // The page told drivers the phone was faster "during working hours"
+    // without ever saying which ones. A driver loading at half five wants
+    // to know whether ringing is worth it before the truck is loaded, not
+    // after.
+    phoneHours: '6:00 – 22:00, every day',
+    emailHours: 'Answered within a working day',
     drivers: {
         title: 'Drivers',
         intro:
-            'Accounts are created by dispatch — there is no sign-up in the app. If your ' +
+            'Accounts are created by dispatch. There is no sign-up in the app. If your ' +
             'number is not recognised, it has not been registered yet, and dispatch can ' +
             'do that in a moment.',
         answers: [
@@ -39,14 +46,14 @@ export const supportEn = {
                 body:
                     'Location only reports while a shift is active, so check the home screen ' +
                     'says you are on shift. If it does, open your phone’s settings for Inzira ' +
-                    'Driver and make sure location permission is set to Always — “While Using” ' +
+                    'Driver and make sure location permission is set to Always. “While Using” ' +
                     'stops reporting the moment the screen locks, which is most of a driving day.',
             },
             {
                 problem: 'I cannot upload a delivery photo',
                 body:
                     'The photo needs a data connection to reach the office. In a weak-signal ' +
-                    'spot, complete the stop when you are moving again — the job stays on your ' +
+                    'spot, complete the stop when you are moving again. The job stays on your ' +
                     'list until it goes through.',
             },
             {

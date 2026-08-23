@@ -231,11 +231,23 @@
 
 /* The dispatcher board is a fixed full-screen app, hence overflow:hidden
    on the root elements below. A marketing page has to scroll, so the
-   public surface opts back out for as long as it is mounted. */
+   public surface opts back out for as long as it is mounted.
+
+   `overflow: visible`, not `overflow-y: auto`. The earlier version restored
+   only the vertical axis, which left overflow-x:hidden in place — and an
+   element with overflow on either axis is a scroll container. That made
+   #root the header's nearest scrolling ancestor, and #root is exactly as
+   tall as its content and so never scrolls: the pinned header dutifully
+   stuck to something that never moved, and looked static. Handing scrolling
+   back to the viewport is what makes position:sticky work at all.
+
+   Nothing here may overflow horizontally, then, since there is no longer a
+   hidden axis to catch it. The one wide thing on the page — the rate card
+   table — scrolls inside its own box for that reason. */
 html.allow-scroll,
 html.allow-scroll body,
 html.allow-scroll #root {
-  overflow-y: auto;
+  overflow: visible;
   height: auto;
   min-height: 100%;
 }
@@ -447,4 +459,16 @@ body, html, #root {
     inset 0 1px 0 rgba(241, 239, 232, 0.06),
     0 8px 24px -12px rgba(0, 0, 0, 0.6);
   transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+/* The public header is pinned, so a section scrolled to from the navigation
+   would otherwise arrive with its eyebrow and the first line of its heading
+   tucked underneath it. Slightly more than the header's height, so the
+   section starts clear of the bar rather than flush against it.
+
+   On the element rather than in the scroll call: scrollIntoView honours
+   scroll-margin, and so does a bare #anchor in the URL bar, which the call
+   cannot reach. */
+section[id] {
+    scroll-margin-top: 5rem;
 }

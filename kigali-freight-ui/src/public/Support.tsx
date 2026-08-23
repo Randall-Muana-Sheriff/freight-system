@@ -58,6 +58,7 @@ export default function Support() {
                         className="focus-ring mt-1 block font-mono text-lg font-medium text-pub-laterite underline underline-offset-4">
                         {PHONE}
                     </a>
+                    <p className="mt-1 text-[15px] tabular-nums text-pub-onpaper-soft">{d.phoneHours}</p>
                 </div>
                 <div>
                     <p className="data-label text-pub-onpaper-soft/70">{d.emailLabel}</p>
@@ -65,6 +66,7 @@ export default function Support() {
                         className="focus-ring mt-1 block text-lg font-medium text-pub-laterite underline underline-offset-4">
                         {EMAIL}
                     </a>
+                    <p className="mt-1 text-[15px] text-pub-onpaper-soft">{d.emailHours}</p>
                 </div>
             </div>
 

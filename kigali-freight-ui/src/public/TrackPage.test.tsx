@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { TrackPage } from './TrackPage';
+import { TrackPage, REACHED_BY } from './TrackPage';
 import { trackShipment } from './publicApi';
 import { LanguageProvider } from './i18n';
 
@@ -87,5 +87,44 @@ describe('TrackPage proof of delivery', () => {
 
         expect(await screen.findByText('Proof of delivery')).toBeInTheDocument();
         expect(screen.queryByAltText(/Photograph taken at handover/)).not.toBeInTheDocument();
+    });
+});
+
+describe('the milestone a status lands on', () => {
+    // Written out rather than imported from the router — the point is to
+    // catch a status the backend gains and this file does not hear about.
+    // Sourced from ALLOWED_ORDER_STATUSES in
+    // kigali-freight-router/controllers/orderController.js.
+    const BACKEND_STATUSES = ['PENDING', 'OFFERED', 'ASSIGNED', 'AT_PICKUP',
+                              'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
+
+    it('maps every status the backend can emit, with nothing left to the fallback', () => {
+        // AT_PICKUP was missing and took the `?? 0` fallback, so a customer
+        // whose driver was standing at their gate was shown "Order received".
+        // A fallback that under-reports progress is worse than a crash: the
+        // screen looks perfectly fine while telling somebody the wrong thing.
+        for (const status of BACKEND_STATUSES) {
+            expect(REACHED_BY[status], `${status} falls through to the default`).toBeDefined();
+        }
+    });
+
+    it('never goes backwards as a shipment progresses', () => {
+        const steps = BACKEND_STATUSES.map((s) => REACHED_BY[s]);
+        for (let i = 1; i < steps.length; i++) {
+            expect(steps[i], `${BACKEND_STATUSES[i]} regresses`).toBeGreaterThanOrEqual(steps[i - 1]);
+        }
+    });
+
+    it('does not show a driver as assigned before one has accepted', () => {
+        // OFFERED means the job has gone to one named driver who has not
+        // agreed yet. Showing "Driver assigned" is a promise the next
+        // refresh may take back.
+        expect(REACHED_BY.OFFERED).toBe(REACHED_BY.PENDING);
+        expect(REACHED_BY.ASSIGNED).toBeGreaterThan(REACHED_BY.OFFERED);
+    });
+
+    // CANCELLED is handled on its own path rather than as a milestone.
+    it('leaves cancellation out of the timeline', () => {
+        expect(REACHED_BY.CANCELLED).toBeUndefined();
     });
 });

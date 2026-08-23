@@ -42,6 +42,22 @@ describe('French is complete', () => {
             'review.contact',            // likewise
             'steps.contact',             // and again — the step of that name
             'language.kinyarwanda',      // the language's own name
+
+            // The rate card. Money and payloads are localised wherever the
+            // notation differs — "8,000" becomes "8 000", "3.5" becomes
+            // "3,5" — so what stays identical is only the figures whose
+            // French form genuinely is the English one: three digits need
+            // no separator and a single digit has nothing to change. A
+            // number turning up here that does have a French form is the
+            // bug this list exists to expose.
+            'pricing.columns.minimum',   // "Minimum" — the same word in French
+            'pricing.rows.0.perKm',      // "700" — no separator at three digits
+            'pricing.rows.0.perKg',      // "8"
+            'pricing.rows.1.payload',    // "1 – 8 t" — digits and a unit symbol
+            'pricing.rows.1.perKm',      // "900"
+            'pricing.rows.1.perKg',      // "6"
+            'pricing.rows.2.payload',    // "8 – 12 t"
+            'services.items.4.spec',     // the three hubs, which are place names
         ];
         const enLeaves = leaves(en);
         const same = leaves(fr).filter(([, v], i) => v === enLeaves[i][1]).map(([k]) => k);
@@ -262,8 +278,10 @@ describe('the mobile menu', () => {
 
         await userEvent.click(screen.getByRole('button', { name: 'Open menu' }));
 
-        // Both the inline nav and the panel now hold these, so there are two.
-        expect(screen.getAllByText('What we move').length).toBe(2);
+        // One, not two. The inline nav keeps its sections behind a category
+        // menu now, so until that menu is opened the phone panel is the only
+        // place the label is rendered at all.
+        expect(screen.getAllByText('What we move').length).toBe(1);
         expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute('aria-expanded', 'true');
     });
 
@@ -414,5 +432,24 @@ describe('back to top', () => {
 
         // A full-page glide is exactly the movement that setting exists to stop.
         expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
+    });
+});
+
+describe('the hub points somewhere', () => {
+    it('has a path for every door on the landing page', async () => {
+        const { EXPLORE_PATHS } = await import('../Landing');
+        // The cards are rendered by index against this list, which is the
+        // one coupling in the copy that a translator or a writer could
+        // break without seeing it: a fifth item added to `explore` renders
+        // a card whose click goes to `undefined`.
+        expect(en.explore.items.length).toBe(EXPLORE_PATHS.length);
+        expect(fr.explore.items.length).toBe(EXPLORE_PATHS.length);
+    });
+
+    it('points only at pages the site actually serves', async () => {
+        const { EXPLORE_PATHS } = await import('../Landing');
+        const served = ['/', '/order', '/track', '/privacy', '/support',
+                        '/pricing', '/how-it-works', '/business', '/faq'];
+        for (const path of EXPLORE_PATHS) expect(served, `${path} is not a route`).toContain(path);
     });
 });

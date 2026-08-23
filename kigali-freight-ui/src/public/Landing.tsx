@@ -1,93 +1,19 @@
-import { useState, type FormEvent } from 'react';
-import { sendContactMessage } from './publicApi';
+import { useState } from 'react';
 import { HeroRoute } from './HeroRoute';
 import { HeroTerrain } from './HeroTerrain';
 import { useLanguage } from './i18n';
+import { SECTION, BLOCK, CARD, CARD_HOVER } from './sections/kit';
+import { ServicesSection } from './sections/Services';
+import { ContactSection } from './sections/Contact';
 
-// Copy lives in content.ts. This file is layout only, so the writing can
-// be read and edited as writing.
-
-function SectionHead({ eyebrow, headline, onPaper = true, className = '' }: {
-    eyebrow: string; headline: string; onPaper?: boolean; className?: string;
-}) {
-    return (
-        <div className={className}>
-            <p className={`data-label mb-5 ${onPaper ? 'text-pub-laterite' : 'text-pub-laterite-soft'}`}>{eyebrow}</p>
-            <h2 className={`display-wide text-[clamp(2rem,4.5vw,3.2rem)] ${onPaper ? 'text-pub-onpaper' : 'text-pub-onink'}`}
-                style={{ textWrap: 'balance' } as React.CSSProperties}>
-                {headline}
-            </h2>
-        </div>
-    );
-}
-
-function ContactForm() {
-    const { t } = useLanguage();
-    const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
-    const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle');
-    const [error, setError] = useState<string | null>(null);
-
-    const submit = async (event: FormEvent) => {
-        event.preventDefault();
-        setState('sending');
-        setError(null);
-        try {
-            await sendContactMessage(form);
-            setState('sent');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Could not send your message.');
-            setState('idle');
-        }
-    };
-
-    if (state === 'sent') {
-        return (
-            <div className="border-l-2 border-pub-laterite bg-pub-paper2 px-8 py-10">
-                <p className="display-tight text-2xl text-pub-onpaper">{t.form.messageReceived}</p>
-                <p className="mt-2 text-[15px] text-pub-onpaper-soft">{t.form.weAnswer}</p>
-            </div>
-        );
-    }
-
-    const field = 'w-full border-b border-pub-onpaper/20 bg-transparent py-2.5 text-[17px] text-pub-onpaper placeholder:text-pub-onpaper-soft/50 focus:border-pub-laterite focus:outline-none';
-
-    return (
-        <form onSubmit={submit} className="grid gap-6 sm:grid-cols-2">
-            <label className="block">
-                <span className="data-label text-pub-onpaper-soft">{t.form.name}</span>
-                <input required className={field} value={form.name} placeholder={t.order.namePlaceholder}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </label>
-            <label className="block">
-                <span className="data-label text-pub-onpaper-soft">{t.form.phone}</span>
-                <input required className={field} value={form.phone} placeholder={t.order.phonePlaceholder}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            </label>
-            <label className="block sm:col-span-2">
-                <span className="data-label text-pub-onpaper-soft">{t.form.emailOptional}</span>
-                <input type="email" className={field} value={form.email} placeholder={t.order.emailPlaceholder}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </label>
-            <label className="block sm:col-span-2">
-                <span className="data-label text-pub-onpaper-soft">{t.form.whatMoved}</span>
-                <textarea required rows={3} className={`${field} resize-none`} value={form.message}
-                    placeholder={t.misc.enquiryPlaceholder}
-                    onChange={(e) => setForm({ ...form, message: e.target.value })} />
-            </label>
-
-            {error ? <p role="alert" className="text-[15px] text-pub-laterite sm:col-span-2">{error}</p> : null}
-
-            <div className="sm:col-span-2">
-                <button type="submit" disabled={state === 'sending'}
-                    className="focus-ring rounded-md bg-pub-onpaper px-8 py-4 text-sm font-semibold text-pub-paper transition-colors hover:bg-pub-laterite disabled:opacity-60">
-                    {state === 'sending' ? t.buttons.sending : t.buttons.send}
-                </button>
-            </div>
-        </form>
-    );
-}
-
-
+// The hub. It used to be the whole site: eight bands stacked on one page,
+// roughly eight thousand pixels of scroll, with the answer to "what does
+// it cost" four screens below the fold. Pricing, the business track, the
+// walkthrough and the questions are pages now, and this opens the door to
+// each of them instead of containing them.
+//
+// Layout only — the writing lives in i18n/en.ts so it can be read and
+// edited as writing.
 // Icons for the three entry cards.
 //
 // Drawn here rather than pulled from an icon set. The brand mark is a
@@ -96,23 +22,6 @@ function ContactForm() {
 // instead of three pictograms borrowed from somewhere else. It also keeps
 // an icon library out of a bundle that a customer downloads to book one
 // delivery.
-// Stated once so every band on the page sits in the same column and the
-// gaps between them are even. A section that set its own would be the one
-// that quietly drifts out of line.
-const SECTION = 'px-4 py-3 sm:px-6 sm:py-4';
-
-// A card that sits above the surface rather than being ruled off from it.
-// Defined once because there are four groups of them and a shadow that
-// differs by two pixels between groups is the sort of thing nobody can
-// name but everybody sees.
-//
-// The shadow is soft and low rather than dramatic: these are meant to
-// look like paper resting on paper, and a heavy drop shadow on a page
-// this quiet reads as a different site's component pasted in.
-const CARD = 'rounded-md card-float';
-const CARD_HOVER = 'card-float-lift';
-const CARD_DARK = 'rounded-md card-float-dark';
-const BLOCK = 'mx-auto max-w-6xl overflow-hidden rounded-lg';
 
 const ICONS = {
     // A parcel, drawn isometrically so it reads as a thing with weight
@@ -174,7 +83,9 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
         { icon: 'pin' as const, title: t.entries.trackTitle, body: t.entries.trackBody, go: () => onNavigate('/track') },
         {
             icon: 'repeat' as const, title: t.entries.standingTitle, body: t.entries.standingBody,
-            go: () => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+            // Was the contact form, which answered a different question
+            // than the card asked. Now the business section.
+            go: () => document.getElementById('business')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
         },
     ];
 
@@ -200,6 +111,46 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
                         <p className="mt-1 text-[14px] leading-snug text-pub-onpaper-soft">{card.body}</p>
                     </button>
                 ))}
+            </div>
+        </section>
+    );
+}
+
+// The four doors. Paths here, titles and prose in the dictionary — the
+// order of this list is the order of `explore.items`, and a test asserts
+// the two are the same length so a card added on one side and forgotten on
+// the other fails the build rather than rendering blank.
+export const EXPLORE_PATHS = ['/pricing', '/business', '/how-it-works', '/faq'] as const;
+
+function Explore({ onNavigate }: { onNavigate: (path: string) => void }) {
+    const { t } = useLanguage();
+    return (
+        <section className={SECTION}>
+            <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
+            <div className="mx-auto max-w-6xl">
+                <div className="mb-12 max-w-2xl">
+                    <p className="data-label text-pub-laterite">{t.explore.eyebrow}</p>
+                    <h2 className="display-wide mt-3 text-4xl text-pub-onpaper sm:text-5xl">{t.explore.headline}</h2>
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2">
+                    {t.explore.items.map((item, i) => (
+                        <button key={item.title} onClick={() => onNavigate(EXPLORE_PATHS[i])}
+                            className={`focus-ring group bg-pub-paper2 px-6 py-7 text-left ${CARD} ${CARD_HOVER}`}>
+                            <h3 className="display-tight text-xl text-pub-onpaper">{item.title}</h3>
+                            <p className="mt-2 text-[17px] leading-relaxed text-pub-onpaper-soft">{item.body}</p>
+                            <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-pub-laterite">
+                                {item.cta}
+                                <svg viewBox="0 0 12 10" aria-hidden="true"
+                                    className="h-2.5 w-3 transition-transform group-hover:translate-x-0.5">
+                                    <path d="M1 5h9M6.5 1.5 10 5l-3.5 3.5" fill="none" stroke="currentColor"
+                                        strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </div>
             </div>
         </section>
     );
@@ -279,6 +230,15 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
                             {t.hero.headline}
                         </h1>
 
+                        {/* The supporting line. The headline names the city
+                            and stops; this is where the rest of the country
+                            and the two things that make booking easy get
+                            said, which is the job every Uber and DHL hero
+                            gives its second line. */}
+                        <p className="mt-5 max-w-md text-lg leading-relaxed text-pub-onink-soft">
+                            {t.hero.lead}
+                        </p>
+
                         <button data-tour="book" onClick={() => onNavigate('/order')}
                             className="focus-ring mt-7 rounded-md bg-pub-laterite px-7 py-3.5 text-sm font-semibold text-pub-onink transition-colors hover:bg-pub-laterite-soft">
                             {t.actions.book}
@@ -315,89 +275,13 @@ export function Landing({ onNavigate }: { onNavigate: (path: string) => void }) 
 
             <EntryCards onNavigate={onNavigate} />
 
+
             {/* ── THE PAPERWORK ────────────────────────────────────────── */}
-            <section id="services" className={SECTION}>
-                <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
-                <div className="mx-auto max-w-6xl">
-                    <SectionHead eyebrow={t.services.eyebrow} headline={t.services.headline} className="mb-14 max-w-2xl" />
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        {t.services.items.map((service) => (
-                            <article key={service.name} className={`bg-pub-paper2 px-6 py-7 ${CARD}`}>
-                                <p className="data-label mb-3 text-pub-laterite">{service.spec}</p>
-                                <h3 className="display-tight text-xl text-pub-onpaper">{service.name}</h3>
-                                <p className="mt-2 text-[17px] leading-relaxed text-pub-onpaper-soft">{service.body}</p>
-                            </article>
-                        ))}
-                    </div>
-                </div>
-                </div>
-            </section>
+            <ServicesSection />
 
-            {/* The one section that is genuinely a sequence, so the one
-                section drawn as a route with ordinals. */}
-            <section id="how" className={SECTION}>
-                <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
-                <div className="mx-auto max-w-3xl">
-                    <SectionHead eyebrow={t.journey.eyebrow} headline={t.journey.headline} className="mb-14" />
-                    <ol className="relative">
-                        <span aria-hidden="true" className="absolute bottom-6 left-[7px] top-3 w-px bg-pub-onpaper/20" />
-                        {t.journey.stops.map((stop, index) => (
-                            <li key={stop.name} className="relative flex gap-7 pb-11 last:pb-0">
-                                <span aria-hidden="true"
-                                    className={`relative z-10 mt-1.5 h-[15px] w-[15px] shrink-0 rounded-full border-2 ${
-                                        index === 0 ? 'border-pub-laterite bg-pub-laterite' : 'border-pub-onpaper/40 bg-pub-paper2'
-                                    }`} />
-                                <div>
-                                    <p className="data-label mb-1.5 text-pub-onpaper-soft">{t.journeyExtra.stopLabel} {index + 1}</p>
-                                    <h3 className="display-tight text-lg text-pub-onpaper">{stop.name}</h3>
-                                    <p className="mt-1.5 max-w-xl text-[17px] leading-relaxed text-pub-onpaper-soft">{stop.body}</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ol>
-                </div>
-                </div>
-            </section>
+            <Explore onNavigate={onNavigate} />
 
-            {/* Returns to the dark ground: this section is about the
-                machinery on the road, and it gives the long light stretch
-                a break before the page closes on the contact form. */}
-            <section id="about" className={SECTION}>
-                <div className={`${BLOCK} bg-pub-ink px-6 py-16 sm:px-12 sm:py-20`}>
-                <div className="mx-auto max-w-6xl">
-                    <div className="mb-14 max-w-2xl">
-                        <SectionHead eyebrow={t.about.eyebrow} headline={t.about.headline} onPaper={false} />
-                        <p className="mt-6 text-lg leading-relaxed text-pub-onink-soft">{t.about.intro}</p>
-                    </div>
-
-                    <div className="grid gap-5 md:grid-cols-3">
-                        {t.about.views.map((view) => (
-                            <article key={view.title} className={`bg-pub-ink2 px-6 py-7 ${CARD_DARK}`}>
-                                <h3 className="display-tight text-lg text-pub-onink">{view.title}</h3>
-                                <p className="mt-2.5 text-[17px] leading-relaxed text-pub-onink-soft">{view.body}</p>
-                            </article>
-                        ))}
-                    </div>
-
-                    <p className="mt-12 max-w-2xl border-l-2 border-pub-laterite pl-5 text-[17px] leading-relaxed text-pub-onink-soft">
-                        {t.about.closing}
-                    </p>
-                </div>
-                </div>
-            </section>
-
-            <section id="contact" className={SECTION}>
-                <div className={`${BLOCK} bg-pub-paper px-6 py-16 sm:px-12 sm:py-20`}>
-                <div className="mx-auto grid max-w-5xl gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
-                    <div>
-                        <SectionHead eyebrow={t.contact.eyebrow} headline={t.contact.headline} />
-                        <p className="mt-5 max-w-sm text-[17px] leading-relaxed text-pub-onpaper-soft">{t.contact.body}</p>
-                        <p className="data-label mt-8 text-pub-onpaper-soft">{t.contact.address}</p>
-                    </div>
-                    <ContactForm />
-                </div>
-                </div>
-            </section>
+            <ContactSection />
         </>
     );
 }

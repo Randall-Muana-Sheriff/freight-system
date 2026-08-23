@@ -8,14 +8,17 @@ export const supportFr: SupportDoc = {
     title: 'Assistance',
     intro:
         'Un problème avec une livraison, ou avec l’application Inzira Driver ? Contactez-nous ' +
-        'directement — aux heures ouvrables le téléphone est plus rapide que l’e-mail, et si la ' +
-        'marchandise est en route, appelez.',
+        'directement. Le téléphone est décroché de six heures du matin à dix heures du soir, ' +
+        'tous les jours de la semaine, et si la marchandise est en route, appelez plutôt ' +
+        'que d’écrire.',
     phoneLabel: 'Téléphone',
     emailLabel: 'E-mail',
+    phoneHours: '6h – 22h, tous les jours',
+    emailHours: 'Réponse sous un jour ouvré',
     drivers: {
         title: 'Chauffeurs',
         intro:
-            'Les comptes sont créés par la régulation — il n’y a pas d’inscription dans ' +
+            'Les comptes sont créés par la régulation. Il n’y a pas d’inscription dans ' +
             'l’application. Si votre numéro n’est pas reconnu, c’est qu’il n’a pas encore été ' +
             'enregistré, et la régulation peut le faire en un instant.',
         answers: [
@@ -39,7 +42,7 @@ export const supportFr: SupportDoc = {
                     'La position n’est transmise que pendant un service actif : vérifiez que ' +
                     'l’écran d’accueil indique bien que vous êtes en service. Si c’est le cas, ' +
                     'ouvrez les réglages de votre téléphone pour Inzira Driver et assurez-vous ' +
-                    'que l’autorisation de localisation est sur Toujours — « Lorsque l’app est ' +
+                    'que l’autorisation de localisation est sur Toujours. « Lorsque l’app est ' +
                     'active » cesse de transmettre dès que l’écran se verrouille, c’est-à-dire ' +
                     'la majeure partie d’une journée de conduite.',
             },
@@ -47,7 +50,7 @@ export const supportFr: SupportDoc = {
                 problem: 'Je n’arrive pas à envoyer la photo de livraison',
                 body:
                     'La photo a besoin d’une connexion de données pour parvenir au bureau. Dans ' +
-                    'une zone mal couverte, terminez l’arrêt une fois reparti — la course reste ' +
+                    'une zone mal couverte, terminez l’arrêt une fois reparti. La course reste ' +
                     'sur votre liste jusqu’à ce que l’envoi passe.',
             },
             {

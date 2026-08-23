@@ -36,10 +36,16 @@ import type { PartialStrings } from './en';
 
 export const rw: PartialStrings = {
     nav: {
-        whatWeMove: 'Ibyo dutwara',
+        whatWeDo: 'Ibyo dukora',
         howItWorks: 'Uko bikora',
-        theSystem: 'Sisitemu',
         talkToUs: 'Twandikire',
+
+        whatWeMove: 'Ibyo dutwara',
+        pricing: 'Ibiciro',
+        forBusiness: 'Ku bucuruzi',
+        theJourney: 'Urugendo rw’umuzigo',
+        theSystem: 'Sisitemu',
+        questions: 'Ibibazo',
         home: 'Ahabanza ha Inzira',
     },
     actions: {
@@ -85,12 +91,13 @@ export const rw: PartialStrings = {
     form: {
         name: 'Amazina',
         phone: 'Telefone',
-        emailOptional: 'Imeyili — si itegeko',
+        emailOptional: 'Imeyili (si itegeko)',
         whatMoved: 'Ni iki ushaka gutwarwa?',
         messageReceived: 'Ubutumwa bwakiriwe.',
         weAnswer: 'Tuzagusubiza kuri nimero watanze, akenshi kuri uwo munsi.',
     },
     footer: {
+        questions: 'Ibibazo bikunze kubazwa',
         getMoving: 'Tangira',
         company: 'Ikigo',
         tagline: 'Ubwikorezi mu Kigali, aho umuzigo wawe ugeze bigaragarira uwawohereje.',

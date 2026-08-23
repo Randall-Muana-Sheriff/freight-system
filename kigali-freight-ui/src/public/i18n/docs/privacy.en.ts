@@ -21,8 +21,8 @@ export const privacyEn = {
         title: 'The driver app',
         intro:
             'Inzira Driver is a work tool, issued to drivers who carry freight for us. ' +
-            'Accounts are created by our dispatch team — there is no public sign-up — and ' +
-            'the app collects the following while it is in use.',
+            'Accounts are created by our dispatch team, and there is no public sign-up. The ' +
+            'app collects the following while it is in use.',
         sharedWithLabel: 'Shared with:',
         rows: [
             { what: 'Location', why: 'Latitude, longitude and speed, so dispatch can see where a consignment is and tell the customer who is waiting for it. Collected only between the moment a driver starts a shift and the moment they end it, including while the app is in the background or the phone is locked, because a delivery does not pause when a driver pockets their phone. Ending a shift or signing out stops collection immediately.', shared: 'our dispatch team only' },
@@ -45,7 +45,7 @@ export const privacyEn = {
         body:
             'Booking through this website asks for your name, a phone number, optionally an ' +
             'email address, and the pickup and delivery addresses. We use them to carry out ' +
-            'the delivery and to reach you about it — the tracking code we send by text, and ' +
+            'the delivery and to reach you about it: the tracking code we send by text, and ' +
             'a call if the driver cannot find the address.',
         body2:
             'Anyone holding the tracking code can see that consignment’s progress and the ' +
@@ -65,8 +65,8 @@ export const privacyEn = {
         title: 'Your choices',
         body:
             'You can ask us what we hold about you, ask for it to be corrected, or ask for ' +
-            'it to be deleted, and we will do so unless we are required to keep it — an ' +
-            'example being the compliance documents a licensed carrier has to retain.',
+            'it to be deleted, and we will do so unless we are required to keep it. The ' +
+            'compliance documents a licensed carrier has to retain are one example.',
         body2:
             'Drivers can revoke location access at any time in the phone’s own settings. ' +
             'Doing so stops collection, and it also stops dispatch being able to allocate ' +

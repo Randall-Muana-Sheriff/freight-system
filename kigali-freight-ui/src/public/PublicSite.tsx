@@ -5,6 +5,10 @@ import { OrderFlow } from './OrderFlow';
 import { TrackPage } from './TrackPage';
 import PrivacyPolicy from './PrivacyPolicy';
 import Support from './Support';
+import PricingPage from './PricingPage';
+import HowItWorksPage from './HowItWorksPage';
+import BusinessPage from './BusinessPage';
+import FaqPage from './FaqPage';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { SiteTour } from './SiteTour';
 import { setCanonical, setDescription } from '../utils/seo';
@@ -30,7 +34,7 @@ function readRoute(): Route {
 // The search snippet has to match what the page actually says. Advertising
 // a bookable service while the page tells visitors it is not open yet is
 // the kind of mismatch that loses trust before anyone clicks twice.
-const PRE_LAUNCH_DESCRIPTION = `Inzira is a freight service for Kigali where you can see exactly where your cargo is, the whole way. Opening ${LAUNCH_LABEL} — leave your number and we will tell you when.`;
+const PRE_LAUNCH_DESCRIPTION = `Inzira is a freight service for Kigali where the person who sent the cargo can follow it the whole way. Opening ${LAUNCH_LABEL}. Leave your number and we will tell you when.`;
 
 // Its own component because PublicSite renders the provider and so cannot
 // read from it in the same body — and this link, of all of them, has to be
@@ -50,12 +54,20 @@ function PageMeta({ path, holding }: { path: string; holding: boolean }) {
         '/track': t.meta.titleTrack,
         '/privacy': t.meta.titlePrivacy,
         '/support': t.meta.titleSupport,
+        '/pricing': t.meta.titlePricing,
+        '/how-it-works': t.meta.titleHow,
+        '/business': t.meta.titleBusiness,
+        '/faq': t.meta.titleFaq,
     };
     const descriptions: Record<string, string> = {
         '/order': t.meta.descOrder,
         '/track': t.meta.descTrack,
         '/privacy': t.meta.descPrivacy,
         '/support': t.meta.descSupport,
+        '/pricing': t.meta.descPricing,
+        '/how-it-works': t.meta.descHow,
+        '/business': t.meta.descBusiness,
+        '/faq': t.meta.descFaq,
     };
 
     // Landing gets the bare product name: a company's home page titling
@@ -156,6 +168,14 @@ export default function PublicSite() {
                     <PrivacyPolicy />
                 ) : route.path === '/support' ? (
                     <Support />
+                ) : route.path === '/pricing' ? (
+                    <PricingPage onNavigate={navigate} />
+                ) : route.path === '/how-it-works' ? (
+                    <HowItWorksPage />
+                ) : route.path === '/business' ? (
+                    <BusinessPage />
+                ) : route.path === '/faq' ? (
+                    <FaqPage />
                 ) : (
                     <Landing onNavigate={navigate} />
                 )}

@@ -14,11 +14,25 @@ import type { Strings } from './en';
 // not, because there is no reason for it to be.
 export const fr: Strings = {
     nav: {
-        whatWeMove: 'Ce que nous transportons',
+        whatWeDo: 'Ce que nous faisons',
         howItWorks: 'Comment ça marche',
-        theSystem: 'Le système',
         talkToUs: 'Nous contacter',
+
+        whatWeMove: 'Ce que nous transportons',
+        pricing: 'Tarifs',
+        forBusiness: 'Entreprises',
+        theJourney: 'Le parcours de votre marchandise',
+        theSystem: 'Le système',
+        questions: 'Questions fréquentes',
         home: 'Accueil Inzira',
+    },
+    nav_desc: {
+        whatWeMove: 'De l’enveloppe au chargement complet',
+        pricing: 'La grille tarifaire, publiée en entier',
+        forBusiness: 'Lignes régulières et lots complets',
+        theJourney: 'De la commande à la signature, étape par étape',
+        theSystem: 'Ce que chauffeur, régulateur et vous voyez',
+        questions: 'Responsabilité, paiement, ce que nous prenons',
     },
     actions: {
         book: 'Commander une livraison',
@@ -60,13 +74,13 @@ export const fr: Strings = {
             collected: 'Enlevée',
             collectedNote: 'Le chargement est à bord.',
             delivered: 'Livrée',
-            deliveredNote: 'Réceptionnée, avec photo à l’appui.',
+            deliveredNote: 'Réceptionnée, avec preuve enregistrée.',
         },
     },
     form: {
         name: 'Nom',
         phone: 'Téléphone',
-        emailOptional: 'E-mail — facultatif',
+        emailOptional: 'E-mail (facultatif)',
         whatMoved: 'Que devons-nous transporter ?',
         messageReceived: 'Message bien reçu.',
         weAnswer: 'Nous répondons au numéro que vous avez indiqué, en général le jour même.',
@@ -74,33 +88,87 @@ export const fr: Strings = {
     footer: {
         getMoving: 'Commencer',
         company: 'Société',
-        tagline: 'Du fret dans tout Kigali, avec la position de chaque expédition visible par celui qui l’a envoyée.',
+        questions: 'Questions fréquentes',
+        tagline: 'Du fret à Kigali et dans tout le Rwanda, la position de chaque expédition visible par celui qui l’a envoyée.',
     },
     hero: {
         headline: 'Du fret à travers Kigali, visible d’un bout à l’autre.',
+        lead:
+            'Livraison le jour même dans la ville, et chargements complets partout au Rwanda. '
+            + 'Commandez en moins d’une minute, sans compte, puis suivez la marchandise de '
+            + 'l’enlèvement à la signature.',
         trackPrompt: 'Suivez votre marchandise',
     },
     services: {
         eyebrow: 'Ce que nous transportons',
         headline: 'Six façons de l’acheminer.',
         items: [
-            { name: 'Livraison le jour même', spec: 'Commandez avant midi', body: 'Partout dans Kigali, sur la route dans l’heure, suivie d’un bout à l’autre.' },
-            { name: 'Fret en vrac', spec: 'Charges palettisées', body: 'Une flotte de gros porteurs, avec des chauffeurs qui chargent et arriment eux-mêmes.' },
-            { name: 'Transport sécurisé', spec: 'Scellé et vérifié', body: 'Marchandises de valeur sous scellés inviolables, avec rapport d’incident si l’on y touche.' },
-            { name: 'Lignes régulières', spec: 'Réglé une fois, roule tous les jours', body: 'Une liaison fixe entre deux points, pour ne plus commander la même course chaque matin.' },
-            { name: 'De dépôt à dépôt', spec: 'Déposez et repartez', body: 'Laissez la marchandise dans l’un de nos dépôts et nous l’acheminons jusqu’au dépôt d’arrivée.' },
-            { name: 'Coursier de documents', spec: 'Signature à l’arrivée', body: 'Contrats et certificats, avec une chaîne de responsabilité présentable à un client.' },
+            { name: 'Livraison le jour même', spec: 'Jusqu’à 1 t · Kigali', body: 'Commandée avant midi, sur la route dans l’heure et suivie d’un bout à l’autre. Nos fourgons desservent tous les quartiers de la ville.' },
+            { name: 'Fret en vrac', spec: '1 – 12 t · tout le pays', body: 'Charges palettisées ou en vrac, en camion ou en gros porteur, avec des chauffeurs qui chargent et arriment eux-mêmes plutôt que de vous regarder faire.' },
+            { name: 'Transport sécurisé', spec: 'Scellé · incident consigné', body: 'Marchandises de valeur sous scellés inviolables, photographiées au départ et à l’arrivée, avec un rapport écrit si un scellé est rompu entre les deux.' },
+            { name: 'Lignes régulières', spec: 'Réglé une fois · roule tous les jours', body: 'Une liaison fixe entre deux points, tarifée à la ligne et non à la course, pour ne plus commander le même trajet chaque matin.' },
+            { name: 'De dépôt à dépôt', spec: 'Nyabugogo · Kimironko · Gikondo', body: 'Laissez la marchandise dans l’un de nos trois dépôts et nous l’acheminons jusqu’au dépôt d’arrivée. C’est la façon la moins chère d’expédier ce qui n’est pas urgent.' },
+            { name: 'Coursier de documents', spec: 'Signature à l’arrivée', body: 'Contrats et certificats acheminés le jour même, avec une chaîne de responsabilité horodatée que vous pouvez présenter à un client.' },
+        ],
+    },
+    pricing: {
+        eyebrow: 'Ce que cela coûte',
+        headline: 'Notre grille tarifaire, en public.',
+        intro:
+            'Ici, le fret se négocie au téléphone : le prix dépend de qui le demande. Pas le nôtre. '
+            + 'Chacun de nos devis est établi sur cette grille : un forfait de départ, la distance '
+            + 'routière, le poids, et un plancher sous les petites courses.',
+        columns: {
+            vehicle: 'Véhicule',
+            payload: 'Charge utile',
+            base: 'Forfait',
+            perKm: 'Au km',
+            perKg: 'Au kg',
+            minimum: 'Minimum',
+        },
+        rows: [
+            { vehicle: 'Fourgon léger', payload: 'Jusqu’à 1 t', base: '8 000', perKm: '700', perKg: '8', minimum: '15 000' },
+            { vehicle: 'Camion moyen', payload: '1 – 8 t', base: '18 000', perKm: '900', perKg: '6', minimum: '40 000' },
+            { vehicle: 'Gros porteur', payload: '8 – 12 t', base: '60 000', perKm: '1 500', perKg: '3,5', minimum: '120 000' },
+        ],
+        unitNote: 'Montants en RWF. Le véhicule est choisi d’après le poids que vous indiquez, vous n’avez donc pas à savoir lequel il faut.',
+        examplesTitle: 'Ce que cela donne',
+        examples: [
+            { job: '400 kg, de Nyabugogo à Kimironko', detail: '15 km par la route', price: '25 700' },
+            { job: '3 tonnes, dix kilomètres en ville', detail: '16 km par la route', price: '57 900' },
+            { job: '4 tonnes, de Kigali à Rubavu', detail: '157 km par la route', price: '231 400' },
+        ],
+        notesTitle: 'Ce qui fait bouger le prix',
+        notes: [
+            { title: 'La distance se mesure par la route', body: 'Pas à vol d’oiseau sur la carte. Au-delà de 25 km, le tarif au kilomètre baisse pour le reste du trajet : un kilomètre de grand axe ne coûte pas ce que coûte un kilomètre en ville.' },
+            { title: 'La première heure d’attente est offerte', body: 'Ensuite, le temps de chargement et de déchargement est facturé à l’heure : 3 800 RWF pour un fourgon, 8 500 pour un camion, 19 400 pour un gros porteur. Une remise normale n’y arrive jamais.' },
+            { title: 'Plus lourd et plus loin, sur devis', body: 'Au-delà de 12 tonnes, et pour tout passage de frontière, le prix est établi à la main plutôt que sur cette grille. Dites-nous de quoi il s’agit et nous revenons vers vous avec un chiffre.' },
+        ],
+        closing:
+            'Ce sont des exemples chiffrés, pas un devis. Le formulaire calcule le prix de votre '
+            + 'course avant tout engagement, et un régulateur le confirme une fois l’enlèvement et '
+            + 'la livraison pointés sur la carte.',
+        cta: 'Chiffrer ma livraison',
+    },
+    explore: {
+        eyebrow: 'Pour aller plus loin',
+        headline: 'Le reste.',
+        items: [
+            { title: 'Tarifs', body: 'La grille complète : forfait de départ, au kilomètre, au kilogramme, plus trois courses réelles chiffrées de bout en bout.', cta: 'Voir les prix' },
+            { title: 'Entreprises', body: 'Lignes régulières et lots complets, tarifés à la ligne plutôt qu’à la course, sur un seul compte.', cta: 'Lignes régulières' },
+            { title: 'Comment ça marche', body: 'De la commande à la signature, étape par étape, et ce que voient le chauffeur, le régulateur et vous.', cta: 'Du début à la fin' },
+            { title: 'Questions fréquentes', body: 'Responsabilité, paiement, délais d’enlèvement, et ce que nous ne transportons pas.', cta: 'Lire les réponses' },
         ],
     },
     journey: {
         eyebrow: 'Du début à la fin',
         headline: 'Ce qui arrive à votre chargement.',
         stops: [
-            { name: 'Vous passez commande', body: 'Enlèvement, destination, nature de la marchandise. Sans compte, sans appel, sans attendre un devis pour pouvoir commander.' },
-            { name: 'Un régulateur la confirme', body: 'Une personne vérifie les adresses et vous appelle en cas de doute. Rien ne part chez un chauffeur sans contrôle.' },
-            { name: 'Un chauffeur la prend', body: 'Le chauffeur vérifié le plus proche en service, votre marchandise sur sa feuille de route et son véhicule sur notre carte.' },
-            { name: 'Vous la suivez', body: 'Votre code montre où se trouve la marchandise, pas seulement qu’elle est partie. Actualisez autant que vous voulez.' },
-            { name: 'Signée et photographiée', body: 'Preuve prise à la porte et horodatée : la livraison est consignée, pas seulement racontée.' },
+            { name: 'Vous passez commande', body: 'Enlèvement, destination, nature de la marchandise. Sans compte, sans appel, et avec un prix avant tout engagement, jusqu’à douze tonnes. Au-delà, nous établissons le devis à la main.' },
+            { name: 'Un régulateur la prend en charge', body: 'Chaque commande est confiée à un chauffeur par une personne, qui vous appelle en cas de doute. Rien ici ne s’expédie tout seul. Aucune marchandise ne part chez un chauffeur parce qu’une machine en a décidé ainsi.' },
+            { name: 'Un chauffeur la prend', body: 'Un chauffeur vérifié, choisi parmi les plus proches disponibles. Son permis et l’assurance de son véhicule doivent être validés et encore valables, sinon le système refuse purement et simplement d’inscrire votre marchandise sur sa feuille de route.' },
+            { name: 'Vous la suivez', body: 'Votre code indique l’étape atteinte par votre marchandise : reçue, attribuée, enlevée, livrée. Il donne aussi le prénom du chauffeur qui la transporte. Actualisez autant que vous voulez.' },
+            { name: 'Signée à la porte', body: 'Preuve prise à la remise et horodatée, soit une photo, soit un code relu par la personne qui a réceptionné. Dans les deux cas la livraison est consignée, pas seulement mémorisée.' },
         ],
     },
     about: {
@@ -112,21 +180,80 @@ export const fr: Strings = {
             'chauffeur, l’écran du régulateur et votre page de suivi sont trois vues de la même expédition, ' +
             'et elles se mettent à jour ensemble.',
         views: [
-            { title: 'Ce que vous voyez', body: 'Commandez avec un nom et un numéro — sans compte. Vous recevez un code indiquant l’étape où en est votre marchandise, son lieu d’enlèvement et sa destination, le prénom du chauffeur une fois assigné, et la photo prise à la remise.' },
-            { title: 'Ce que porte le chauffeur', body: 'Une application ne contenant que ses propres courses. Elle transmet la position du véhicule pendant le service, prend la photo de preuve à la porte et signale pannes et dommages depuis le bord de la route. Dans un coin de la ville sans réseau, elle garde la confirmation et l’envoie au retour de la connexion.' },
-            { title: 'Ce que surveille la régulation', body: 'Tous les véhicules en service sur une carte en direct, avec des zones de livraison délimitées qui déclenchent une alerte si un véhicule transportant votre marchandise en sort. Les nouvelles commandes sont vérifiées par une personne, et le système propose le chauffeur disponible le plus proche plutôt que le premier à répondre.' },
+            { title: 'Ce que vous voyez', body: 'Commandez avec un nom et un numéro, sans compte. Vous recevez un code indiquant l’étape où en est votre marchandise, son lieu d’enlèvement et sa destination, le prénom du chauffeur une fois assigné, et la preuve prise à la remise, soit une photo, soit un code relu par la personne qui a réceptionné.' },
+            { title: 'Ce que porte le chauffeur', body: 'Une application ne contenant que ses propres courses. Elle transmet la position du véhicule pendant le service, prend la preuve à la porte et signale pannes et dommages depuis le bord de la route. Dans un coin de la ville sans réseau, elle garde la confirmation jusqu’au retour de la connexion. Elle déplace aussi la photo hors du cache de l’appareil photo vers son propre stockage, pour que le téléphone ne puisse pas effacer discrètement votre preuve de livraison pendant l’attente.' },
+            { title: 'Ce que surveille la régulation', body: 'Tous les véhicules en service sur une carte en direct, avec des zones réglementées et des limitations de vitesse qui déclenchent une alerte dès qu’un véhicule y entre ou roule trop vite pour la route. Les commandes sont attribuées par une personne, et la course est proposée à un chauffeur nommément désigné que le système a classé comme le plus proche. Elle n’est jamais diffusée au premier qui répond.' },
         ],
         closing:
             'Rien de tout cela ne se voit de l’extérieur, et c’est bien l’intérêt : c’est pourquoi le code ' +
             'que nous vous envoyons peut être cru sur parole.',
     },
+    business: {
+        eyebrow: 'Pour les entreprises',
+        headline: 'Du fret que vous n’avez pas à commander chaque matin.',
+        intro:
+            'Une livraison ponctuelle se commande avec le formulaire ci-dessus. Acheminer la même '
+            + 'chose sur la même route chaque semaine est un autre arrangement, et cela ne devrait '
+            + 'pas se tarifer comme l’appel d’un inconnu.',
+        offers: [
+            { name: 'Lignes régulières', body: 'Une liaison entre deux points fixes, selon un calendrier que vous fixez. Convenue une fois, puis elle roule, et elle se tarife au volume plutôt qu’à la course.' },
+            { name: 'Lots complets', body: 'Des mouvements réguliers en véhicule complet, y compris les trajets au départ de Kigali. Tarifés à la ligne une fois connus le poids, la fréquence et la route.' },
+            { name: 'Un compte, un registre', body: 'Chaque expédition du compte réunie au même endroit plutôt qu’éparpillée entre les reçus des chauffeurs, avec son code de suivi et sa photo de livraison rattachés à la ligne correspondante. Le paiement reste à la course, par mobile money, pour l’instant.' },
+        ],
+        closing:
+            'Dites-nous la forme que cela prend : ce qui circule, à quelle fréquence et entre quels '
+            + 'points. Nous revenons vers vous avec un tarif pour la ligne.',
+        cta: 'Parlons de votre ligne',
+    },
+    faq: {
+        eyebrow: 'Avant de commander',
+        headline: 'Les questions à poser d’abord.',
+        items: [
+            {
+                q: 'Que se passe-t-il si ma marchandise est endommagée ou perdue ?',
+                a: 'Nous sommes transporteur et non assureur : nous ne couvrons pas la valeur de ce que nous transportons. L’assurance de la marchandise revient à l’expéditeur, et pour tout ce qui a de la valeur, elle s’impose. Ce dont nous répondons, c’est de la preuve : une photo à la remise, un scellé inviolable sur les envois sécurisés, et un rapport d’incident rédigé depuis le bord de la route plutôt que reconstitué après coup. En cas de problème, vous saurez ce qui s’est passé, quand, et qui transportait.',
+            },
+            {
+                q: 'Qui conduit ma marchandise ?',
+                a: 'Un chauffeur dont nous avons vérifié le permis et l’identité, dans un véhicule dont nous avons vérifié l’assurance et le contrôle technique. Ce n’est pas une promesse sur nos recrutements. C’est un verrou dans le système. Si une attestation d’assurance expire dans la nuit, le lendemain matin le système refuse simplement de confier de la marchandise à ce chauffeur tant qu’elle n’est pas renouvelée, et il nous prévient trois semaines avant toute échéance, si bien que cela arrive rarement.',
+            },
+            {
+                q: 'Comment payer ?',
+                a: 'Par mobile money, à la course, une fois le prix confirmé par un régulateur. Aucune carte à saisir, rien à configurer à l’avance.',
+            },
+            {
+                q: 'Faut-il un compte ?',
+                a: 'Non. Un nom et un numéro de téléphone suffisent. Le code de suivi arrive par SMS et c’est tout ce qu’il faut pour suivre la marchandise. Rien où se connecter, aucun mot de passe à perdre.',
+            },
+            {
+                q: 'Le prix affiché est-il ferme ?',
+                a: 'Le montant indiqué au formulaire est calculé sur le seul poids tant que l’enlèvement et la livraison ne sont pas pointés sur la carte ; il est ensuite établi sur la distance routière réelle. Un régulateur le confirme avant tout départ. Seul le temps d’attente peut s’y ajouter ensuite, et uniquement au-delà de la première heure offerte.',
+            },
+            {
+                q: 'Y a-t-il des marchandises que vous ne prenez pas ?',
+                a: 'Le formulaire de commande énumère les types que nous traitons. Si ce que vous expédiez n’y figure pas, posez la question avant de commander plutôt qu’après : la conversation est courte et vaut mieux au départ.',
+            },
+            {
+                q: 'Sous quel délai l’enlèvement a-t-il lieu ?',
+                a: 'Vous pouvez commander à n’importe quelle heure. La prise de commande ne ferme jamais. Une course du jour passée avant midi part généralement dans l’heure. Au-delà, ou pour un chargement complet quittant la ville, l’organisation se règle avec vous lorsque le régulateur appelle pour confirmer, et cet appel a lieu entre six heures du matin et dix heures du soir.',
+            },
+        ],
+        closing: 'Pour tout ce qui n’est pas traité ici, demandez-nous. Le téléphone est décroché de six heures du matin à dix heures du soir, tous les jours.',
+    },
     contact: {
-        eyebrow: 'Nous contacter',
-        headline: 'Vous expédiez régulièrement ?',
+        eyebrow: 'Parlez-nous',
+        headline: 'Dites-nous ce que vous transportez.',
         body:
-            'Les lignes régulières et les gros volumes sont tarifés par entreprise plutôt qu’à la course. ' +
-            'Dites-nous ce que cela représente et nous revenons vers vous avec un chiffre.',
-        address: 'Zone industrielle de Gikondo · Kigali',
+            'Une ligne à tarifer, un chargement que notre grille tarifaire ne couvre pas, ou une '
+            + 'question avant de commander. Vous joignez une personne, pas une file d’attente, '
+            + 'et nous répondons le jour ouvré même.',
+        address: 'Zone industrielle de Gikondo \u00b7 Kigali',
+        hoursTitle: 'Nos horaires',
+        hours: [
+            { label: 'Commande et suivi', time: 'À toute heure, tous les jours', note: 'Le site enregistre les commandes, trouve le chauffeur et vous indique où en est votre marchandise, à n’importe quelle heure, tous les jours de l’année. Rien ici ne ferme.' },
+            { label: 'Assistance', time: '6h \u2013 22h, tous les jours', note: 'Une personne au téléphone, du premier chargement du matin à la dernière livraison en retard.' },
+            { label: 'Comptes entreprises', time: 'Du lundi au vendredi, 8h \u2013 17h', note: 'Lignes régulières, lots complets et tout ce qui se règle sur compte.' },
+        ],
     },
 
     order: {
@@ -146,8 +273,8 @@ export const fr: Strings = {
         choose: 'Choisir…',
         weight: 'Poids en kg',
         weightPlaceholder: '150',
-        neededBy: 'Pour quand — facultatif',
-        instructions: 'À signaler au chauffeur — facultatif',
+        neededBy: 'Pour quand ? (facultatif)',
+        instructions: 'À signaler au chauffeur (facultatif)',
         instructionsPlaceholder: 'Fragile. Demander Claudine au portail.',
         yourName: 'Votre nom',
         namePlaceholder: 'Jean Mutabazi',
@@ -177,11 +304,19 @@ export const fr: Strings = {
         titleTrack: 'Suivre une expédition',
         titlePrivacy: 'Politique de confidentialité',
         titleSupport: 'Assistance',
-        descOrder: 'Commandez du fret dans Kigali en moins d’une minute. Enlèvement, destination et nature de la marchandise — sans compte, et un code de suivi par SMS dès la commande passée.',
-        descTrack: 'Saisissez le code reçu par SMS pour voir où se trouve votre expédition Inzira, à quelle étape elle en est et qui la conduit.',
+        titlePricing: 'Tarifs',
+        titleHow: 'Comment ça marche',
+        titleBusiness: 'Entreprises',
+        titleFaq: 'Questions fréquentes',
+        descOrder: 'Commandez du fret à Kigali et dans tout le pays en moins d’une minute. Enlèvement, destination et nature de la marchandise. Tarifé sur une grille publiée, sans compte, avec un code de suivi par SMS dès la commande passée.',
+        descTrack: 'Saisissez le code reçu par SMS pour voir à quelle étape en est votre expédition Inzira, qui la conduit, et la photo prise à la remise.',
         descPrivacy: 'Ce que le site Inzira et l’application Inzira Driver collectent, pourquoi, avec qui c’est partagé, et comment demander vos données.',
-        descSupport: 'Aide pour une livraison ou pour l’application Inzira Driver — téléphone, e-mail, et réponses aux problèmes les plus courants des chauffeurs.',
-        descDefault: 'Fret le jour même et en vrac dans tout Kigali. Commandez en moins d’une minute sans compte, puis suivez votre marchandise de l’enlèvement à la signature avec un code de suivi.',
+        descSupport: 'Aide pour une livraison ou pour l’application Inzira Driver. Téléphone, e-mail, et réponses aux problèmes les plus courants des chauffeurs.',
+        descPricing: 'Ce que coûte le fret à Kigali et dans tout le Rwanda, publié en entier : forfait, au kilomètre et au kilogramme pour fourgons, camions et gros porteurs, avec des exemples chiffrés.',
+        descHow: 'Ce qui arrive à votre marchandise, de la commande à la signature à la porte, et ce que voient le chauffeur, le régulateur et vous pendant le trajet.',
+        descBusiness: 'Lignes régulières et lots complets pour les entreprises qui expédient régulièrement à Kigali et au Rwanda, tarifés à la ligne plutôt qu’à la livraison.',
+        descFaq: 'Responsabilité, paiement, délais d’enlèvement et ce que nous ne transportons pas. Les questions à poser avant de commander du fret chez Inzira.',
+        descDefault: 'Fret le jour même et en vrac à Kigali et dans tout le Rwanda, à grille tarifaire publiée. Commandez en moins d’une minute sans compte, puis suivez votre marchandise de l’enlèvement à la signature avec un code de suivi.',
     },
 
     coming: {
@@ -190,8 +325,8 @@ export const fr: Strings = {
         headlineTop: 'Du fret dans tout Kigali,',
         headlineBottom: 'sans rien cacher.',
         body:
-            'Nous construisons un service de fret où celui qui a expédié la marchandise voit ' +
-            'exactement où elle se trouve, d’un bout à l’autre. Pas encore ouvert au public — ' +
+            'Nous construisons un service de fret où celui qui a expédié la marchandise peut ' +
+            'la suivre d’un bout à l’autre. Pas encore ouvert au public : ' +
             'laissez-nous votre numéro et nous vous préviendrons le jour venu.',
         days: 'Jours',
         hours: 'Heures',
@@ -236,6 +371,7 @@ export const fr: Strings = {
         INVALID_NEEDED_BY: 'Choisissez l’une des échéances proposées, ou laissez le champ vide.',
         INVALID_PHONE: 'Ce numéro ne ressemble pas à un mobile rwandais.',
         INVALID_WEIGHT: 'Indiquez le poids en kilogrammes, en chiffres.',
+        WEIGHT_NEEDS_QUOTE: 'Ce chargement dépasse ce que nous pouvons tarifer en ligne. Parlez-nous-en et nous reviendrons avec un prix.',
         ORDER_CREATE_FAILED: 'Nous n’avons pas pu enregistrer votre commande pour le moment. Merci de réessayer.',
         TRACK_FAILED: 'Nous n’avons pas pu effectuer cette recherche pour le moment. Merci de réessayer.',
         CONTACT_FAILED: 'Nous n’avons pas pu envoyer votre message pour le moment. Merci de réessayer.',
@@ -251,7 +387,7 @@ export const fr: Strings = {
         check: 'Vérification',
         continue: 'Continuer',
         keepCode: 'Gardez ce code.',
-        keepCodeBody: 'C’est ainsi que vous verrez où se trouve votre marchandise. Un régulateur vérifie les détails et vous appellera si quelque chose doit être confirmé.',
+        keepCodeBody: 'C’est ainsi que vous suivrez l’avancement de votre marchandise. Un régulateur vérifie les détails et vous appellera si quelque chose doit être confirmé.',
         trackItNow: 'Suivre maintenant',
         done: 'Terminé',
         neededByNote: 'Cela aide le régulateur à organiser votre course. Il confirmera ce qui est possible lors de son appel.',
@@ -264,7 +400,7 @@ export const fr: Strings = {
         byDriver: 'par',
     },
     comingExtra: {
-        thanks: 'Merci — nous vous enverrons un SMS le jour de l’ouverture.',
+        thanks: 'Merci. Nous vous enverrons un SMS le jour de l’ouverture.',
     },
 
     buttons: {
@@ -279,7 +415,7 @@ export const fr: Strings = {
     },
     tour: {
         bookTitle: 'Commandez ici',
-        bookBody: 'Enlèvement, destination, ce que vous envoyez. Il suffit d’un nom et d’un numéro de téléphone — aucun compte à créer.',
+        bookBody: 'Enlèvement, destination, ce que vous envoyez. Il suffit d’un nom et d’un numéro de téléphone, et aucun compte à créer.',
         trackTitle: 'Déjà envoyé quelque chose ?',
         trackBody: 'Saisissez ici le code reçu par SMS pour voir où votre marchandise est arrivée.',
     },
@@ -288,7 +424,7 @@ export const fr: Strings = {
         bookTitle: 'Commander une livraison',
         bookBody: 'En moins d’une minute, sans compte.',
         trackTitle: 'Suivre une expédition',
-        trackBody: 'Voyez où est votre marchandise.',
+        trackBody: 'Voyez l’étape atteinte.',
         standingTitle: 'Lignes régulières',
         standingBody: 'Liaisons régulières, tarifées par entreprise.',
     },

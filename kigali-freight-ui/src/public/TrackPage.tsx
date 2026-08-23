@@ -17,10 +17,23 @@ const MILESTONES = [
     { key: 'DELIVERED', label: 'delivered', note: 'deliveredNote' },
 ] as const;
 
-// Seven backend statuses folded into the four a customer cares about.
-// ARRIVED reads the same as IN_TRANSIT from outside the cab.
-const REACHED_BY: Record<string, number> = {
-    PENDING: 0, ASSIGNED: 1, PICKED_UP: 2, IN_TRANSIT: 2, ARRIVED: 2, DELIVERED: 3,
+// The backend's eight live statuses folded into the four a customer cares
+// about. ARRIVED reads the same as IN_TRANSIT from outside the cab.
+//
+// Every status the backend can emit is listed, on purpose. There is a `?? 0`
+// fallback at the call site, and an unlisted status silently took it — which
+// is how AT_PICKUP came to show "Order received" to somebody whose driver was
+// standing at their gate. A fallback that quietly reports *less* progress
+// than has happened is worse than a missing row, because nothing looks wrong.
+//
+// OFFERED is deliberately 0 rather than 1: the job has been put to one named
+// driver who has not accepted it yet, and telling a customer a driver is
+// assigned before one has agreed is a promise the next screen may retract.
+export const REACHED_BY: Record<string, number> = {
+    PENDING: 0, OFFERED: 0,
+    ASSIGNED: 1, AT_PICKUP: 1,
+    PICKED_UP: 2, IN_TRANSIT: 2, ARRIVED: 2,
+    DELIVERED: 3,
 };
 
 function formatTime(iso?: string) {

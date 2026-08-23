@@ -22,8 +22,8 @@ export const privacyFr: PrivacyDoc = {
         title: 'L’application chauffeur',
         intro:
             'Inzira Driver est un outil de travail, remis aux chauffeurs qui transportent du ' +
-            'fret pour nous. Les comptes sont créés par notre équipe de régulation — il n’y a ' +
-            'pas d’inscription publique — et l’application collecte les éléments suivants ' +
+            'fret pour nous. Les comptes sont créés par notre équipe de régulation, et il n’y a ' +
+            'pas d’inscription publique. L’application collecte les éléments suivants ' +
             'pendant son utilisation.',
         sharedWithLabel: 'Partagé avec :',
         rows: [
@@ -48,7 +48,7 @@ export const privacyFr: PrivacyDoc = {
         body:
             'La commande sur ce site demande votre nom, un numéro de téléphone, éventuellement ' +
             'une adresse e-mail, ainsi que les adresses d’enlèvement et de livraison. Nous les ' +
-            'utilisons pour effectuer la livraison et pour vous joindre à son sujet — le code ' +
+            'utilisons pour effectuer la livraison et pour vous joindre à son sujet : le code ' +
             'de suivi envoyé par SMS, et un appel si le chauffeur ne trouve pas l’adresse.',
         body2:
             'Toute personne détenant le code de suivi peut voir l’avancement de cette ' +
@@ -61,7 +61,7 @@ export const privacyFr: PrivacyDoc = {
             'Les dossiers d’expédition, photos de livraison comprises, sont conservés tant ' +
             'qu’ils peuvent servir à traiter une question ou une réclamation concernant cette ' +
             'livraison. L’historique de localisation des chauffeurs est une donnée ' +
-            'opérationnelle, supprimée automatiquement au bout de 90 jours — un délai ' +
+            'opérationnelle, supprimée automatiquement au bout de 90 jours, un délai ' +
             'suffisant pour examiner une livraison contestée ou enquêter sur un incident ' +
             'plusieurs semaines après les faits.',
     },
@@ -70,7 +70,7 @@ export const privacyFr: PrivacyDoc = {
         body:
             'Vous pouvez nous demander ce que nous détenons à votre sujet, en demander la ' +
             'rectification ou la suppression, et nous y donnerons suite sauf obligation de ' +
-            'conservation — par exemple les documents réglementaires qu’un transporteur agréé ' +
+            'conservation, par exemple les documents réglementaires qu’un transporteur agréé ' +
             'doit conserver.',
         body2:
             'Les chauffeurs peuvent révoquer l’accès à la localisation à tout moment dans les ' +
