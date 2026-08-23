@@ -138,6 +138,21 @@ services:
       AT_API_KEY: ${AT_API_KEY:-}
       AT_USERNAME: ${AT_USERNAME:-}
       AT_SENDER_ID: ${AT_SENDER_ID:-}
+      # MTN Mobile Money. Unset by default, which switches the feature off
+      # entirely rather than half-on: payment requests are refused with a
+      # message telling the driver to take cash, and no payout is attempted.
+      MOMO_BASE_URL: ${MOMO_BASE_URL:-}
+      MOMO_TARGET_ENVIRONMENT: ${MOMO_TARGET_ENVIRONMENT:-}
+      MOMO_CURRENCY: ${MOMO_CURRENCY:-}
+      MOMO_COLLECTION_SUBSCRIPTION_KEY: ${MOMO_COLLECTION_SUBSCRIPTION_KEY:-}
+      MOMO_COLLECTION_API_USER: ${MOMO_COLLECTION_API_USER:-}
+      MOMO_COLLECTION_API_KEY: ${MOMO_COLLECTION_API_KEY:-}
+      MOMO_DISBURSEMENT_SUBSCRIPTION_KEY: ${MOMO_DISBURSEMENT_SUBSCRIPTION_KEY:-}
+      MOMO_DISBURSEMENT_API_USER: ${MOMO_DISBURSEMENT_API_USER:-}
+      MOMO_DISBURSEMENT_API_KEY: ${MOMO_DISBURSEMENT_API_KEY:-}
+      MOMO_CALLBACK_BASE_URL: ${MOMO_CALLBACK_BASE_URL:-}
+      DRIVER_PAYOUT_DELAY_MINUTES: ${DRIVER_PAYOUT_DELAY_MINUTES:-5}
+      DRIVER_PAYOUT_TICK_MS: ${DRIVER_PAYOUT_TICK_MS:-60000}
       AT_DELIVERY_REPORT_SECRET: ${AT_DELIVERY_REPORT_SECRET:-}
       # One phone number whose sign-in code is a known constant instead of
       # a text message, so Apple's and Google's reviewers can actually get

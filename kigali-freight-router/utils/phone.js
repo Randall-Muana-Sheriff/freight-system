@@ -73,3 +73,36 @@ export function generateInviteCode() {
     }
     return code;
 }
+
+// Which network a Rwandan mobile number belongs to.
+//
+// MTN Mobile Money can only charge an MTN subscriber. A customer on Airtel
+// cannot be sent a MoMo prompt at all — the request is accepted and then
+// fails a minute later with nothing useful said — so the driver has to be
+// told at the door, before they ask, that this number cannot pay this way.
+// That is the whole reason the "pay from another number" field exists.
+//
+// Prefixes are asserted only where they are certain: 078 and 079 are MTN.
+// Everything else returns 'OTHER' rather than guessing, because the cost of
+// wrongly claiming a number is MTN is a driver standing at a gate watching a
+// prompt that will never arrive.
+const MTN_RW_PREFIXES = ['78', '79'];
+
+export function mobileNetwork(phone) {
+    const normalised = normalizePhone(phone);
+    if (!normalised) return 'UNKNOWN';
+    const rwandan = normalised.match(/^\+250(\d{2})/);
+    if (!rwandan) return 'UNKNOWN';
+    return MTN_RW_PREFIXES.includes(rwandan[1]) ? 'MTN' : 'OTHER';
+}
+
+export function canReceiveMomoPrompt(phone) {
+    return mobileNetwork(phone) === 'MTN';
+}
+
+// MTN wants the MSISDN bare: no plus, no spaces. Returns null for anything
+// normalizePhone will not accept, so a malformed number never reaches the API.
+export function toMsisdn(phone) {
+    const normalised = normalizePhone(phone);
+    return normalised ? normalised.replace(/^\+/, '') : null;
+}

@@ -58,6 +58,8 @@ import pricingRoutes from './routes/pricingRoutes.js';
 import exceptionRoutes from './routes/exceptionRoutes.js';
 import placeHintRoutes from './routes/placeHintRoutes.js';
 import savedViewRoutes from './routes/savedViewRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import { startPayoutWorker, stopPayoutWorker } from './services/payoutWorker.js';
 
 const app = express();
 const allowedOrigins = appConfig.corsOrigins;
@@ -150,6 +152,7 @@ app.use('/api/pricing', pricingRoutes);
 app.use('/api/exceptions', exceptionRoutes);
 app.use('/api/place-hints', placeHintRoutes);
 app.use('/api/saved-views', savedViewRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Anything that reaches here escaped every controller's own try/catch —
 // a malformed JSON body, a multer error thrown before a route handler
@@ -311,6 +314,10 @@ function startServer(port = appConfig.port) {
     server.listen(port, () => {
       server.off('error', reject);
       console.log(`🚀 Secured Core Telemetry Routing Engine online on port ${port}`);
+      // Started with the listener rather than at import time, so importing
+      // the app in a test does not begin moving money. It is a no-op unless
+      // the disbursement product is configured.
+      startPayoutWorker();
       resolve(server);
     });
   });
@@ -341,6 +348,7 @@ if (isMainModule) {
 }
 
 async function shutdownServices() {
+  stopPayoutWorker();
   await telemetryQueue.shutdown();
   // io.close(), not just server.close(). Socket.IO owns engine.io's
   // ping/timeout interval and any still-open client connections, and
