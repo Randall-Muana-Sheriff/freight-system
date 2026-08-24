@@ -16,6 +16,15 @@
 # Mirrors .github/workflows/ci.yml's deploy-production job, with the same
 # exclude list — .env/.env.production/secrets/ are both skipped AND
 # protected from --delete, since they are server-only and never in git.
+#
+# WHAT IT REFUSES TO SHIP, and why each check exists separately:
+#   - a dirty tree        — the code would match no commit at all
+#   - a non-main branch   — nothing has reviewed it (DEPLOY_ALLOW_BRANCH=1)
+#   - a HEAD that differs — a clean tree on a stale or unpushed main is
+#     from origin/<branch>  still clean, and that is how the wrong commit
+#                           shipped once already
+# and it prints what is live, what is about to replace it, and any
+# migrations in between before asking for the short sha out loud.
 set -euo pipefail
 
 HOST="api.inzira.systems"
@@ -38,7 +47,94 @@ fi
 SHA="$(git rev-parse HEAD)"
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
-echo "📦 Deploying $BRANCH @ ${SHA:0:7} to $USER@$HOST:$REMOTE_PATH"
+# A CLEAN TREE IS NOT THE SAME AS THE RIGHT COMMIT.
+#
+# The dirty-tree check above was the only guard, and it answers a different
+# question than the one that matters: it proves what ships corresponds to
+# *some* commit, not that it corresponds to the one that was reviewed and
+# went green. A checkout sitting on a feature branch, or on a main that is
+# five commits behind origin, is perfectly clean — which is how the wrong
+# commit shipped, with the clean tree read as an all-clear.
+#
+# Three separate things are checked, because they fail separately:
+#   1. HEAD is on main            — a feature branch has not been reviewed.
+#   2. main matches origin/main   — a stale or unpushed local main ships
+#                                   code CI has never seen.
+#   3. The operator confirms      — everything above can be legitimately
+#      the SHA out loud             overridden; none of it should be
+#                                   overridden by accident.
+#
+# DEPLOY_ALLOW_BRANCH=1 skips (1) for the genuine hotfix-from-a-branch case.
+# There is deliberately no override for (2): shipping a commit that does not
+# exist on the remote means nobody else can check out what is running, and
+# rollback-production.sh's ancestor arithmetic has nothing to anchor to.
+if [ "$BRANCH" != "main" ] && [ "${DEPLOY_ALLOW_BRANCH:-}" != "1" ]; then
+    echo "❌ HEAD is on '$BRANCH', not main."
+    echo "   Production ships main. If this is a deliberate hotfix from a"
+    echo "   branch, re-run with DEPLOY_ALLOW_BRANCH=1."
+    exit 1
+fi
+
+echo "🔍 Fetching origin to check this commit is the one that was pushed..."
+git fetch --quiet origin "$BRANCH" 2>/dev/null || git fetch --quiet origin || true
+REMOTE_SHA="$(git rev-parse --verify --quiet "origin/$BRANCH" || true)"
+
+if [ -z "$REMOTE_SHA" ]; then
+    echo "❌ No origin/$BRANCH to compare against — cannot tell whether this"
+    echo "   commit was ever pushed, reviewed, or built by CI."
+    exit 1
+fi
+if [ "$SHA" != "$REMOTE_SHA" ]; then
+    echo "❌ HEAD does not match origin/$BRANCH."
+    echo "   local:  ${SHA:0:7} $(git log -1 --format=%s "$SHA")"
+    echo "   remote: ${REMOTE_SHA:0:7} $(git log -1 --format=%s "$REMOTE_SHA" 2>/dev/null || echo '(not fetched)')"
+    echo
+    if git merge-base --is-ancestor "$SHA" "$REMOTE_SHA" 2>/dev/null; then
+        echo "   Your checkout is BEHIND the remote — pull first, or you will"
+        echo "   ship an older commit over a newer one."
+    else
+        echo "   Your checkout has commits the remote does not — push them"
+        echo "   first, so what runs in production is something someone else"
+        echo "   can check out and CI has actually seen."
+    fi
+    exit 1
+fi
+
+# What is live right now, so the operator confirms a transition rather than
+# a destination. Best-effort: a router that is already down should not stop
+# the deploy that fixes it.
+LIVE="$(curl -fsS "https://$HOST/health" 2>/dev/null \
+    | sed -n 's/.*"version":"\([^"]*\)".*/\1/p' || true)"
+
+if [ -n "$LIVE" ]; then
+    LIVE_LABEL="${LIVE:0:7} $(git log -1 --format=%s "$LIVE" 2>/dev/null || echo '(commit not in this checkout)')"
+else
+    LIVE_LABEL="unknown (/health is unstamped or unreachable)"
+fi
+
+echo
+echo "📦 Deploying to $USER@$HOST:$REMOTE_PATH"
+echo "   from $LIVE_LABEL"
+echo "   to   ${SHA:0:7} $(git log -1 --format=%s "$SHA")"
+if [ -n "$LIVE" ] && git rev-parse --verify --quiet "$LIVE" >/dev/null 2>&1; then
+    AHEAD="$(git rev-list --count "$LIVE..$SHA" 2>/dev/null || echo '?')"
+    echo "   ($AHEAD commit(s) ahead of what is live)"
+    # Same warning rollback-production.sh gives in the other direction. A
+    # migration is the part of a deploy that a rollback cannot undo, so it
+    # is worth seeing before it runs, not after.
+    CROSSED="$(git diff --name-only "$LIVE" "$SHA" -- kigali-freight-router/migrations/ | grep -v '/down/' || true)"
+    if [ -n "$CROSSED" ]; then
+        echo
+        echo "⚠️  This deploy runs migrations:"
+        echo "$CROSSED" | sed 's/^/      /'
+        echo "   They run on container boot. A failure leaves the router"
+        echo "   crash-looping and the site down until a human intervenes,"
+        echo "   and rolling back afterwards does NOT unmigrate the schema."
+    fi
+fi
+echo
+read -r -p "Type the short sha (${SHA:0:7}) to confirm: " CONFIRM
+[ "$CONFIRM" = "${SHA:0:7}" ] || { echo "Aborted."; exit 1; }
 echo
 
 # --delete keeps the server from drifting, but never touches an --exclude'd
