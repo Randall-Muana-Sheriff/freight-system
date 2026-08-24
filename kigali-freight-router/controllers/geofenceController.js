@@ -67,7 +67,7 @@ export const GeofenceController = {
                 'INSERT INTO geofences (name, speed_limit_kmh, geom) VALUES ($1, $2, ST_GeomFromText($3, 4326)) ON CONFLICT (name) DO UPDATE SET geom = EXCLUDED.geom, speed_limit_kmh = EXCLUDED.speed_limit_kmh',
                 [name, finalSpeedLimit, wktPolygon]
             );
-            io.emit('geofenceUpdated', { name, speedLimitKmh: finalSpeedLimit });
+            toDispatch('geofenceUpdated', { name, speedLimitKmh: finalSpeedLimit });
             await appendAuditLog({
                 actionType: 'GEOFENCE_SAVED',
                 description: `Saved geofence ${name} with limit ${finalSpeedLimit} km/h`,
@@ -88,7 +88,7 @@ export const GeofenceController = {
         const { id } = req.params;
         try {
             await pool.query('DELETE FROM geofences WHERE id = $1', [id]);
-            io.emit('geofenceUpdated', { id, deleted: true });
+            toDispatch('geofenceUpdated', { id, deleted: true });
             await appendAuditLog({
                 actionType: 'GEOFENCE_DELETED',
                 description: `Deleted geofence ${id}`,

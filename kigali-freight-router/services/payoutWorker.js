@@ -13,6 +13,7 @@ import pool from '../config/db.js';
 import { io } from '../server.js';
 import { appendAuditLog } from './auditLogService.js';
 import { isMomoConfigured, newReference, transfer, getTransferStatus } from './momoClient.js';
+import { toDispatchAndDriver } from './realtime.js';
 
 const TICK_MS = Number(process.env.DRIVER_PAYOUT_TICK_MS || 60_000);
 // After this many failed attempts a payout stops retrying and waits for a
@@ -153,7 +154,7 @@ async function confirmSentPayouts() {
         );
         if (succeeded) {
             try {
-                io.emit('payout:sent', {
+                toDispatchAndDriver(payout.driver_username, 'payout:sent', {
                     driver: payout.driver_username,
                     orderId: payout.order_id,
                     amount: Number(payout.amount),

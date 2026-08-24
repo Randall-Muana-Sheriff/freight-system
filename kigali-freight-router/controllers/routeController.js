@@ -71,7 +71,7 @@ export const RouteController = {
                 [1, driverName || 'Dispatcher Snapshot', JSON.stringify(normalizedPath), 0, 0]
             );
 
-            io.emit('routeUpdated', result.rows[0]);
+            toDispatch('routeUpdated', result.rows[0]);
             await appendAuditLog({
                 actionType: 'ROUTE_SAVED',
                 description: `Saved route snapshot for ${driverName ? await describeDriver(driverName) : 'Dispatcher Snapshot'}`,

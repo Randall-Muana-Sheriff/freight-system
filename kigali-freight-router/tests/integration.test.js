@@ -1192,9 +1192,26 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             });
         });
 
+        // The broadcast is watched from DISPATCH, not from the driver.
+        //
+        // This used to listen on the driver's own socket, which passed only
+        // because every emission went to every connected client — the driver
+        // was receiving the whole fleet's positions. That is the leak, and
+        // asserting it kept it in place. A driver pushes their position; the
+        // board is who sees it.
+        const dispatchSocket = socketClient(`http://127.0.0.1:${socketPort}`, {
+            auth: { token: `Bearer ${adminToken}` },
+            transports: ['websocket'],
+        });
+        await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Dispatch socket connection timed out.')), 7000);
+            dispatchSocket.on('connect', () => { clearTimeout(timeout); resolve(); });
+            dispatchSocket.on('connect_error', (err) => { clearTimeout(timeout); reject(err); });
+        });
+
         const updateSeen = new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('No telemetry broadcast received.')), 7000);
-            socket.on('driver:location-update', (payload) => {
+            const timeout = setTimeout(() => reject(new Error('No telemetry broadcast received by dispatch.')), 7000);
+            dispatchSocket.on('driver:location-update', (payload) => {
                 if (payload.driverName === driverName) {
                     clearTimeout(timeout);
                     resolve();
@@ -1202,11 +1219,23 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
             });
         });
 
+        // And the other half of the boundary: the driver who pushed it must
+        // not be told where anybody is, including themselves.
+        let driverSawFleetTraffic = false;
+        socket.on('driver:location-update', () => { driverSawFleetTraffic = true; });
+        socket.on('fleet:snapshot', () => { driverSawFleetTraffic = true; });
+
         socket.emit('driver:telemetry-push', { driverName, lat, lng });
         await updateSeen;
 
         // Allow async DB writes from the socket handler to complete.
         await delay(300);
+
+        assert.equal(
+            driverSawFleetTraffic, false,
+            'a driver must not receive fleet positions — that is the leak this scoping closes'
+        );
+        dispatchSocket.close();
 
         const historyResult = await pool.query(
             'SELECT COUNT(*)::int AS count FROM driver_location_history WHERE driver_name = $1',

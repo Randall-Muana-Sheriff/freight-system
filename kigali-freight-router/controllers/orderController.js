@@ -16,6 +16,7 @@ import { isValidLat, isValidLng, isValidWeightKg } from '../utils/validators.js'
 import { priceJob, distanceKmBetween, detentionForOrder, backfillCreditForOrder, returnLoadCandidatesFor } from '../services/pricingRepository.js';
 import { issueDeliveryCode, sendDeliveryCode, verifyDeliveryCode, DELIVERY_CODE_MAX_ATTEMPTS } from '../services/deliveryCodeService.js';
 import { PricingError } from '../services/pricingService.js';
+import { toDispatch, toDispatchAndDriver } from '../services/realtime.js';
 
 const ALLOWED_ORDER_STATUSES = ['PENDING', 'OFFERED', 'ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED', 'CANCELLED'];
 // A dispatcher works a backlog in sittings, not in one gesture; this is
@@ -585,7 +586,7 @@ export const OrderController = {
             ]);
 
             const newOrder = result.rows[0];
-            io.emit('order:created', newOrder);
+            toDispatch('order:created', newOrder);
 
             return ok(res, { message: "Order logged successfully.", order: newOrder }, { status: 201 });
         } catch (error) {
@@ -736,7 +737,7 @@ export const OrderController = {
             // Save changes permanently to the core engine
             await client.query('COMMIT');
 
-            io.emit('order:dispatched', {
+            toDispatch('order:dispatched', {
                 driverName,
                 assignedManifest: updateResult.rows,
                 timestamp: new Date().toISOString()
@@ -849,8 +850,8 @@ export const OrderController = {
                 );
                 await client.query('COMMIT');
 
-                io.emit('order:unassigned', { orderId: Number(id), previousDriver, timestamp: new Date().toISOString() });
-                io.emit('order:created', updateResult.rows[0]);
+                toDispatch('order:unassigned', { orderId: Number(id), previousDriver, timestamp: new Date().toISOString() });
+                toDispatch('order:created', updateResult.rows[0]);
 
                 return ok(res, { message: `Unassigned from ${previousDriver}. Back in the dispatch queue.`, order: updateResult.rows[0] });
             }
@@ -930,7 +931,7 @@ export const OrderController = {
 
             await client.query('COMMIT');
 
-            io.emit('order:reassigned', {
+            toDispatch('order:reassigned', {
                 orderId: Number(id),
                 previousDriver,
                 driverName: nextDriver,
@@ -1127,7 +1128,7 @@ export const OrderController = {
                 newStatus: normalizedStatus,
             });
 
-            io.emit('order:status-updated', {
+            toDispatchAndDriver(assignedTo, 'order:status-updated', {
                 orderId: updatedOrder.id,
                 status: updatedOrder.status,
                 cargo_description: updatedOrder.cargo_description,
@@ -1232,7 +1233,7 @@ export const OrderController = {
                 username: req.user?.username || 'System',
             });
 
-            io.emit('order:status-updated', {
+            toDispatchAndDriver(assignedTo, 'order:status-updated', {
                 orderId: Number(id), status, forced: true,
                 assignedTo: updated.rows[0].assigned_to, timestamp: new Date().toISOString(),
             });
@@ -1438,7 +1439,7 @@ export const OrderController = {
 
             const updatedOrder = updateResult.rows[0];
             const photoUrl = await toSignedUrl(photoKey);
-            io.emit('order:status-updated', {
+            toDispatchAndDriver(assignedTo, 'order:status-updated', {
                 orderId: updatedOrder.id,
                 status: updatedOrder.status,
                 cargo_description: updatedOrder.cargo_description,
@@ -1933,7 +1934,7 @@ export const OrderController = {
 
             await client.query('COMMIT');
 
-            for (const order of updated.rows) io.emit('order:offered', order);
+            for (const order of updated.rows) toDispatch('order:offered', order);
             sendPushToUser(driverName, {
                 title: updated.rows.length === 1 ? 'A job is offered to you' : `${updated.rows.length} jobs offered to you`,
                 body: 'Open the app to accept or turn it down.',
@@ -1985,7 +1986,7 @@ export const OrderController = {
             );
             await client.query('COMMIT');
 
-            io.emit('order:status-updated', { orderId: Number(id), status: 'ASSIGNED', initiatedByDriver: true, timestamp: new Date().toISOString() });
+            toDispatchAndDriver(driverName, 'order:status-updated', { orderId: Number(id), status: 'ASSIGNED', initiatedByDriver: true, timestamp: new Date().toISOString() });
             return ok(res, { order: taken.rows[0] });
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});
@@ -2035,7 +2036,7 @@ export const OrderController = {
             // Back on the board, and dispatch told why. A job silently
             // returning to PENDING looks like a glitch; a job returning with
             // "too far for the rate" is something to act on.
-            io.emit('order:offer-declined', { orderId: Number(id), driverName, reason });
+            toDispatch('order:offer-declined', { orderId: Number(id), driverName, reason });
             return ok(res, { released: released.rows[0], reason });
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});

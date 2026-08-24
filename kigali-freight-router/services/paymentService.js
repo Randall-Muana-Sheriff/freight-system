@@ -24,6 +24,7 @@ import { logError } from '../utils/logger.js';
 import { appendAuditLog } from './auditLogService.js';
 import { sendPushToUser } from './pushNotificationService.js';
 import { canReceiveMomoPrompt, mobileNetwork, toMsisdn } from '../utils/phone.js';
+import { toDispatchAndDriver } from './realtime.js';
 import {
     MomoError, getRequestToPayStatus, isMomoConfigured,
     newReference, requestToPay,
@@ -323,7 +324,7 @@ async function queueDriverPayout(request) {
 function notifyDriver(request, event, payload) {
     const body = { orderId: request.order_id, reference: request.reference, ...payload };
     try {
-        io.emit(event, body);
+        toDispatchAndDriver(request.assigned_to, event, body);
     } catch { /* the socket is a convenience; the database is the record */ }
     if (request.assigned_to) {
         sendPushToUser(request.assigned_to, {

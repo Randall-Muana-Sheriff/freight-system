@@ -61,6 +61,7 @@ import savedViewRoutes from './routes/savedViewRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { startPayoutWorker, stopPayoutWorker } from './services/payoutWorker.js';
 import { startPaymentSweep, stopPaymentSweep } from './services/paymentService.js';
+import { DISPATCH_ROOM, driverRoom } from './services/realtime.js';
 
 const app = express();
 const allowedOrigins = appConfig.corsOrigins;
@@ -257,8 +258,33 @@ io.use((socket, next) => {
 
 io.on('connection', async (socket) => {
   observeSocketEvent('connection');
-  const fleetSnapshot = await hashGetAll(FLEET_STATE_KEY);
-  socket.emit('fleet:snapshot', Object.values(fleetSnapshot));
+
+  // A socket is put in exactly one room, decided here from the verified
+  // token rather than from anything the client asks for.
+  //
+  // Everything used to be io.emit(), which reaches every connected socket,
+  // and socket auth accepts any valid token — so a driver's app received the
+  // entire dispatch feed and discarded the parts it did not want in
+  // JavaScript, on the device. That is a courtesy to the UI, not a boundary:
+  // the data still arrived, and a driver can delete a line of their own
+  // client or simply watch the socket.
+  const isStaff = socket.isSimulator || ['admin', 'dispatcher'].includes(socket.user?.role);
+  if (isStaff) {
+    socket.join(DISPATCH_ROOM);
+  } else if (socket.user?.role === 'driver' && socket.user?.username) {
+    socket.join(driverRoom(socket.user.username));
+  }
+
+  // The fleet's live positions, to dispatch only.
+  //
+  // This was sent to every connection unconditionally, so a driver held the
+  // whole fleet's whereabouts before touching anything — and the driver app
+  // has no listener for it at all, which makes it the purest form of the
+  // leak: data delivered to a device that never asked and cannot use it.
+  if (isStaff) {
+    const fleetSnapshot = await hashGetAll(FLEET_STATE_KEY);
+    socket.emit('fleet:snapshot', Object.values(fleetSnapshot));
+  }
   socket.on('driver:telemetry-push', async (data) => {
     observeSocketEvent('driver:telemetry-push');
 

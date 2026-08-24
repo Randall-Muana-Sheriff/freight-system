@@ -2,6 +2,7 @@ import { hashDelete, hashGet, hashGetAll, hashSet, listLength, listPopBatch, lis
 import { marketTime } from '../utils/marketTime.js';
 import { sendPushToUser } from './pushNotificationService.js';
 import { getAssetLabelForDriver, ALERT_CATEGORY } from './alertDispatchService.js';
+import { toDispatch, toDispatchAndDriver } from './realtime.js';
 
 const DEFAULT_FLUSH_INTERVAL_MS = 250;
 const DEFAULT_BATCH_SIZE = 100;
@@ -189,7 +190,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                     enteredAt: timestamp,
                 };
 
-                io.emit('geofence:violation', incidentPayload);
+                toDispatchAndDriver(driverName, 'geofence:violation', incidentPayload);
                 getAssetLabelForDriver(driverName)
                     .catch(() => driverName)
                     .then((assetLabel) => {
@@ -215,7 +216,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
                  VALUES ($1, $2, $3, $4, $5, NOW())`,
                 [await currentActiveOrderId(), driverName, 'ZONE_EXIT', `${driverName} exited ${ongoingViolation.zoneName}`, 0]
             );
-            io.emit('geofence:exit', { driverName, zoneName: ongoingViolation.zoneName, exitedAt: timestamp });
+            toDispatchAndDriver(driverName, 'geofence:exit', { driverName, zoneName: ongoingViolation.zoneName, exitedAt: timestamp });
             getAssetLabelForDriver(driverName)
                 .catch(() => driverName)
                 .then((assetLabel) => {
@@ -229,7 +230,7 @@ export function createTelemetryQueue({ pool, io, dispatchExternalAlert }) {
         const vehicleType = await getVehicleTypeForDriver(driverName);
         const nextState = { driverName, lat: displayLat, lng: displayLng, velocityKmh: currentVelocityKmh, lastSeen: timestamp, vehicleType };
         await hashSet(FLEET_STATE_KEY, driverName, nextState);
-        io.emit('driver:location-update', nextState);
+        toDispatch('driver:location-update', nextState);
     }
 
     // Finds every driver with an active (picked-up/in-transit/arrived) job

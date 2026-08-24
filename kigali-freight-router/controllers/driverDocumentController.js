@@ -7,6 +7,7 @@ import { sendPushToUser } from '../services/pushNotificationService.js';
 import { analyzeDriverDocument } from '../services/documentAnalysisService.js';
 import { REQUIRED_DOCUMENT_TYPES, ACCEPTED_DOCUMENT_TYPES, DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
+import { toDispatchAndDriver } from '../services/realtime.js';
 
 // Three of the five documents describe the truck, not the person, and now
 // live in vehicle_documents keyed by vehicle. The upload still comes from
@@ -498,7 +499,7 @@ export const DriverDocumentController = {
             // they have it open, same broadcast-then-client-filters
             // pattern order:status-updated and incident:status-updated
             // already use.
-            io.emit('document:status-updated', {
+            toDispatchAndDriver(doc.username, 'document:status-updated', {
                 username: doc.username,
                 documentType: doc.documentType,
                 status: doc.status,

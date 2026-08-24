@@ -21,6 +21,7 @@ import { logError } from '../utils/logger.js';
 import { sequenceStops, plannedDistanceMetres } from '../utils/routeSequencing.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
 import { notifyCustomerOfStatus } from '../services/customerNotificationService.js';
+import { toDispatch, toDispatchAndDriver } from '../services/realtime.js';
 
 const STOP_KINDS = ['PICKUP', 'DROP'];
 const OPEN_STOP_STATUSES = ['PENDING', 'ARRIVED'];
@@ -253,7 +254,7 @@ export const TripController = {
                 description: `Run #${tripId} planned with ${full.stopCount} stops across ${ids.length} orders${driverUsername ? ` for ${driverUsername}` : ''}`,
                 username: req.user?.username || 'System',
             });
-            io.emit('trip:updated', { tripId, status: full.status });
+            toDispatch('trip:updated', { tripId, status: full.status });
             if (driverUsername) {
                 sendPushToUser(driverUsername, {
                     title: 'New run assigned',
@@ -393,7 +394,7 @@ export const TripController = {
 
             const full = await loadTrip(client, tripId);
             await client.query('COMMIT');
-            io.emit('trip:updated', { tripId, status: full.status });
+            toDispatch('trip:updated', { tripId, status: full.status });
             return ok(res, full);
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});
@@ -437,7 +438,7 @@ export const TripController = {
                 description: `Run #${tripId} re-ordered by hand`,
                 username: req.user?.username || 'System',
             });
-            io.emit('trip:updated', { tripId, status: full.status });
+            toDispatch('trip:updated', { tripId, status: full.status });
             return ok(res, full);
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});
@@ -537,7 +538,7 @@ export const TripController = {
                 description: `Run #${tripId}${status ? ` set to ${status}` : ''}${driverUsername !== undefined ? ` assigned to ${driverUsername || 'nobody'}` : ''}`,
                 username: req.user?.username || 'System',
             });
-            io.emit('trip:updated', { tripId, status: full.status });
+            toDispatch('trip:updated', { tripId, status: full.status });
             return ok(res, full);
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});
@@ -634,7 +635,7 @@ export const TripController = {
                         `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by) VALUES ($1, $2, $3, $4)`,
                         [stop.order_id, previous.rows[0].status, orderStatus, req.user?.username || 'System']
                     );
-                    io.emit('order:status-updated', {
+                    toDispatchAndDriver(stop.driver_username, 'order:status-updated', {
                         orderId: stop.order_id,
                         status: orderStatus,
                         initiatedByDriver: role === 'driver',
@@ -674,7 +675,7 @@ export const TripController = {
                     username: req.user?.username || 'System',
                 });
             }
-            io.emit('trip:updated', { tripId: stop.trip_id, status: full.status });
+            toDispatch('trip:updated', { tripId: stop.trip_id, status: full.status });
             return ok(res, full);
         } catch (error) {
             await client.query('ROLLBACK').catch(() => {});

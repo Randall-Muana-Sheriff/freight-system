@@ -10,6 +10,7 @@ import { findNearestHub } from '../services/hubService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { dispatchExternalAlert, getAssetLabelForDriver, ALERT_CATEGORY } from '../services/alertDispatchService.js';
+import { toDispatchAndDriver } from '../services/realtime.js';
 
 const SEVERITY_EMOJI = { high: '🚨', medium: '⚠️', low: 'ℹ️' };
 
@@ -76,7 +77,7 @@ async function finalizeIncidentAnalysis({
 }
 
 async function emitIncident(event, row) {
-    io.emit(event, { ...row, photo_url: await toSignedUrl(row.photo_url) });
+    toDispatchAndDriver(row.driver_name, event, { ...row, photo_url: await toSignedUrl(row.photo_url) });
 }
 
 // Fire-and-forget, same as the geofence/stale-signal alerts — never delay
