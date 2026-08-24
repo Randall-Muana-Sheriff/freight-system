@@ -1054,6 +1054,15 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         // The code itself is never stored, so the test has to plant a known
         // hash the way the OTP tests do -- which is also the proof that it is
         // hashed rather than kept in the clear.
+        // A delivery is confirmed at the door, so the journey has to reach the
+        // door first. confirmDelivery is now the only way to DELIVERED and it
+        // only opens from ARRIVED — previously this test skipped straight from
+        // IN_TRANSIT, which is exactly the shortcut that let a job be closed
+        // without ever being recorded as having arrived.
+        const arrived = await request(app).patch(`/api/orders/${orderId}/status`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ status: 'ARRIVED' });
+        assert.equal(arrived.statusCode, 200, JSON.stringify(arrived.body));
+
         const known = '4271';
         // Hashed here rather than in SQL: digest() needs pgcrypto, which this
         // database does not have, and the application hashes in Node anyway.

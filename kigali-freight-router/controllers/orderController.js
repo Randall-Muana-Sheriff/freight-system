@@ -7,6 +7,7 @@ import { ok, fail } from '../utils/httpResponse.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { uploadDeliveryPhoto, toSignedUrl } from '../config/r2Client.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
+import { canTransition, refusalFor, DELIVERABLE_FROM, isTerminal } from '../utils/orderTransitions.js';
 import { appendAuditLog } from '../services/auditLogService.js';
 import * as Sentry from '@sentry/node';
 import { logError } from '../utils/logger.js';
@@ -992,7 +993,7 @@ export const OrderController = {
             await client.query('BEGIN');
 
             // Fetch the current state to populate previous status columns
-            const currentQuery = `SELECT status, assigned_to FROM orders WHERE id = $1 FOR UPDATE;`;
+            const currentQuery = `SELECT status, assigned_to, payment_status FROM orders WHERE id = $1 FOR UPDATE;`;
             const currentResult = await client.query(currentQuery, [id]);
 
             if (currentResult.rows.length === 0) {
@@ -1005,6 +1006,7 @@ export const OrderController = {
             }
 
             const previousStatus = currentResult.rows[0].status;
+
             const assignedTo = currentResult.rows[0].assigned_to;
 
             if (requesterRole === 'driver' && String(assignedTo || '').toLowerCase() !== String(req.user?.username || '').toLowerCase()) {
@@ -1013,6 +1015,30 @@ export const OrderController = {
                     status: 403,
                     code: 'ORDERS_STATUS_FORBIDDEN',
                     message: 'Drivers may only update orders assigned to them.',
+                });
+            }
+
+            // The rule that did not exist. Every state could reach every
+            // other, which is how DELIVERED was obtainable without the proof
+            // confirmDelivery demands.
+            if (!canTransition(previousStatus, normalizedStatus)) {
+                await client.query('ROLLBACK');
+                const refusal = refusalFor(previousStatus, normalizedStatus);
+                return fail(res, { status: 409, ...refusal });
+            }
+
+            // Cancelling a job the customer has already paid for is not a
+            // status change, it is a refund. Nothing here can move money
+            // back, so the honest answer is to refuse and say what is owed
+            // rather than quietly leave the order cancelled and the payment
+            // reading PAID -- which is money kept against a job that did not
+            // happen, and appears on no board.
+            if (normalizedStatus === 'CANCELLED' && currentResult.rows[0].payment_status === 'PAID') {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: 'ORDERS_CANCEL_ALREADY_PAID',
+                    message: 'This delivery has already been paid for. Refund the customer first, or use a forced close and record why.',
                 });
             }
 
@@ -1135,6 +1161,91 @@ export const OrderController = {
     // in one transaction. Expects multipart/form-data with a `photo` file
     // field (see routes/orderRoutes.js for the multer middleware) and an
     // optional `notes` text field.
+    // PATCH /api/orders/:id/force-status   { status, reason }
+    //
+    // The escape hatch, and deliberately a loud one.
+    //
+    // Real deliveries go wrong in ways the state machine cannot know about: a
+    // phone dies at the gate, a driver marks the wrong job, a customer pays
+    // and then refuses the goods. Refusing those outright would leave dispatch
+    // stuck and push people into editing the database by hand, which is worse
+    // than a side entrance because it leaves no trace at all.
+    //
+    // So the exception exists, but it costs something: admin only, a written
+    // reason is mandatory, and it lands in the permanent audit log with the
+    // name of whoever forced it. That is the difference between an escape
+    // hatch and the quiet second door this replaces -- both let you through,
+    // only one of them remembers.
+    forceOrderStatus: async (req, res) => {
+        const client = await pool.connect();
+        try {
+            const { id } = req.params;
+            const status = String(req.body?.status || '').toUpperCase();
+            const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+
+            if (!ALLOWED_ORDER_STATUSES.includes(status)) {
+                return fail(res, { status: 400, code: 'ORDERS_STATUS_INVALID',
+                    message: `Status must be one of: ${ALLOWED_ORDER_STATUSES.join(', ')}.` });
+            }
+            // The reason is the entire point. A forced transition with no
+            // explanation is the thing this endpoint exists to prevent.
+            if (reason.length < 10) {
+                return fail(res, { status: 400, code: 'ORDERS_FORCE_REASON_REQUIRED',
+                    message: 'Say why this is being forced, in a sentence. It goes on the permanent record.' });
+            }
+
+            await client.query('BEGIN');
+            const current = await client.query(
+                'SELECT status, payment_status, assigned_to FROM orders WHERE id = $1 FOR UPDATE;', [id]
+            );
+            if (current.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return fail(res, { status: 404, code: 'ORDERS_NOT_FOUND', message: 'Order record not found.' });
+            }
+            const previousStatus = current.rows[0].status;
+            if (previousStatus === status) {
+                await client.query('ROLLBACK');
+                return fail(res, { status: 409, code: 'ORDERS_FORCE_NO_CHANGE',
+                    message: `That order is already ${status.toLowerCase()}.` });
+            }
+
+            const updated = await client.query(
+                `UPDATE orders SET status = $2, updated_at = NOW() WHERE id = $1
+                 RETURNING id, cargo_description, status, assigned_to, payment_status`,
+                [id, status]
+            );
+            await client.query(
+                `INSERT INTO order_status_logs (order_id, previous_status, new_status, changed_by)
+                 VALUES ($1, $2, $3, $4)`,
+                [id, previousStatus, status, `force:${req.user?.username || 'unknown'}`]
+            );
+            await client.query('COMMIT');
+
+            // Outside the transaction: the audit entry must survive even if
+            // something later fails, and it is the record a refund
+            // conversation will be built on.
+            await appendAuditLog({
+                actionType: 'ORDER_STATUS_FORCED',
+                description: `Order #${id} forced ${previousStatus} -> ${status}`
+                    + (current.rows[0].payment_status === 'PAID' ? ' (ALREADY PAID — refund may be owed)' : '')
+                    + `. Reason: ${reason.slice(0, 300)}`,
+                username: req.user?.username || 'System',
+            });
+
+            io.emit('order:status-updated', {
+                orderId: Number(id), status, forced: true,
+                assignedTo: updated.rows[0].assigned_to, timestamp: new Date().toISOString(),
+            });
+            return ok(res, { order: updated.rows[0], previousStatus, forced: true });
+        } catch (error) {
+            await client.query('ROLLBACK');
+            logError(req, 'Forcing order status failed', error);
+            return fail(res, { status: 500, code: 'ORDERS_FORCE_FAILED', message: 'Could not force that status.' });
+        } finally {
+            client.release();
+        }
+    },
+
     confirmDelivery: async (req, res) => {
         const client = await pool.connect();
         try {
@@ -1189,6 +1300,23 @@ export const OrderController = {
             }
 
             const { status: previousStatus, assigned_to: assignedTo, delivery_geom: deliveryGeom } = currentResult.rows[0];
+
+            // The other half of the same rule. The status endpoint can no
+            // longer reach DELIVERED, so this is the only door -- and a door
+            // with a lock on it still needs to check which room it opens
+            // from. A job closed without ever being marked arrived leaves the
+            // customer's timeline with no arrival on it, and lets the whole
+            // journey be skipped in two calls instead of one.
+            if (!DELIVERABLE_FROM.includes(previousStatus)) {
+                await client.query('ROLLBACK');
+                return fail(res, {
+                    status: 409,
+                    code: isTerminal(previousStatus) ? 'ORDERS_STATUS_TERMINAL' : 'ORDERS_DELIVERY_NOT_ARRIVED',
+                    message: isTerminal(previousStatus)
+                        ? `This order is already ${previousStatus.toLowerCase()} and cannot be confirmed again.`
+                        : 'Mark the delivery as arrived before confirming the handover.',
+                });
+            }
             const requesterRole = String(req.user?.role || '').toLowerCase();
             if (requesterRole === 'driver' && String(assignedTo || '').toLowerCase() !== driverName.toLowerCase()) {
                 await client.query('ROLLBACK');

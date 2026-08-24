@@ -61,6 +61,10 @@ router.post('/offer', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, 
 // there being an offer rather than an assignment.
 router.post('/:id/accept', authMiddleware(['driver']), orderWriteLimit, OrderController.acceptOffer);
 router.post('/:id/decline', authMiddleware(['driver']), orderWriteLimit, OrderController.declineOffer);
+// The audited exception to the transition rules. Admin only, and it records
+// who forced it and why — the ordinary status endpoint refuses out-of-sequence
+// moves, and this is the door for the cases real deliveries produce anyway.
+router.patch('/:id/force-status', authMiddleware(['admin']), orderWriteLimit, OrderController.forceOrderStatus);
 router.patch('/:id/reassign', authMiddleware(['admin', 'dispatcher']), orderWriteLimit, OrderController.reassignOrder);
 // Pins a customer-placed order to real coordinates. Dispatch-only: it is a
 // judgement call about what a customer's free-text address actually means.
