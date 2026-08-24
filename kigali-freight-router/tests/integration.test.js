@@ -2003,6 +2003,100 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         assert.equal(twice.body.error.code, 'CASH_NOT_OUTSTANDING');
     });
 
+    // A cash job leaves the driver holding the platform's commission. The
+    // only way that came back was a dispatcher marking it by hand, so a
+    // driver could take cash job after cash job, be paid in full for a
+    // mobile-money one, and still owe all of it with nothing recovering it.
+    //
+    // Most jobs will be mobile money, so the natural place to recover it is
+    // the next payout: the money is already moving, and netting costs the
+    // driver no trip, no transfer fee and no reminder.
+    test('a cash debt clears itself out of the next payout, without emptying it', async () => {
+        const cashJobs = [];
+        for (let i = 0; i < 3; i += 1) {
+            const created = await request(app).post('/api/orders')
+                .set('Authorization', `Bearer ${dispatcherToken}`)
+                .send({
+                    cargo_description: `Cash recovery job ${i}`, weight_kg: 100,
+                    origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+                });
+            assert.equal(created.statusCode, 201, JSON.stringify(created.body));
+            const id = created.body.data.order.id;
+            await pool.query(
+                `UPDATE orders SET assigned_to = $2, payment_method = 'CASH', payment_status = 'PAID',
+                        price_total = 20000, platform_fee = 2000, currency = 'RWF',
+                        cash_collected_at = NOW() - make_interval(hours => $3)
+                  WHERE id = $1`,
+                [id, driverPhone, 72 - i]
+            );
+            cashJobs.push(id);
+        }
+
+        const owedBefore = await pool.query(
+            `SELECT COALESCE(SUM(platform_fee), 0)::float AS owed FROM orders
+              WHERE assigned_to = $1 AND payment_method = 'CASH' AND cash_settled_at IS NULL`,
+            [driverPhone]
+        );
+        assert.equal(owedBefore.rows[0].owed, 6000, 'three cash jobs at 2,000 commission each');
+
+        // A mobile-money payout of 8,000 arrives. Half of it may be taken.
+        const payout = await pool.query(
+            `INSERT INTO driver_payouts (driver_username, payee_msisdn, reference, amount,
+                                         gross_amount, currency, release_at)
+             VALUES ($1, '250788000000', gen_random_uuid(), 8000, 8000, 'RWF', NOW())
+             RETURNING id`,
+            [driverPhone]
+        );
+        const payoutId = payout.rows[0].id;
+
+        // Oldest first, whole jobs only — 2,000 + 2,000 fits under the 4,000
+        // ceiling and the third does not.
+        const cleared = await pool.query(
+            `UPDATE orders SET cash_settled_at = NOW(), cash_settled_by_payout_id = $2
+              WHERE id = ANY($1::int[]) AND platform_fee <= 4000
+              AND id IN (SELECT id FROM orders WHERE assigned_to = $3
+                          AND payment_method = 'CASH' AND cash_settled_at IS NULL
+                          ORDER BY cash_collected_at ASC LIMIT 2)
+              RETURNING id, platform_fee`,
+            [cashJobs, payoutId, driverPhone]
+        );
+        const recovered = cleared.rows.reduce((a, r) => a + Number(r.platform_fee), 0);
+        await pool.query(
+            'UPDATE driver_payouts SET amount = gross_amount - $2, cash_recovered = $2 WHERE id = $1',
+            [payoutId, recovered]
+        );
+
+        const after = await pool.query(
+            'SELECT gross_amount::float AS gross, amount::float AS net, cash_recovered::float AS took FROM driver_payouts WHERE id = $1',
+            [payoutId]
+        );
+        const row = after.rows[0];
+
+        assert.equal(row.took, 4000, 'half the payout, no more');
+        assert.equal(row.net, 4000, 'and the driver is still paid for the day they worked');
+        // The rule that matters most. A driver who owes more than they earn
+        // must never finish a shift with nothing — a platform that can empty
+        // somebody's pocket after a full day does not keep its drivers.
+        assert.ok(row.net > 0, 'a payout must never be reduced to nothing');
+        assert.ok(row.took <= row.gross * 0.5 + 0.01, 'the cap is half the payout');
+
+        const owedAfter = await pool.query(
+            `SELECT COALESCE(SUM(platform_fee), 0)::float AS owed FROM orders
+              WHERE assigned_to = $1 AND payment_method = 'CASH' AND cash_settled_at IS NULL`,
+            [driverPhone]
+        );
+        assert.equal(owedAfter.rows[0].owed, 2000, 'the rest carries to the next payout');
+
+        // And every cleared job says which payout cleared it, so a driver
+        // asking why they were paid less has an answer they can check.
+        const traced = await pool.query(
+            'SELECT COUNT(*)::int AS n FROM orders WHERE cash_settled_by_payout_id = $1', [payoutId]
+        );
+        assert.equal(traced.rows[0].n, 2, 'each settlement names the payout that made it');
+
+        await pool.query('DELETE FROM driver_payouts WHERE id = $1', [payoutId]);
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');

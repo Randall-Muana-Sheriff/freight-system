@@ -312,6 +312,61 @@ export async function reconcilePaymentRequest(reference) {
     return { known: true, status: 'SUCCESSFUL', changed: true };
 }
 
+// The most of a single payout that can be taken to clear a cash debt.
+//
+// Not all of it, deliberately. A driver who owes fifty thousand and earns
+// five today would otherwise finish a day's work with nothing, and a platform
+// that can leave someone with an empty pocket after a full shift will not
+// keep its drivers. Half clears a debt over a few jobs while the driver is
+// always paid for the day they worked.
+const CASH_RECOVERY_MAX_SHARE = Number(process.env.CASH_RECOVERY_MAX_SHARE || 0.5);
+
+/**
+ * Take what can be taken of a driver's outstanding cash commission out of a
+ * payout that is about to be queued.
+ *
+ * Oldest debts first, and only whole jobs — settling half of one order's
+ * commission would leave a figure nobody can reconcile against anything.
+ *
+ * Returns what was withheld and which orders it cleared. Runs inside the
+ * caller's transaction so a payout can never be reduced without the matching
+ * orders being marked, or the reverse.
+ */
+async function recoverCashOwed(client, driverUsername, payoutAmount, payoutId) {
+    const ceiling = payoutAmount * CASH_RECOVERY_MAX_SHARE;
+    if (!(ceiling > 0)) return { recovered: 0, cleared: [] };
+
+    const { rows } = await client.query(
+        `SELECT id, platform_fee FROM orders
+          WHERE assigned_to = $1 AND payment_method = 'CASH'
+            AND cash_settled_at IS NULL AND platform_fee IS NOT NULL
+            AND platform_fee > 0
+          ORDER BY cash_collected_at ASC
+          FOR UPDATE`,
+        [driverUsername]
+    );
+
+    let recovered = 0;
+    const cleared = [];
+    for (const row of rows) {
+        const fee = Number(row.platform_fee);
+        // Whole jobs only. Stop at the first one that does not fit rather
+        // than skipping ahead to a smaller later debt — oldest first is
+        // easier for a driver to follow than cheapest first.
+        if (recovered + fee > ceiling) break;
+        recovered += fee;
+        cleared.push(row.id);
+    }
+    if (cleared.length === 0) return { recovered: 0, cleared: [] };
+
+    await client.query(
+        `UPDATE orders SET cash_settled_at = NOW(), cash_settled_by_payout_id = $2, updated_at = NOW()
+          WHERE id = ANY($1::int[])`,
+        [cleared, payoutId]
+    );
+    return { recovered, cleared };
+}
+
 // The driver's earning, recorded now and sent shortly. The row is what the
 // driver's screen reads, so the money is visible the instant the customer
 // pays even though the transfer has not happened yet.
@@ -322,15 +377,63 @@ async function queueDriverPayout(request) {
         logError(null, `Driver ${request.assigned_to} has no payable number; payout held`, new Error('unpayable'));
         return;
     }
-    await pool.query(
-        `INSERT INTO driver_payouts
-            (order_id, payment_request_id, driver_username, payee_msisdn, reference,
-             amount, currency, release_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() + make_interval(mins => $8))
-         ON CONFLICT (payment_request_id) WHERE payment_request_id IS NOT NULL DO NOTHING`,
-        [request.order_id, request.id, request.assigned_to, msisdn, newReference(),
-         Number(request.driver_net), request.currency, PAYOUT_DELAY_MINUTES]
-    );
+    // One transaction, because a payout reduced without its orders being
+    // marked settled would take a driver's money for a debt that still shows
+    // as owed — and the reverse would clear a debt nobody paid.
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const gross = Number(request.driver_net);
+        const inserted = await client.query(
+            `INSERT INTO driver_payouts
+                (order_id, payment_request_id, driver_username, payee_msisdn, reference,
+                 amount, gross_amount, currency, release_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $6, $7, NOW() + make_interval(mins => $8))
+             ON CONFLICT (payment_request_id) WHERE payment_request_id IS NOT NULL DO NOTHING
+             RETURNING id`,
+            [request.order_id, request.id, request.assigned_to, msisdn, newReference(),
+             gross, request.currency, PAYOUT_DELAY_MINUTES]
+        );
+        // Nothing inserted means a payout for this collection already exists.
+        if (inserted.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return;
+        }
+        const payoutId = inserted.rows[0].id;
+
+        // Netting the cash debt off here rather than chasing it separately.
+        // The money is already moving, so recovery costs the driver no trip,
+        // no transfer fee and no reminder — and a debt that clears itself is
+        // one nobody has to have an awkward conversation about.
+        const { recovered, cleared } = await recoverCashOwed(
+            client, request.assigned_to, gross, payoutId
+        );
+        if (recovered > 0) {
+            await client.query(
+                `UPDATE driver_payouts SET amount = gross_amount - $2, cash_recovered = $2
+                  WHERE id = $1`,
+                [payoutId, recovered]
+            );
+        } else {
+            await client.query('UPDATE driver_payouts SET cash_recovered = 0 WHERE id = $1', [payoutId]);
+        }
+        await client.query('COMMIT');
+
+        if (recovered > 0) {
+            await appendAuditLog({
+                actionType: 'DRIVER_CASH_RECOVERED',
+                description: `${recovered} ${request.currency || ''} of cash commission recovered from `
+                    + `${request.assigned_to}'s payout on order #${request.order_id}, `
+                    + `clearing order(s) #${cleared.join(', #')}.`,
+                username: 'System',
+            });
+        }
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        logError(null, `Queuing payout for order #${request.order_id} failed`, error);
+    } finally {
+        client.release();
+    }
 }
 
 function notifyDriver(request, event, payload) {
