@@ -33,8 +33,22 @@
 ALTER TABLE pricing_rates
     ADD COLUMN IF NOT EXISTS return_leg_full_km NUMERIC(10, 2);
 
+-- GREATEST rather than a flat 75.00, because this backfill is followed by a
+-- constraint requiring full_km > beyond_km, and a fixed default cannot promise
+-- that. Every row we can see today starts at 25.00, so 75.00 clears it — but
+-- pricing_rates is operator-editable through the rate card panel's supersede
+-- flow, and a card whose empty-return charge starts at 80 km would be
+-- backfilled to 75, fail the CHECK, and take migrate.js down with a non-zero
+-- exit. The container command is `migrate && server`, so that is not a failed
+-- migration, it is a router that will not start.
+--
+-- Keeping the band width instead of the endpoint is also the more faithful
+-- default: the 50 km ramp is the claim being made -- backhaul probability
+-- decays over about fifty kilometres of distance from the market -- and an
+-- operator who moves the start has moved where that decay begins, not how long
+-- it takes. For every existing row this is 75.00 exactly, as before.
 UPDATE pricing_rates
-   SET return_leg_full_km = 75.00
+   SET return_leg_full_km = GREATEST(75.00, return_leg_beyond_km + 50.00)
  WHERE return_leg_full_km IS NULL
    AND return_leg_beyond_km IS NOT NULL;
 
