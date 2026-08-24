@@ -54,7 +54,7 @@ describe('ExceptionsHome', () => {
     describe('a backlog is not an alarm', () => {
         it('gives a large historical count a plain line, not a ranked card', async () => {
             mockedFetch.mockResolvedValue(reportOf(
-                group({ key: 'payment_outstanding', label: 'Payment outstanding', severity: 'act', count: 108 }),
+                group({ key: 'delivered_unpriced', label: 'Delivered, and never priced', severity: 'watch', count: 108 }),
             ));
 
             renderBoard();
@@ -69,7 +69,7 @@ describe('ExceptionsHome', () => {
         // somebody in the next ten minutes.
         it('keeps the urgent heading for the small operational alert beside it', async () => {
             mockedFetch.mockResolvedValue(reportOf(
-                group({ key: 'payment_outstanding', label: 'Payment outstanding', severity: 'act', count: 108 }),
+                group({ key: 'delivered_unpriced', label: 'Delivered, and never priced', severity: 'watch', count: 108 }),
                 group({ key: 'assigned_driver_dark', label: 'Driver has gone dark', severity: 'act', count: 1 }),
             ));
 
@@ -84,7 +84,7 @@ describe('ExceptionsHome', () => {
         it('offers a way in to the unplaced queue, and only to that one', async () => {
             mockedFetch.mockResolvedValue(reportOf(
                 group({ key: 'unplaced_orders', label: 'Unplaced', count: 61 }),
-                group({ key: 'payment_outstanding', label: 'Payment outstanding', count: 108 }),
+                group({ key: 'delivered_unpriced', label: 'Delivered, and never priced', severity: 'watch', count: 108 }),
             ));
 
             renderBoard();
@@ -131,13 +131,46 @@ describe('ExceptionsHome', () => {
     // printing "nothing is going wrong" directly beneath a visible one.
     it('does not claim nothing is wrong while a backlog is on screen', async () => {
         mockedFetch.mockResolvedValue(reportOf(
-            group({ key: 'payment_outstanding', label: 'Payment outstanding', count: 108 }),
+            group({ key: 'delivered_unpriced', label: 'Delivered, and never priced', severity: 'watch', count: 108 }),
         ));
 
         renderBoard();
 
         expect(await screen.findByText('Nothing needs anyone right now.')).toBeTruthy();
         expect(screen.queryByText('Nothing is going wrong that the system can see.')).toBeNull();
+    });
+
+    // The half of the split that must NOT be a backlog. payment_outstanding
+    // means delivered, priced, and the money is not in — somebody rings
+    // someone today. It was on the backlog list while the server used one
+    // group for both, and leaving it there after they were split would have
+    // taken the urgent half and dressed it as history.
+    it('treats an unpaid priced delivery as urgent, not as backlog', async () => {
+        mockedFetch.mockResolvedValue(reportOf(
+            group({ key: 'payment_outstanding', label: 'Delivered, and nobody has paid', severity: 'act', count: 2 }),
+        ));
+
+        renderBoard();
+
+        expect(await screen.findByText('Needs someone now')).toBeTruthy();
+        expect(screen.getByText('Delivered, and nobody has paid')).toBeTruthy();
+        expect(screen.queryByText(/backlog to settle/i)).toBeNull();
+    });
+
+    it('keeps them apart when both arrive together', async () => {
+        mockedFetch.mockResolvedValue(reportOf(
+            group({ key: 'payment_outstanding', label: 'Delivered, and nobody has paid', severity: 'act', count: 2 }),
+            group({ key: 'delivered_unpriced', label: 'Delivered, and never priced', severity: 'watch', count: 108 }),
+        ));
+
+        renderBoard();
+
+        // The 2 that needs a phone call is ranked; the 108 that needs a
+        // pricing decision is a line. Sizes reversed, urgency not.
+        expect(await screen.findByText('Needs someone now')).toBeTruthy();
+        expect(screen.getByText('Delivered, and nobody has paid')).toBeTruthy();
+        expect(screen.getByText(/backlog to settle/i)).toBeTruthy();
+        expect(screen.queryByText('Worth watching')).toBeNull();
     });
 
     it('shows the failure rather than an empty board that looks healthy', async () => {

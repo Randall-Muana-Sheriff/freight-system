@@ -22,18 +22,24 @@ import { fetchExceptions, type ExceptionGroup, type ExceptionReport } from '../u
 // time, which is how the two deliveries that arrived and were never closed get
 // missed. It gets one line, not a ranked card.
 //
-// payment_outstanding joins it for the same reason. It is orders delivered
-// before there was any way to price or charge them: every one real, the number
-// worth seeing, but a standing balance to work through rather than something
-// that broke today. Rendered as an `act` card beside "1 driver has gone dark"
-// a large one would out-shout the alert that needs somebody in the next ten
-// minutes, and teach a dispatcher that the top of this screen is noise.
+// delivered_unpriced joins it for the same reason. Those are orders delivered
+// before there was any way to price them: every one real, the number worth
+// seeing, but unbillable rather than unpaid — nobody can be asked for a figure
+// that was never agreed, so no phone call fixes one. Rendered as a ranked card
+// beside "1 driver has gone dark" a hundred of them would out-shout the alert
+// that needs somebody in the next ten minutes, and teach a dispatcher that the
+// top of this screen is noise.
 //
-// Classified by what the group MEANS, not by how big it happens to be. A
+// payment_outstanding is deliberately NOT here, and the distinction is the
+// whole point. It means delivered, priced, and the money is not in — a phone
+// call somebody makes today. It was on this list while the server used one
+// group for both, and leaving it here after they were split would have taken
+// the urgent half and dressed it as the backlog: exactly the harm the split
+// was made to prevent.
+//
+// Classified by what a group MEANS, not by how big it happens to be. A
 // magnitude rule would demote a genuine spike to a footnote on exactly the day
-// it mattered. (Local fixture data shows a few hundred here and production
-// shows a handful — which is the point: neither number should change how this
-// reads.)
+// it mattered.
 //
 // The distinction is time, not importance: an exception needs action now, a
 // backlog needs a decision this week.
@@ -44,10 +50,10 @@ const BACKLOGS = [
         action: 'place' as const,
     },
     {
-        key: 'payment_outstanding',
+        key: 'delivered_unpriced',
         // Says outright that it is a backlog, because a bare "108" beside a
         // "1" reads as something having just broken.
-        sentence: 'past deliveries were never priced or charged — a backlog to settle, not a fault today',
+        sentence: 'past deliveries were never priced — a backlog to settle, not a fault today',
         action: null,
     },
 ];
