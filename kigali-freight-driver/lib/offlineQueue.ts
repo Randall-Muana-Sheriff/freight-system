@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { File, Directory, Paths } from 'expo-file-system';
 import { reportIncident, updateOrderStatus, confirmDelivery } from './api';
+import { isRetryableFailure } from './retryable';
 
 const OFFLINE_QUEUE_KEY = 'kigali_freight_driver_offline_queue';
 
@@ -38,6 +39,25 @@ export type PendingDriverAction =
       notes?: string;
       createdAt: string;
     };
+
+// An action the server refused outright, rather than one still waiting for a
+// signal. Kept apart from `remaining` because the two demand opposite
+// handling: `remaining` is retried, `rejected` never will be, so it is the
+// only part of a flush a driver may need to be told about.
+export type RejectedDriverAction = {
+  item: PendingDriverAction;
+  reason: string;
+  message: string;
+};
+
+export type FlushResult = {
+  flushed: number;
+  remaining: number;
+  // Always present, never optional. Every early return sets it to []. A
+  // caller that has to ask whether a rejection list exists before reading it
+  // is a caller that will quietly skip the one case worth reporting.
+  rejected: RejectedDriverAction[];
+};
 
 async function readQueue(): Promise<PendingDriverAction[]> {
   const raw = await AsyncStorage.getItem(OFFLINE_QUEUE_KEY);
@@ -111,15 +131,16 @@ export async function clearOfflineQueue() {
 
 let isFlushing = false;
 
-export async function flushOfflineQueue(token: string) {
-  if (isFlushing) return { flushed: 0, remaining: await getOfflineQueueCount() };
+export async function flushOfflineQueue(token: string): Promise<FlushResult> {
+  if (isFlushing) return { flushed: 0, remaining: await getOfflineQueueCount(), rejected: [] };
   isFlushing = true;
 
   try {
     const queue = await readQueue();
-    if (queue.length === 0) return { flushed: 0, remaining: 0 };
+    if (queue.length === 0) return { flushed: 0, remaining: 0, rejected: [] };
 
     const remaining: PendingDriverAction[] = [];
+    const rejected: RejectedDriverAction[] = [];
     let flushed = 0;
 
     for (let index = 0; index < queue.length; index += 1) {
@@ -148,7 +169,39 @@ export async function flushOfflineQueue(token: string) {
           new File(item.localFileUri).delete();
         }
         flushed += 1;
-      } catch {
+      } catch (error) {
+        // A refusal and a dropped connection are not the same thing, and this
+        // used to treat them identically: re-queue the item, re-queue
+        // everything behind it, break. That is correct for a network blip and
+        // catastrophic for a 4xx, because a 4xx never becomes a 200 — the
+        // queue head-of-line blocks for ever, in front of the delivery
+        // photos, and the driver is told nothing.
+        //
+        // It became reachable when the server grew a state machine. This
+        // queue manufactures duplicate status updates routinely — the trip
+        // screen does not advance local state after queuing, and the request
+        // timeout misfires on a slow connection — and a replayed status now
+        // returns 409 ORDERS_STATUS_OUT_OF_SEQUENCE.
+        if (!isRetryableFailure(error)) {
+          // Dropped, not retried. For a status update this is right and not
+          // a loss: the server refusing the transition means it already
+          // holds that state or a later one, so the item is redundant. Kept
+          // as a count so the caller can say something rather than the work
+          // vanishing in silence.
+          const status = (error as { status?: number } | null)?.status;
+          const code = (error as { code?: string } | null)?.code;
+          rejected.push({
+            item,
+            reason: code ?? `HTTP ${status ?? 'unknown'}`,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          if (item.type === 'incident-report' && item.localPhotoUri) {
+            new File(item.localPhotoUri).delete();
+          } else if (item.type === 'delivery-photo') {
+            new File(item.localFileUri).delete();
+          }
+          continue;
+        }
         remaining.push(item);
         remaining.push(...queue.slice(index + 1));
         break;
@@ -156,7 +209,7 @@ export async function flushOfflineQueue(token: string) {
     }
 
     await writeQueue(remaining);
-    return { flushed, remaining: remaining.length };
+    return { flushed, remaining: remaining.length, rejected };
   } finally {
     isFlushing = false;
   }

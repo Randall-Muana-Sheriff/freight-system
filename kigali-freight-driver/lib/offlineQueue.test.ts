@@ -130,7 +130,7 @@ describe('offlineQueue', () => {
 
         const result = await flushOfflineQueue('token-123');
 
-        expect(result).toEqual({ flushed: 2, remaining: 0 });
+        expect(result).toEqual({ flushed: 2, remaining: 0, rejected: [] });
         expect(mockUpdateOrderStatus).toHaveBeenCalledWith('token-123', 1, 'PICKED_UP');
         expect(mockReportIncident).toHaveBeenCalledWith('token-123', { title: 'Delay', description: 'Traffic' });
         expect(await getOfflineQueueCount()).toBe(0);
@@ -149,8 +149,57 @@ describe('offlineQueue', () => {
 
         // Action 1 flushed; actions 2 and 3 remain queued (in original
         // order) for the next flush attempt — nothing is silently dropped.
-        expect(result).toEqual({ flushed: 1, remaining: 2 });
+        expect(result).toEqual({ flushed: 1, remaining: 2, rejected: [] });
         expect(await getOfflineQueueCount()).toBe(2);
+    });
+
+    // The jam this fixes, and it was reachable in the field.
+    //
+    // The queue manufactures duplicate status updates routinely — the trip
+    // screen does not advance local state after queuing, and the request
+    // timeout misfires on a slow connection. Once the server grew a state
+    // machine, a replayed status started returning 409 instead of 200. The old
+    // flush treated that like a dropped connection: re-queue the item,
+    // re-queue everything behind it, break. A 409 never becomes a 200, so the
+    // queue never drained again — and the first thing stuck behind it is the
+    // proof of delivery.
+    it('drops a refusal and keeps draining, instead of jamming behind it for ever', async () => {
+        const refusal = Object.assign(new Error('That step comes later.'), {
+            status: 409, code: 'ORDERS_STATUS_OUT_OF_SEQUENCE',
+        });
+        mockUpdateOrderStatus
+            .mockRejectedValueOnce(refusal)      // a replayed duplicate
+            .mockResolvedValueOnce(undefined);   // the one behind it
+
+        await enqueueOfflineAction({ type: 'status-update', orderId: 1, status: 'PICKED_UP', createdAt: '2026-01-01T00:00:00Z' });
+        await enqueueOfflineAction({ type: 'status-update', orderId: 2, status: 'IN_TRANSIT', createdAt: '2026-01-01T00:00:01Z' });
+
+        const result = await flushOfflineQueue('token-123');
+
+        expect(result.flushed).toBe(1);
+        expect(result.remaining).toBe(0);
+        expect(await getOfflineQueueCount()).toBe(0);
+
+        // Discarded, not lost in silence: the server refusing the transition
+        // means it already holds that state or a later one, so the item was
+        // redundant — but the caller is told, with the reason.
+        expect(result.rejected).toHaveLength(1);
+        expect(result.rejected[0].reason).toBe('ORDERS_STATUS_OUT_OF_SEQUENCE');
+    });
+
+    it('still waits out a network failure rather than discarding the work', async () => {
+        // The other half. A refusal is permanent; a dropped connection is not,
+        // and treating them the same in either direction loses something.
+        mockUpdateOrderStatus.mockRejectedValueOnce(new Error('Network request failed'));
+
+        await enqueueOfflineAction({ type: 'status-update', orderId: 1, status: 'DELIVERED', createdAt: '2026-01-01T00:00:00Z' });
+
+        const result = await flushOfflineQueue('token-123');
+
+        expect(result.flushed).toBe(0);
+        expect(result.remaining).toBe(1);
+        expect(result.rejected).toEqual([]);
+        expect(await getOfflineQueueCount()).toBe(1);
     });
 
     it('does not run two flushes concurrently — a second call while one is in flight is a no-op', async () => {
@@ -213,7 +262,7 @@ describe('offlineQueue', () => {
 
             const result = await flushOfflineQueue('token-123');
 
-            expect(result).toEqual({ flushed: 1, remaining: 0 });
+            expect(result).toEqual({ flushed: 1, remaining: 0, rejected: [] });
             expect(mockConfirmDelivery).toHaveBeenCalledWith(
                 'token-123',
                 42,
@@ -245,7 +294,7 @@ describe('offlineQueue', () => {
 
             const result = await flushOfflineQueue('token-123');
 
-            expect(result).toEqual({ flushed: 0, remaining: 1 });
+            expect(result).toEqual({ flushed: 0, remaining: 1, rejected: [] });
             expect(deletedUris).not.toContain(persistedUri);
             expect(await getOfflineQueueCount()).toBe(1);
         });

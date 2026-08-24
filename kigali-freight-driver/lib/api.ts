@@ -1,6 +1,37 @@
 import Constants from 'expo-constants';
 import { File, UploadType, type UploadResult } from 'expo-file-system';
 import { refreshAccessToken } from './tokenStore';
+import { isRetryableFailure } from './retryable';
+
+/** An API failure that remembers what kind it was.
+ *
+ *  The app threw bare Errors, which meant nothing downstream could tell a
+ *  dropped connection from a refusal. That was survivable until the server
+ *  grew a state machine: a replayed status update now returns 409, the
+ *  offline queue treated it like a network blip, and re-queued it for ever
+ *  along with every item behind it — including the delivery photos. A 409
+ *  never becomes a 200, so that queue never drained again.
+ *
+ *  `retryable` is the whole point of this class. 5xx and a lost connection
+ *  are worth another attempt; a 4xx is the server telling us the request
+ *  itself is wrong, and repeating it is how a queue jams silently. 408 and
+ *  429 are the exceptions — both mean "not now" rather than "not ever". */
+export class ApiError extends Error {
+    status: number;
+    code: string | null;
+    constructor(message: string, status: number, code: string | null = null) {
+        super(message);
+        this.name = 'ApiError';
+        this.status = status;
+        this.code = code;
+    }
+    get retryable(): boolean {
+        return isRetryableFailure(this);
+    }
+}
+
+
+
 
 function resolveApiBase() {
   const extra = Constants.expoConfig?.extra as { apiBaseUrl?: string } | undefined;
@@ -110,7 +141,7 @@ async function parseResponse(response: Response) {
       }
     }
     const message = payload?.error?.message || payload?.error || payload?.message || `Request failed with status ${response.status}`;
-    throw new Error(message);
+    throw new ApiError(message, response.status, payload?.error?.code ?? payload?.code ?? null);
   }
 
   if (acceptedResponse && payload == null) {
@@ -139,7 +170,7 @@ function parseUploadResult(result: UploadResult) {
 
   if (result.status < 200 || (result.status >= 300 && !acceptedResponse)) {
     const message = payload?.error?.message || payload?.error || payload?.message || `Request failed with status ${result.status}`;
-    throw new Error(message);
+    throw new ApiError(message, result.status, payload?.error?.code ?? payload?.code ?? null);
   }
 
   if (acceptedResponse && payload == null) {
@@ -174,7 +205,7 @@ async function doFetch(path: string, options: { method?: string; token?: string;
     });
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('Network request failed (request timed out)');
+      throw new ApiError('Network request failed (request timed out)', 408);
     }
     throw error;
   } finally {
