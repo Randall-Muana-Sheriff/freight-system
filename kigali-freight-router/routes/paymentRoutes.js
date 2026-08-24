@@ -25,6 +25,9 @@ router.post('/orders/:orderId/cash', staffOrDriver, requestLimit, PaymentControl
 // a driver clearing their own debt is what this record exists to prevent.
 router.post('/orders/:orderId/cash/settle', authMiddleware(['admin', 'dispatcher']), PaymentController.settleCash);
 router.get('/driver/earnings', authMiddleware(['driver']), PaymentController.earnings);
+// The cash mirror. A driver holding a week of fares needs to know which part
+// of it is the platform's before they spend it.
+router.get('/driver/cash', authMiddleware(['driver']), PaymentController.cashSummary);
 
 // No auth: this is MTN calling us. Safe because the handler reads nothing
 // from the body — it treats the call as "ask MTN about this reference" and

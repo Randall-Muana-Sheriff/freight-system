@@ -211,6 +211,90 @@ export const PaymentController = {
         });
     },
 
+    // GET /api/payments/driver/cash
+    //
+    // The mirror of earnings, and the number that matters is the one the
+    // driver owes rather than the one they took.
+    //
+    // A driver holding a week of cash does not automatically know which part
+    // of it is not theirs. commissionOwed is that part, and it is the figure
+    // this endpoint exists to make impossible to lose track of.
+    //
+    // Deliberately NOT combined with the payout totals. A cash price_total is
+    // the whole fare including the platform's share; a payout is the driver's
+    // net. Adding them overstates what a driver has earned, and the two are
+    // different facts about money anyway — one is in their hand with a debt
+    // attached, the other is in their wallet.
+    cashSummary: async (req, res) => {
+        try {
+            const username = req.user.username;
+            const { rows } = await pool.query(
+                `SELECT id AS order_id, price_total, platform_fee, currency,
+                        cash_collected_at, cash_settled_at
+                   FROM orders
+                  WHERE assigned_to = $1 AND payment_method = 'CASH'
+                  ORDER BY cash_collected_at DESC NULLS LAST
+                  LIMIT 50`,
+                [username]
+            );
+            const totals = await pool.query(
+                `SELECT currency,
+                        COALESCE(SUM(price_total), 0) AS collected,
+                        COALESCE(SUM(platform_fee) FILTER (WHERE cash_settled_at IS NULL), 0) AS owed,
+                        COALESCE(SUM(platform_fee) FILTER (WHERE cash_settled_at IS NOT NULL), 0) AS settled,
+                        -- A total cannot carry a null the way a row can.
+                        --
+                        -- SUM ignores nulls, so a driver whose cash jobs all
+                        -- have an unworked-out commission sees owed = 0 and
+                        -- reads it as "you owe nothing" — the same trap as
+                        -- coercing a row's fee to zero, one level up, and
+                        -- more expensive because it is the headline figure.
+                        -- Counting them lets the screen say the total is
+                        -- incomplete rather than quietly understating a debt.
+                        COUNT(*) FILTER (WHERE cash_settled_at IS NULL AND platform_fee IS NULL)::int AS owed_unknown
+                   FROM orders
+                  WHERE assigned_to = $1 AND payment_method = 'CASH'
+                  GROUP BY currency`,
+                [username]
+            );
+            const single = totals.rows.length === 1 ? totals.rows[0].currency : null;
+            const sum = (f) => totals.rows.reduce((acc, r) => acc + Number(r[f]), 0);
+
+            return ok(res, {
+                collected: totals.rows.length > 1 ? null : sum('collected'),
+                commissionOwed: totals.rows.length > 1 ? null : sum('owed'),
+                commissionSettled: totals.rows.length > 1 ? null : sum('settled'),
+                // How many jobs the owed figure could not include. Zero means
+                // the total is complete; anything else means it is a floor.
+                commissionOwedUnknownJobs: totals.rows.reduce((a, r) => a + Number(r.owed_unknown), 0),
+                currency: single,
+                byCurrency: totals.rows.map((r) => ({
+                    currency: r.currency,
+                    collected: Number(r.collected),
+                    commissionOwed: Number(r.owed),
+                    commissionSettled: Number(r.settled),
+                    commissionOwedUnknownJobs: Number(r.owed_unknown),
+                })),
+                jobs: rows.map((r) => ({
+                    orderId: r.order_id,
+                    amount: Number(r.price_total),
+                    // Left null rather than coerced to zero. "We do not know
+                    // what you owe" and "you owe nothing" are different
+                    // statements, and a driver reading the second when the
+                    // first is true will be surprised later.
+                    platformFee: r.platform_fee === null ? null : Number(r.platform_fee),
+                    currency: r.currency,
+                    collectedAt: r.cash_collected_at,
+                    settledAt: r.cash_settled_at,
+                })),
+            });
+        } catch (error) {
+            logError(req, 'Cash summary read failed', error);
+            return fail(res, { status: 500, code: 'CASH_SUMMARY_FAILED',
+                message: 'Could not load your cash collections.' });
+        }
+    },
+
     // POST /api/payments/momo/callback/:reference
     //
     // MTN's callback. Unauthenticated by design on their side — there is no
@@ -256,16 +340,45 @@ export const PaymentController = {
                   ORDER BY created_at DESC LIMIT 50`,
                 [username]
             );
+            // Summed per currency, not across all of them.
+            //
+            // This was a bare SUM(amount), which on the day a driver has
+            // payouts in two currencies quietly adds francs to something
+            // else and reports the result as one number. Nobody would notice
+            // until the figure was already wrong on somebody's screen.
+            //
+            // Everything is RWF today, so this is a defect that has not yet
+            // had the chance to be visible — which is the only reason it is
+            // cheap to fix now.
             const totals = await pool.query(
-                `SELECT
-                    COALESCE(SUM(amount) FILTER (WHERE status = 'SUCCESSFUL'), 0) AS paid_out,
-                    COALESCE(SUM(amount) FILTER (WHERE status IN ('QUEUED','SENDING')), 0) AS on_the_way
-                   FROM driver_payouts WHERE driver_username = $1`,
+                `SELECT currency,
+                        COALESCE(SUM(amount) FILTER (WHERE status = 'SUCCESSFUL'), 0) AS paid_out,
+                        COALESCE(SUM(amount) FILTER (WHERE status IN ('QUEUED','SENDING')), 0) AS on_the_way
+                   FROM driver_payouts WHERE driver_username = $1
+                  GROUP BY currency`,
                 [username]
             );
+
+            // The screen wants one figure when there is honestly one to give.
+            // A driver with a single currency should not be made to read a
+            // breakdown; a driver with two must not be shown a sum that means
+            // nothing.
+            const currencies = totals.rows.map((r) => r.currency);
+            const single = currencies.length === 1 ? currencies[0] : null;
+            const sum = (field) => totals.rows.reduce((acc, r) => acc + Number(r[field]), 0);
+
             return ok(res, {
-                paidOut: Number(totals.rows[0].paid_out),
-                onTheWay: Number(totals.rows[0].on_the_way),
+                // Bare sums, kept for the single-currency case the app
+                // renders today. Meaningless if byCurrency has more than one
+                // row, which is why currency is returned beside them.
+                paidOut: single === null && totals.rows.length > 1 ? null : sum('paid_out'),
+                onTheWay: single === null && totals.rows.length > 1 ? null : sum('on_the_way'),
+                currency: single,
+                byCurrency: totals.rows.map((r) => ({
+                    currency: r.currency,
+                    paidOut: Number(r.paid_out),
+                    onTheWay: Number(r.on_the_way),
+                })),
                 payouts: rows.map((r) => ({ ...r, amount: Number(r.amount) })),
             });
         } catch (error) {
