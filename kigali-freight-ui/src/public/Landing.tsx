@@ -83,9 +83,16 @@ function EntryCards({ onNavigate }: { onNavigate: (path: string) => void }) {
         { icon: 'pin' as const, title: t.entries.trackTitle, body: t.entries.trackBody, go: () => onNavigate('/track') },
         {
             icon: 'repeat' as const, title: t.entries.standingTitle, body: t.entries.standingBody,
-            // Was the contact form, which answered a different question
-            // than the card asked. Now the business section.
-            go: () => document.getElementById('business')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+            // Navigates rather than scrolls, because the business section is
+            // no longer on this page.
+            //
+            // It scrolled to id="business" until the site was split into
+            // pages and that section moved to /business. getElementById
+            // returned null, the optional chain swallowed it, and the card
+            // did nothing at all — no error, no console warning, just a
+            // click that went nowhere. A scroll target on another page is
+            // the one kind of dead link that leaves no trace.
+            go: () => onNavigate('/business'),
         },
     ];
 
