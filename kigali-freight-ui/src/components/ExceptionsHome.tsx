@@ -1,8 +1,10 @@
 // src/components/ExceptionsHome.tsx — the Monitor workspace's home.
 //
 // A control tower's home screen is a list of things that deviate, not a
-// display of everything that exists. This reads the eight exception sources
-// the backend already computed and nothing previously surfaced.
+// display of everything that exists. This renders whichever exception groups
+// the backend computed — the set has grown over time, and empty groups are
+// dropped from the payload entirely, so nothing here may assume a given key
+// is present.
 //
 // Two ranks, not eight. `act` means somebody has to do something now; `watch`
 // is degrading but not yet blocking. If everything is an exception, nothing
@@ -12,12 +14,43 @@ import { RefreshCw, MapPin } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { fetchExceptions, type ExceptionGroup, type ExceptionReport } from '../utils/api';
 
+// Backlogs, as distinct from exceptions.
+//
 // Sixty-one percent of the queue is unplaced. A deviation covering three
 // fifths of the data is not a deviation, it is the normal state — and leading
 // with it teaches a dispatcher to scroll past the top of this screen every
 // time, which is how the two deliveries that arrived and were never closed get
-// missed. It gets one line and a way in, not a ranked card.
-const BACKLOG_KEY = 'unplaced_orders';
+// missed. It gets one line, not a ranked card.
+//
+// payment_outstanding joins it for the same reason. It is orders delivered
+// before there was any way to price or charge them: every one real, the number
+// worth seeing, but a standing balance to work through rather than something
+// that broke today. Rendered as an `act` card beside "1 driver has gone dark"
+// a large one would out-shout the alert that needs somebody in the next ten
+// minutes, and teach a dispatcher that the top of this screen is noise.
+//
+// Classified by what the group MEANS, not by how big it happens to be. A
+// magnitude rule would demote a genuine spike to a footnote on exactly the day
+// it mattered. (Local fixture data shows a few hundred here and production
+// shows a handful — which is the point: neither number should change how this
+// reads.)
+//
+// The distinction is time, not importance: an exception needs action now, a
+// backlog needs a decision this week.
+const BACKLOGS = [
+    {
+        key: 'unplaced_orders',
+        sentence: 'bookings still need placing on the map before anyone can carry them',
+        action: 'place' as const,
+    },
+    {
+        key: 'payment_outstanding',
+        // Says outright that it is a backlog, because a bare "108" beside a
+        // "1" reads as something having just broken.
+        sentence: 'past deliveries were never priced or charged — a backlog to settle, not a fault today',
+        action: null,
+    },
+];
 
 function sinceLabel(iso?: string | null) {
     if (!iso) return null;
@@ -92,9 +125,18 @@ export default function ExceptionsHome({ onGoToDispatch }: { onGoToDispatch: () 
     if (userRole !== 'admin' && userRole !== 'dispatcher') return null;
 
     const groups = report?.groups || [];
-    const backlog = groups.find((g) => g.key === BACKLOG_KEY);
-    const act = groups.filter((g) => g.severity === 'act' && g.key !== BACKLOG_KEY);
-    const watch = groups.filter((g) => g.severity === 'watch' && g.key !== BACKLOG_KEY);
+    const backlogKeys = new Set(BACKLOGS.map((b) => b.key));
+    const backlogs = BACKLOGS
+        .map((b) => {
+            const group = groups.find((g) => g.key === b.key);
+            // Narrowed here rather than asserted at the call site: an empty
+            // group is absent from the payload altogether, so `find` missing
+            // is the normal case and not an anomaly worth a `!`.
+            return group && group.count > 0 ? { ...b, group } : null;
+        })
+        .filter((b): b is NonNullable<typeof b> => b !== null);
+    const act = groups.filter((g) => g.severity === 'act' && !backlogKeys.has(g.key));
+    const watch = groups.filter((g) => g.severity === 'watch' && !backlogKeys.has(g.key));
     const nothingWrong = !loading && !error && act.length === 0 && watch.length === 0;
 
     return (
@@ -125,22 +167,29 @@ export default function ExceptionsHome({ onGoToDispatch }: { onGoToDispatch: () 
                 {/* The backlog line. Deliberately not a ranked card: it is the
                     standing state of the queue, and what it needs is a way in,
                     not a warning. */}
-                {backlog && backlog.count > 0 ? (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line/10 bg-panel px-4 py-3">
+                {backlogs.map(({ key, sentence, action, group }) => (
+                    <div key={key}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line/10 bg-panel px-4 py-3">
                         <p className="text-data text-paper">
-                            <span className="ops-figure mr-2 text-lead text-paper">{backlog.count}</span>
-                            bookings still need placing on the map before anyone can carry them
+                            {/* Deliberately not text-rust, whatever severity the
+                                server gave it. A backlog in alarm colours beside
+                                a live alert is how the live one stops being
+                                read. */}
+                            <span className="ops-figure mr-2 text-lead text-paper">{group.count}</span>
+                            {sentence}
                         </p>
-                        <button
-                            type="button"
-                            onClick={onGoToDispatch}
-                            className="focus-ring flex shrink-0 items-center gap-1.5 rounded border border-route/40 bg-route/15 px-3 py-1.5 text-micro font-semibold uppercase tracking-wide text-route transition-colors hover:bg-route/25"
-                        >
-                            <MapPin size={13} strokeWidth={2.5} />
-                            Place them
-                        </button>
+                        {action === 'place' ? (
+                            <button
+                                type="button"
+                                onClick={onGoToDispatch}
+                                className="focus-ring flex shrink-0 items-center gap-1.5 rounded border border-route/40 bg-route/15 px-3 py-1.5 text-micro font-semibold uppercase tracking-wide text-route transition-colors hover:bg-route/25"
+                            >
+                                <MapPin size={13} strokeWidth={2.5} />
+                                Place them
+                            </button>
+                        ) : null}
                     </div>
-                ) : null}
+                ))}
 
                 {act.length > 0 ? (
                     <div className="space-y-3">
@@ -160,7 +209,13 @@ export default function ExceptionsHome({ onGoToDispatch }: { onGoToDispatch: () 
                     as one, rather than as a screen that failed to load. */}
                 {nothingWrong ? (
                     <p className="rounded-md border border-line/10 bg-panel px-4 py-6 text-center text-data text-steel">
-                        Nothing is going wrong that the system can see.
+                        {/* Scoped to exceptions, because a backlog line may be
+                            sitting directly above this. "Nothing is going
+                            wrong" printed under "108 deliveries were never
+                            charged" reads as a screen contradicting itself. */}
+                        {backlogs.length > 0
+                            ? 'Nothing needs anyone right now.'
+                            : 'Nothing is going wrong that the system can see.'}
                     </p>
                 ) : null}
             </div>
