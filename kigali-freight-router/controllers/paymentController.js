@@ -293,7 +293,17 @@ export const PaymentController = {
                 [username]
             );
             const totals = await pool.query(
-                `SELECT currency,
+                // UPPER(TRIM(...)) so 'rwf' and 'RWF' are one group, not two.
+                //
+                // This grouping is what the driver app's screen reads to
+                // decide whether the debt spans currencies, and utils/money.js
+                // now folds case on the server's own guard. Leaving the SQL
+                // case-sensitive made the two disagree: the server would
+                // permit the settlement and the screen would refuse it,
+                // explaining that the commission is in more than one currency
+                // when it is in one. Fail-closed, so not dangerous -- but a
+                // refusal nobody can act on is its own kind of stuck.
+                `SELECT UPPER(TRIM(currency)) AS currency,
                         COALESCE(SUM(price_total), 0) AS collected,
                         COALESCE(SUM(platform_fee) FILTER (WHERE cash_settled_at IS NULL), 0) AS owed,
                         COALESCE(SUM(platform_fee) FILTER (WHERE cash_settled_at IS NOT NULL), 0) AS settled,
@@ -309,7 +319,7 @@ export const PaymentController = {
                         COUNT(*) FILTER (WHERE cash_settled_at IS NULL AND platform_fee IS NULL)::int AS owed_unknown
                    FROM orders
                   WHERE assigned_to = $1 AND payment_method = 'CASH'
-                  GROUP BY currency`,
+                  GROUP BY UPPER(TRIM(currency))`,
                 [username]
             );
             const single = totals.rows.length === 1 ? totals.rows[0].currency : null;
@@ -411,11 +421,14 @@ export const PaymentController = {
             // had the chance to be visible — which is the only reason it is
             // cheap to fix now.
             const totals = await pool.query(
-                `SELECT currency,
+                // Same fold as the cash summary above: two spellings of one
+                // currency would split a driver's earnings into two groups and
+                // strip the unit off both totals.
+                `SELECT UPPER(TRIM(currency)) AS currency,
                         COALESCE(SUM(amount) FILTER (WHERE status = 'SUCCESSFUL'), 0) AS paid_out,
                         COALESCE(SUM(amount) FILTER (WHERE status IN ('QUEUED','SENDING')), 0) AS on_the_way
                    FROM driver_payouts WHERE driver_username = $1
-                  GROUP BY currency`,
+                  GROUP BY UPPER(TRIM(currency))`,
                 [username]
             );
 

@@ -120,3 +120,31 @@ describe('labelling a total', () => {
         expect(currencyForTotals([])).toBeNull();
     });
 });
+
+// Two spellings of one currency are one currency. Without the fold, a driver
+// with a 'rwf' payout beside a 'RWF' one saw both totals lose their unit and a
+// warning that their jobs were in more than one currency. momoClient
+// uppercases before charging and the totals are grouped by UPPER(TRIM(...)),
+// so every other layer had already agreed they were the same.
+describe('currency case', () => {
+    const row = (currency: string | null) => ({ currency });
+
+    it('does not split one currency into two on case alone', () => {
+        expect(currencyForTotals([row('rwf'), row('RWF')])).toBe('RWF');
+        expect(hasMixedCurrencies([row('rwf'), row('RWF')])).toBe(false);
+    });
+
+    it('returns the chargeable uppercase form', () => {
+        expect(currencyForTotals([row('rwf')])).toBe('RWF');
+    });
+
+    it('still reports a genuinely mixed set', () => {
+        expect(currencyForTotals([row('rwf'), row('usd')])).toBeNull();
+        expect(hasMixedCurrencies([row('rwf'), row('usd')])).toBe(true);
+    });
+
+    it('ignores blanks and nulls rather than counting them', () => {
+        expect(currencyForTotals([row('RWF'), row(null), row('  ')])).toBe('RWF');
+        expect(hasMixedCurrencies([row('RWF'), row(null)])).toBe(false);
+    });
+});

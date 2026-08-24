@@ -120,13 +120,25 @@ function releaseLabel(releaseAt: string | null): string {
  *  else and labelling the result francs. Null means "show the figure without
  *  a unit", which is the same rule the fare card follows. */
 export function currencyForTotals(payouts: Pick<PayoutRow, 'currency'>[]): string | null {
-  const seen = new Set(payouts.map((p) => (p.currency || '').trim()).filter(Boolean));
-  return seen.size === 1 ? [...seen][0] : null;
+  const found = uniqueCurrencies(payouts);
+  return found.length === 1 ? found[0] : null;
 }
 
 /** True when the totals cover more than one currency, so a single figure
  *  cannot be labelled honestly and the screen should say so rather than
  *  quietly drop the unit. */
 export function hasMixedCurrencies(payouts: Pick<PayoutRow, 'currency'>[]): boolean {
-  return new Set(payouts.map((p) => (p.currency || '').trim()).filter(Boolean)).size > 1;
+  return uniqueCurrencies(payouts).length > 1;
+}
+
+/** Distinct currencies, case-folded, blanks dropped.
+ *
+ *  Case matters here for the same reason it does in the router's
+ *  utils/money.js: 'rwf' and 'RWF' are one currency everywhere it counts —
+ *  momoClient uppercases before charging, and the payout totals are now
+ *  grouped by UPPER(TRIM(currency)). Comparing raw strings here would split
+ *  one currency into two, strip the unit off both totals, and print a warning
+ *  that the driver's jobs are in more than one currency when they are not. */
+function uniqueCurrencies(rows: Pick<PayoutRow, 'currency'>[]): string[] {
+  return [...new Set(rows.map((p) => (p.currency || '').trim().toUpperCase()).filter(Boolean))];
 }
