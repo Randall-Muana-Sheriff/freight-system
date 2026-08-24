@@ -327,6 +327,34 @@ export const TripController = {
         try {
             const trip = await loadTrip(client, Number(req.params.id));
             if (!trip) return fail(res, { status: 404, code: 'TRIP_NOT_FOUND', message: 'Run not found.' });
+
+            // A driver may read their own run and no one else's.
+            //
+            // This had no check at all, and trip ids are sequential, so any
+            // approved driver could walk 1, 2, 3 and read every other run in
+            // the fleet: customer names, phone numbers, delivery addresses
+            // and the free-text instructions people write about their own
+            // premises.
+            //
+            // Worse than a read. loadTrip returns each stop's tracking_token,
+            // and /api/public/track/:token needs no authentication at all —
+            // so one driver account converted into permanent, unauthenticated
+            // tracking of other customers' shipments, surviving that driver
+            // being suspended. The right fix is here rather than at the
+            // public endpoint: the token is a credential and this is where it
+            // was being handed out.
+            //
+            // 404, not 403 — updateStop below says "another driver's run"
+            // because the caller demonstrably holds that stop, but here a
+            // refusal that distinguished "not yours" from "does not exist"
+            // would confirm which trip ids are real.
+            const role = String(req.user?.role || '').toLowerCase();
+            const isOwner = String(trip.driver_username || '').toLowerCase()
+                === String(req.user?.username || '').toLowerCase();
+            if (role === 'driver' && !isOwner) {
+                return fail(res, { status: 404, code: 'TRIP_NOT_FOUND', message: 'Run not found.' });
+            }
+
             return ok(res, trip);
         } catch (error) {
             logError(req, 'Get trip failed', error);

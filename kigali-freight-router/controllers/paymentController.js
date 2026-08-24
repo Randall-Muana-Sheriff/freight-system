@@ -60,6 +60,27 @@ export const PaymentController = {
     // staler than this call — the webhook may not have arrived, or may never.
     status: async (req, res) => {
         try {
+            // The same check its sibling makes, and the omission was mine.
+            //
+            // PaymentController.request above refuses a driver reading an
+            // order that is not theirs; this did not, so the same identity
+            // was turned away by /request and let through by /status. It
+            // returns the customer's MoMo number — including the alternative
+            // one handed over at the gate — the amount, and the payment
+            // reference, and it triggers an outbound MTN call against
+            // somebody else's payment on the way.
+            const requesterRole = String(req.user?.role || '').toLowerCase();
+            if (requesterRole === 'driver') {
+                const owns = await pool.query(
+                    'SELECT 1 FROM orders WHERE id = $1 AND assigned_to = $2',
+                    [req.params.orderId, req.user.username]
+                );
+                if (owns.rows.length === 0) {
+                    return fail(res, { status: 403, code: 'PAYMENT_NOT_YOUR_ORDER',
+                        message: 'You can only see payments for your own deliveries.' });
+                }
+            }
+
             const { rows } = await pool.query(
                 `SELECT pr.reference, pr.status, pr.amount, pr.currency, pr.payer_msisdn,
                         pr.failure_reason, pr.created_at, o.payment_status

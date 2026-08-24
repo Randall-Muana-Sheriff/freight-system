@@ -1,7 +1,7 @@
 // What needs a human, gathered in one place.
 //
 // A dispatch board that opens on a queue asks the dispatcher to find the
-// problem. This is the other way round: ten sources of deviation, already
+// problem. This is the other way round: fifteen sources of deviation, already
 // computed elsewhere in the system, collected and ranked so the first thing
 // on screen is the thing that is wrong.
 //
@@ -141,6 +141,100 @@ const GROUPS = [
                  AND (dl.updated_at IS NULL OR dl.updated_at < o.updated_at)
                ORDER BY o.updated_at ASC`,
         params: [ASSIGNED_DARK_MINUTES],
+    },
+    {
+        key: 'payment_outstanding',
+        label: 'Delivered, and nobody has paid',
+        severity: 'act',
+        // The job is done and the money is not in. With collection at the
+        // door this should be rare and immediate — a driver handed the goods
+        // over without taking payment, and every hour that passes makes it
+        // harder to recover.
+        //
+        // Deliberately includes jobs that were never priced. An order
+        // delivered with price_total NULL is not merely unpaid, it is
+        // unbillable — nobody can be asked for a number that was never
+        // settled — and price_still_estimate excludes delivered orders, so
+        // until now those appeared on no board at all. The subtitle says
+        // which of the two it is, because they need different actions: one
+        // is a phone call, the other is a price somebody has to work out.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Delivery') AS title,
+                     CASE WHEN o.price_total IS NULL
+                          THEN 'Delivered and never priced — nothing to bill'
+                          ELSE 'Delivered unpaid — ' || o.price_total || ' ' || COALESCE(o.currency, '') END
+                       AS subtitle,
+                     o.updated_at AS since, o.assigned_to AS driver
+                FROM orders o
+               WHERE o.status = 'DELIVERED' AND o.payment_status = 'UNPAID'
+               ORDER BY o.updated_at ASC`,
+    },
+    {
+        key: 'payment_stuck',
+        label: 'Payment prompts nobody answered',
+        severity: 'act',
+        // A prompt sent to a customer's phone that has neither succeeded nor
+        // failed. The sweep resolves these against MTN, so anything still
+        // here after half an hour means the sweep is not running or MTN is
+        // not answering — and a driver is standing at a gate either way.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Delivery') AS title,
+                     'Waiting on the customer''s PIN' AS subtitle,
+                     pr.created_at AS since, o.assigned_to AS driver
+                FROM payment_requests pr JOIN orders o ON o.id = pr.order_id
+               WHERE pr.status = 'PENDING' AND pr.created_at < NOW() - INTERVAL '30 minutes'
+               ORDER BY pr.created_at ASC`,
+    },
+    {
+        key: 'settlement_outstanding',
+        label: 'Money owed either way after payment',
+        severity: 'watch',
+        // Detention and the return-leg credit are only known after the charge
+        // at the door, so a paid job can end up owing in either direction.
+        // The figure is recorded rather than folded into a price already
+        // collected; this is where somebody acts on it.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Delivery') AS title,
+                     CASE WHEN o.settlement_adjustment > 0
+                          THEN 'Customer owes a further ' || o.settlement_adjustment
+                          ELSE 'Customer is owed a refund of ' || abs(o.settlement_adjustment) END
+                       || ' ' || COALESCE(o.currency, '') AS subtitle,
+                     o.updated_at AS since, o.assigned_to AS driver
+                FROM orders o
+               WHERE o.settlement_adjustment <> 0
+               ORDER BY abs(o.settlement_adjustment) DESC`,
+    },
+    {
+        key: 'stalled_at_pickup',
+        label: 'At the pickup and not moving',
+        severity: 'watch',
+        // The gap between the two groups either side of it: stale_signal
+        // watches PICKED_UP and IN_TRANSIT, assigned_driver_dark watches
+        // ASSIGNED. A driver who reached the collection point and stopped
+        // appeared on neither.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Job') AS title,
+                     'At the pickup since' AS subtitle,
+                     o.updated_at AS since, o.assigned_to AS driver
+                FROM orders o
+               WHERE o.status = 'AT_PICKUP' AND o.updated_at < NOW() - INTERVAL '2 hours'
+               ORDER BY o.updated_at ASC`,
+    },
+    {
+        key: 'assigned_to_nobody',
+        label: 'Assigned, with no driver on it',
+        severity: 'act',
+        // A state that should not exist: the order says it is somebody's and
+        // names nobody. Deliberately excluded from assigned_driver_dark,
+        // because "ring them" needs somebody to ring — but it still has to be
+        // seen, or the job simply sits there being nobody's problem.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Job') AS title,
+                     'Marked assigned but no driver is named' AS subtitle,
+                     o.updated_at AS since, NULL::text AS driver
+                FROM orders o
+               WHERE o.status = 'ASSIGNED' AND o.assigned_to IS NULL
+               ORDER BY o.updated_at ASC`,
     },
     {
         key: 'delivery_not_confirmed',

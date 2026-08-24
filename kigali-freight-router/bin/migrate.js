@@ -70,6 +70,7 @@ const MIGRATIONS = [
     { id: 'add_location_check_unknown.sql', destructive: false },
     { id: 'add_momo_payments.sql', destructive: false },
     { id: 'add_one_pending_payment_per_order.sql', destructive: false },
+    { id: 'add_settlement_adjustment.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

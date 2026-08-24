@@ -146,6 +146,24 @@ async function placeOneOrder({ id, pickupLat, pickupLng, deliveryLat, deliveryLn
         hub = hubResult.rows[0];
     }
 
+    // Money already committed is not repriced.
+    //
+    // Placing an order recomputes its price against a real distance, which is
+    // the right thing to do to an order nobody has paid for. Once a customer
+    // has been charged, or a prompt is on their phone, changing the figure
+    // means the amount collected and the amount owed disagree with no record
+    // of which was which — and nothing here can collect a difference or
+    // refund one.
+    const committed = await pool.query(
+        `SELECT payment_status FROM orders WHERE id = $1`, [id]
+    );
+    if (['PAID', 'PENDING'].includes(committed.rows[0]?.payment_status)) {
+        throw new PlacementError('ORDERS_PLACE_PAYMENT_COMMITTED', 409,
+            committed.rows[0].payment_status === 'PAID'
+                ? 'This delivery has already been paid for, so its price cannot be recalculated. Place it without repricing, or refund and rebook.'
+                : 'A payment prompt is already on the customer\'s phone. Wait for it to finish before changing the price.');
+    }
+
     const result = await pool.query(
         `UPDATE orders SET
             pickup_lat = $2, pickup_lng = $3,
@@ -1275,7 +1293,21 @@ export const OrderController = {
             if (submittedCode) {
                 const check = await verifyDeliveryCode(client, id, submittedCode);
                 if (!check.ok) {
-                    await client.query('ROLLBACK').catch(() => {});
+                    // COMMIT, not ROLLBACK — the failed attempt has to survive.
+                    //
+                    // verifyDeliveryCode increments delivery_code_attempts on
+                    // this same transaction, and rolling back discarded it. So
+                    // the counter never moved and DELIVERY_CODE_MAX_ATTEMPTS
+                    // was unenforceable: proved it by guessing eight times
+                    // against a limit of five and being told "4 tries left"
+                    // every time, with the column still reading 0. A 4-digit
+                    // code with no working attempt limit is 10,000 guesses,
+                    // and the code stays valid until the delivery closes.
+                    //
+                    // Nothing else has been written at this point — the
+                    // transaction has done a locking SELECT and the bump — so
+                    // committing keeps exactly the one fact worth keeping.
+                    await client.query('COMMIT').catch(() => {});
                     const reasons = {
                         NO_CODE_ISSUED: 'No code was sent for this delivery — take a photo instead.',
                         TOO_MANY_ATTEMPTS: `That code has been tried ${DELIVERY_CODE_MAX_ATTEMPTS} times. Take a photo instead.`,
@@ -1413,7 +1445,30 @@ export const OrderController = {
                     -- whole. No commission: this reimburses a driver's stolen
                     -- hour, it is not service the platform brokered, which is
                     -- the same reason fuel sits outside the fee.
-                    price_total = COALESCE(price_total, 0) + COALESCE($3, 0) - COALESCE($4, 0),
+                    -- Once money has been collected, price_total is a record of what
+                    -- was charged, and stops moving.
+                    --
+                    -- Both figures here are only known after the charge. Cash on
+                    -- delivery is taken at ARRIVED; drop detention is not final until
+                    -- the driver leaves, and the return-leg credit lands when somebody
+                    -- else's load fills the empty run home. Adding them to price_total
+                    -- afterwards made the amount collected and the amount owed
+                    -- disagree, with nothing recording which was which.
+                    --
+                    -- On a paid job the difference goes to settlement_adjustment:
+                    -- positive means the customer owes more, negative means they are
+                    -- owed a refund. On an unpaid job nothing has been promised yet,
+                    -- so the price itself is still the right place for it.
+                    price_total = CASE WHEN payment_status = 'PAID' THEN price_total
+                        ELSE COALESCE(price_total, 0) + COALESCE($3, 0) - COALESCE($4, 0) END,
+                    settlement_adjustment = CASE WHEN payment_status = 'PAID'
+                        THEN COALESCE(settlement_adjustment, 0) + COALESCE($3, 0) - COALESCE($4, 0)
+                        ELSE settlement_adjustment END,
+                    settlement_note = CASE WHEN payment_status = 'PAID'
+                            AND (COALESCE($3, 0) <> 0 OR COALESCE($4, 0) <> 0)
+                        THEN 'Adjusted after payment: detention ' || COALESCE($3, 0)
+                             || ', return-leg credit ' || COALESCE($4, 0)
+                        ELSE settlement_note END,
                     driver_net = COALESCE(driver_net, 0) + COALESCE($3, 0) - COALESCE($4, 0),
                     -- The credit comes off the driver as well as the customer,
                     -- because the driver did not drive the empty leg either.
@@ -1425,7 +1480,7 @@ export const OrderController = {
                     updated_at = NOW()
                  WHERE id = $1
                  RETURNING id, cargo_description, status, detention_minutes, detention_amount,
-                           price_total, driver_net;`,
+                           price_total, driver_net, settlement_adjustment, settlement_note;`,
                 [id, detention?.waitedMinutes ?? null, detention?.detentionAmount ?? null,
                  backfill?.creditAmount ?? null, backfill?.filledByOrderId ?? null]
             );
