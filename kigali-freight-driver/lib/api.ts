@@ -220,19 +220,20 @@ async function doFetch(path: string, options: { method?: string; token?: string;
 // itself has also expired/been revoked (session genuinely needs a real
 // login again), or if the retry fails for an unrelated reason.
 //
-// The backend's authMiddleware actually returns 403 "AUTH_INVALID_TOKEN"
-// for an expired/invalid JWT, not 401 — this only checked 401 before, so
-// the refresh-and-retry here never actually fired on real expiry. It was
-// masked because every cold app launch proactively refreshes regardless
-// (see auth.tsx's hydrate()), which is exactly what every reload during
-// active development does — the bug only shows up once the app has been
-// left running past the token's lifetime without a restart. A genuine
-// role-mismatch 403 (AUTH_FORBIDDEN) just fails again identically after
-// the wasted refresh attempt, so treating both the same here is safe.
+// 401 only, and the distinction is load-bearing. The backend used to answer
+// 403 AUTH_INVALID_TOKEN for an expired JWT and 403 AUTH_FORBIDDEN for a
+// genuine role refusal — the same status for "who are you" and "you may
+// not" — so this had to refresh on both. That made every real refusal burn
+// a single-use refresh-token rotation before failing again identically.
+//
+// The router now separates them: 401 for an invalid or expired token, 403
+// for a refusal. So a 403 is never worth a refresh, and it must not get one:
+// a refusal that is retried looks transient, and the offline queue reads a
+// retried-then-failed 403 as a permanent rejection of the driver's work.
 export async function apiFetch(path: string, options: { method?: string; token?: string; body?: unknown } = {}) {
   let response = await doFetch(path, options);
 
-  if ((response.status === 401 || response.status === 403) && options.token) {
+  if (response.status === 401 && options.token) {
     const newToken = await refreshAccessToken(API_BASE);
     if (newToken) {
       response = await doFetch(path, { ...options, token: newToken });
