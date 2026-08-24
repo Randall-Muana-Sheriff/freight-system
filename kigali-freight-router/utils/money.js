@@ -19,11 +19,21 @@
  * unit: a row with no currency recorded is a row we know nothing about, not a
  * row in some fourth currency.
  *
+ * Case is folded, and returned uppercase, because momoClient's
+ * resolveCurrency already uppercases before it charges anything. Without the
+ * fold, 'rwf' and 'RWF' count as two currencies here and refuse a settlement
+ * that the charge path would have handled identically -- the guard
+ * disagreeing with the thing it guards. Uppercase is also what ISO 4217 and
+ * MTN both expect, so this is the form to charge in as well as compare in.
+ *
+ * pricing_rates.currency is plain text with no CHECK constraint, so lowercase
+ * is a hand-written row or a future admin form away.
+ *
  * @param {Array<{ currency?: string | null }>} rows
- * @returns {string[]} distinct, non-blank currencies, in first-seen order
+ * @returns {string[]} distinct, non-blank, uppercased currencies, in first-seen order
  */
 export function distinctCurrencies(rows) {
-    return [...new Set((rows || []).map((r) => (r?.currency || '').trim()).filter(Boolean))];
+    return [...new Set((rows || []).map((r) => (r?.currency || '').trim().toUpperCase()).filter(Boolean))];
 }
 
 /**

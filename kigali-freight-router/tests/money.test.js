@@ -36,6 +36,24 @@ test('whitespace around a currency does not create a second one', () => {
     assert.equal(soleCurrency([{ currency: 'RWF' }, { currency: ' RWF ' }]), 'RWF');
 });
 
+// momoClient's resolveCurrency uppercases before charging, so 'rwf' and 'RWF'
+// reach MTN as the same currency. Counting them as two here would refuse a
+// settlement the charge path handles identically -- the guard disagreeing with
+// the thing it guards. Found by muana-26 exercising the helper rather than
+// reading it.
+test('case does not create a second currency, and the answer is chargeable', () => {
+    assert.deepEqual(distinctCurrencies([{ currency: 'rwf' }, { currency: 'RWF' }]), ['RWF']);
+    assert.equal(soleCurrency([{ currency: 'rwf' }, { currency: 'RWF' }]), 'RWF');
+    // Uppercase out even when every input was lowercase: ISO 4217 and MTN both
+    // want it that way, so this is the form to charge in.
+    assert.equal(soleCurrency([{ currency: 'rwf' }]), 'RWF');
+});
+
+test('folding case does not hide a genuinely mixed debt', () => {
+    assert.deepEqual(distinctCurrencies([{ currency: 'rwf' }, { currency: 'usd' }]), ['RWF', 'USD']);
+    assert.equal(soleCurrency([{ currency: 'rwf' }, { currency: 'usd' }]), null);
+});
+
 // Called with junk rather than an array — a query that failed and returned
 // undefined must not take the whole settlement path down with it.
 test('a missing or malformed row set is survivable', () => {
