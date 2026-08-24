@@ -19,6 +19,7 @@ import {
   type IncidentReportResult,
   type DriverAssignment,
 } from '../../lib/api';
+import { isRetryableFailure } from '../../lib/retryable';
 import { useAuth } from '../../lib/auth';
 import { enqueueOfflineAction, persistIncidentPhotoForQueue } from '../../lib/offlineQueue';
 import { captureException } from '../../lib/crashReporting';
@@ -338,7 +339,9 @@ export default function IncidentsScreen() {
       setJustSent(true);
       void loadIncidents();
     } catch (error) {
-      if (isNetworkFailure(error)) {
+      // Retryable, not merely offline — see the note on the same gate in
+      // trip/[id].tsx. A 500 used to lose the report outright.
+      if (isRetryableFailure(error)) {
         const localPhotoUri = photo ? await persistIncidentPhotoForQueue(photo.uri, photo.fileName || 'incident-photo.jpg') : undefined;
         await enqueueOfflineAction({
           type: 'incident-report',
@@ -353,7 +356,13 @@ export default function IncidentsScreen() {
         setDescription('');
         setPhoto(null);
         setShowErrors(false);
-        setToast({ icon: 'cloud-offline-outline', message: "Saved offline. It'll send as soon as you're back in range.", tone: 'info' });
+        setToast({
+          icon: 'cloud-offline-outline',
+          message: isNetworkFailure(error)
+            ? "Saved offline. It'll send as soon as you're back in range."
+            : 'Dispatch could not take that just now. Saved — it will retry.',
+          tone: 'info',
+        });
         // Queued counts as sent from the driver's side: they are done, and
         // the report leaves when there is signal.
         setJustSent(true);

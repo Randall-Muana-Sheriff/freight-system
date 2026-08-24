@@ -11,6 +11,7 @@ import { useAuth } from '../../../lib/auth';
 import * as ImagePicker from 'expo-image-picker';
 import { updateOrderStatus, fetchOrderById, confirmDelivery, confirmDeliveryByCode, acceptJobOffer, declineJobOffer, isNetworkFailure, type OrderDetail } from '../../../lib/api';
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
+import { isRetryableFailure } from '../../../lib/retryable';
 import { isJobInProgress } from '../../../lib/assignments';
 import { useUpNavigation } from '../../../lib/navigation';
 import { captureException } from '../../../lib/crashReporting';
@@ -138,14 +139,41 @@ export default function TripDetailScreen() {
       await updateOrderStatus(token, Number(id), status);
       loadOrder();
     } catch (error) {
-      if (isNetworkFailure(error)) {
+      // Queue anything that could still succeed later, not only a dropped
+      // connection. This gate used to be a string match on the error message,
+      // so a 500 fell through to an error toast and the driver's work was
+      // simply lost — while retryable.ts, which decides whether the queue
+      // *keeps* an item, called a 500 worth another go. The same question
+      // asked at either end of the pipe should get the same answer.
+      if (isRetryableFailure(error)) {
         await enqueueOfflineAction({
           type: 'status-update',
           orderId: Number(id),
           status,
           createdAt: new Date().toISOString(),
         });
-        setToast({ icon: 'cloud-offline-outline', message: `Trip #${id} will sync when the connection returns.`, tone: 'info' });
+        // Advance the job locally, now, without waiting for a server that we
+        // have just established we cannot reach.
+        //
+        // This is where the duplicate status updates were manufactured. The
+        // queue accepted the action but the screen did not move: same step
+        // highlighted, same live button, so the driver — reasonably — tapped
+        // it again, and again, each tap appending another copy. Every copy
+        // after the first is refused once the queue drains, and until the
+        // refusals were handled that jammed the queue in front of the
+        // delivery photos. Fixing it here is the fix at source; everything
+        // downstream is containment.
+        setOrder((prev) => (prev ? { ...prev, status } : prev));
+        setToast({
+          icon: 'cloud-offline-outline',
+          // A 5xx is not being offline, and telling a driver with four bars
+          // to wait for a connection sends them looking for a fault that is
+          // not theirs.
+          message: isNetworkFailure(error)
+            ? `Trip #${id} will sync when the connection returns.`
+            : `Dispatch could not take that just now. Trip #${id} is saved and will retry.`,
+          tone: 'info',
+        });
       } else {
         setToast({
           icon: 'alert-circle-outline',
@@ -210,7 +238,7 @@ export default function TripDetailScreen() {
       );
       loadOrder();
     } catch (error) {
-      if (isNetworkFailure(error)) {
+      if (isRetryableFailure(error)) {
         try {
           const fileName = asset.fileName ?? 'delivery-confirmation.jpg';
           const persistedUri = await persistDeliveryPhotoForQueue(asset.uri, fileName);
@@ -222,7 +250,17 @@ export default function TripDetailScreen() {
             mimeType: asset.mimeType || 'image/jpeg',
             createdAt: new Date().toISOString(),
           });
-          setToast({ icon: 'cloud-offline-outline', message: `Delivery photo for #${id} will upload when the connection returns.`, tone: 'info' });
+          // Same reason as the status branch: without this the job still
+          // shows "Confirm delivered" and the driver photographs the load a
+          // second time.
+          setOrder((prev) => (prev ? { ...prev, status: 'DELIVERED' } : prev));
+          setToast({
+            icon: 'cloud-offline-outline',
+            message: isNetworkFailure(error)
+              ? `Delivery photo for #${id} will upload when the connection returns.`
+              : `Dispatch could not take that just now. The photo for #${id} is saved and will retry.`,
+            tone: 'info',
+          });
         } catch {
           // Persisting/queueing the photo itself failed (e.g. out of
           // storage) — this is the one case with no safe offline path,
