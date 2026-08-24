@@ -7,6 +7,11 @@ import {
     clearOfflineQueue,
     flushOfflineQueue,
     persistDeliveryPhotoForQueue,
+    getRejectedActions,
+    getRejectedCount,
+    retryRejectedAction,
+    discardRejectedAction,
+    sweepAgedRejections,
 } from './offlineQueue';
 
 // A minimal stand-in for expo-file-system's class-based API (File/
@@ -297,6 +302,137 @@ describe('offlineQueue', () => {
             expect(result).toEqual({ flushed: 0, remaining: 1, rejected: [] });
             expect(deletedUris).not.toContain(persistedUri);
             expect(await getOfflineQueueCount()).toBe(1);
+        });
+    });
+
+    // The worst thing either version of this file has done. Proved by running
+    // it, not by reading it: the first fix dropped a refused delivery photo
+    // AND deleted the file in the same breath. A jammed queue is recoverable —
+    // the work is still on disk. A deleted proof-of-delivery photo, with the
+    // driver already gone from the site, is recoverable by nobody.
+    describe('a refusal never destroys evidence', () => {
+        const photoUri = 'file:///document/pending-delivery-photos/proof.jpg';
+
+        const queuePhoto = () => enqueueOfflineAction({
+            type: 'delivery-photo', orderId: 42,
+            localFileUri: photoUri, fileName: 'proof.jpg', mimeType: 'image/jpeg',
+            createdAt: '2026-01-01T00:00:00Z',
+        });
+
+        const refuse = (status: number, code: string) =>
+            mockConfirmDelivery.mockRejectedValueOnce(
+                Object.assign(new Error('Refused.'), { status, code })
+            );
+
+        it('keeps the photo file when the server refuses the upload', async () => {
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+
+            const result = await flushOfflineQueue('token-123');
+
+            expect(result.rejected).toHaveLength(1);
+            expect(deletedUris).not.toContain(photoUri);
+        });
+
+        // Whatever the reason. There is no refusal code worth destroying the
+        // only copy of a proof of delivery over.
+        it('keeps the photo file for a sequencing refusal too', async () => {
+            refuse(409, 'ORDERS_STATUS_OUT_OF_SEQUENCE');
+            await queuePhoto();
+
+            await flushOfflineQueue('token-123');
+
+            expect(deletedUris).not.toContain(photoUri);
+        });
+
+        it('records the rejection on disk, so a caller that ignores the result cannot lose it', async () => {
+            // auth.tsx did exactly this — awaited the flush and dropped the
+            // return value — so the rejection existed only in a discarded
+            // object while the pending count fell to zero and read as success.
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+
+            await flushOfflineQueue('token-123');
+
+            const stored = await getRejectedActions();
+            expect(stored).toHaveLength(1);
+            expect(stored[0].reason).toBe('AUTH_FORBIDDEN');
+            expect(stored[0].item.type).toBe('delivery-photo');
+        });
+
+        it('adds to earlier rejections rather than replacing them', async () => {
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+            await flushOfflineQueue('token-123');
+
+            mockUpdateOrderStatus.mockRejectedValueOnce(
+                Object.assign(new Error('Later.'), { status: 409, code: 'ORDERS_STATUS_OUT_OF_SEQUENCE' })
+            );
+            await enqueueOfflineAction({ type: 'status-update', orderId: 7, status: 'PICKED_UP', createdAt: '2026-01-02T00:00:00Z' });
+            await flushOfflineQueue('token-123');
+
+            expect(await getRejectedCount()).toBe(2);
+        });
+
+        it('lets the driver put a rejected photo back on the queue', async () => {
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+            await flushOfflineQueue('token-123');
+
+            const [entry] = await getRejectedActions();
+            expect(await retryRejectedAction(entry.id)).toBe(true);
+
+            expect(await getOfflineQueueCount()).toBe(1);
+            expect(await getRejectedCount()).toBe(0);
+
+            // And it can actually succeed the second time, which is the whole
+            // point of having kept the file.
+            mockConfirmDelivery.mockResolvedValueOnce(undefined);
+            const result = await flushOfflineQueue('token-123');
+            expect(result.flushed).toBe(1);
+        });
+
+        it('deletes the photo only when the driver says so', async () => {
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+            await flushOfflineQueue('token-123');
+            expect(deletedUris).not.toContain(photoUri);
+
+            const [entry] = await getRejectedActions();
+            expect(await discardRejectedAction(entry.id)).toBe(true);
+
+            expect(deletedUris).toContain(photoUri);
+            expect(await getRejectedCount()).toBe(0);
+        });
+
+        it('retires a rejection once it is old, and leaves a recent one alone', async () => {
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+            await flushOfflineQueue('token-123');
+
+            const dayMs = 24 * 60 * 60 * 1000;
+            expect(await sweepAgedRejections(Date.now() + 13 * dayMs)).toBe(0);
+            expect(await getRejectedCount()).toBe(1);
+            expect(deletedUris).not.toContain(photoUri);
+
+            expect(await sweepAgedRejections(Date.now() + 15 * dayMs)).toBe(1);
+            expect(await getRejectedCount()).toBe(0);
+            expect(deletedUris).toContain(photoUri);
+        });
+
+        it('keeps a rejection whose timestamp it cannot read, rather than sweeping it', async () => {
+            refuse(403, 'AUTH_FORBIDDEN');
+            await queuePhoto();
+            await flushOfflineQueue('token-123');
+
+            const list = await getRejectedActions();
+            await AsyncStorage.setItem(
+                'kigali_freight_driver_rejected_actions',
+                JSON.stringify([{ ...list[0], rejectedAt: 'not a date' }])
+            );
+
+            expect(await sweepAgedRejections(Date.now() + 3650 * 24 * 60 * 60 * 1000)).toBe(0);
+            expect(await getRejectedCount()).toBe(1);
         });
     });
 });

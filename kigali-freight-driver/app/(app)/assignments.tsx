@@ -19,7 +19,7 @@ function jobsSubtitle(count: number) {
 }
 
 export default function AssignmentsScreen() {
-  const { token } = useAuth();
+  const { token, rejectedActions } = useAuth();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [assignments, setAssignments] = useState<DriverAssignmentCard[]>([]);
@@ -112,6 +112,31 @@ export default function AssignmentsScreen() {
     <ScreenShell refreshing={refreshing} onRefresh={onRefresh}>
       <SectionHeader eyebrow="Dispatch board" title="Jobs" subtitle={jobsSubtitle(assignments.length)} />
 
+      {/* A driver rarely opens the profile screen, and what this is
+          reporting is "your proof of delivery never arrived". So it also has
+          to appear where they already are. One line, tappable through to the
+          detail rather than repeating it — the jobs list is not the place to
+          resolve it, only to find out. */}
+      {rejectedActions.length > 0 ? (
+        <TouchableOpacity
+          style={styles.rejectedBanner}
+          activeOpacity={0.7}
+          onPress={() => router.push('/(app)/profile')}
+          accessibilityRole="button"
+          accessibilityLabel={`${rejectedActions.length} ${rejectedActions.length === 1 ? 'item' : 'items'} did not send. Open profile to review.`}
+        >
+          <View style={[styles.noticeRail, { backgroundColor: theme.colors.warning }]} />
+          <Ionicons name="alert-circle-outline" size={18} color={theme.colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rejectedTitle}>
+              {rejectedActions.length === 1 ? 'Something did not send' : `${rejectedActions.length} things did not send`}
+            </Text>
+            <Text style={styles.rejectedDetail}>Dispatch would not accept it. Tap to review.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+        </TouchableOpacity>
+      ) : null}
+
       {/* Above everything, and outside the loading/error/empty branches
           below: a driver on a run needs the next stop first, and the run
           having loaded does not depend on the job list having loaded.
@@ -185,6 +210,21 @@ export default function AssignmentsScreen() {
 }
 
 const styles = StyleSheet.create({
+  rejectedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.colors.surface2,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  noticeRail: { width: 3, height: 28, borderRadius: 2 },
+  rejectedTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  rejectedDetail: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
   loaderWrap: { alignItems: 'center', gap: 10, paddingVertical: 40 },
   loaderText: { color: theme.colors.muted, ...theme.type.bodySm, fontFamily: theme.fonts.body },
   errorState: {

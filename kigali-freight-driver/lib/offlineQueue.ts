@@ -4,6 +4,19 @@ import { reportIncident, updateOrderStatus, confirmDelivery } from './api';
 import { isRetryableFailure } from './retryable';
 
 const OFFLINE_QUEUE_KEY = 'kigali_freight_driver_offline_queue';
+const REJECTED_ACTIONS_KEY = 'kigali_freight_driver_rejected_actions';
+
+// How long a rejected action — and, crucially, its photo — stays on the phone
+// before the sweep clears it.
+//
+// Nothing is deleted at the moment we decide it was redundant. We have been
+// wrong about "redundant" more than once: the first version of this dropped a
+// refused delivery photo and deleted the file in the same breath, which
+// destroyed the only copy of a proof of delivery for a driver who had already
+// left the site. A head-of-line block is recoverable; that is not. So a
+// rejection keeps its file, the driver gets a chance to see it and retry, and
+// only time — or the driver explicitly discarding it — removes anything.
+const REJECTION_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
 
 export type PendingDriverAction =
   | {
@@ -45,9 +58,12 @@ export type PendingDriverAction =
 // handling: `remaining` is retried, `rejected` never will be, so it is the
 // only part of a flush a driver may need to be told about.
 export type RejectedDriverAction = {
+  // Stable handle so the driver can retry or discard one specific item.
+  id: string;
   item: PendingDriverAction;
   reason: string;
   message: string;
+  rejectedAt: string;
 };
 
 export type FlushResult = {
@@ -129,6 +145,114 @@ export async function clearOfflineQueue() {
   await AsyncStorage.removeItem(OFFLINE_QUEUE_KEY);
 }
 
+// The file a queued action is holding on disk, if it has one. Both photo
+// kinds are persisted copies in this app's own document directory, so the
+// only thing that ever removes them is this module.
+function localFileFor(item: PendingDriverAction): string | undefined {
+  if (item.type === 'delivery-photo') return item.localFileUri;
+  if (item.type === 'incident-report') return item.localPhotoUri;
+  return undefined;
+}
+
+// Deleting a file is never allowed to break the caller. This runs on cleanup
+// paths — a successful upload, an explicit discard, the age-out sweep — and
+// the file may already be gone (the OS reclaimed it, a previous sweep caught
+// it). Failing to delete is untidy; throwing here would abort a flush or
+// leave the UI stuck.
+function deleteFileQuietly(uri: string | undefined) {
+  if (!uri) return;
+  try {
+    new File(uri).delete();
+  } catch {
+    // Nothing useful to do about it, and nothing depends on it having worked.
+  }
+}
+
+async function readRejected(): Promise<RejectedDriverAction[]> {
+  const raw = await AsyncStorage.getItem(REJECTED_ACTIONS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as RejectedDriverAction[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeRejected(list: RejectedDriverAction[]) {
+  await AsyncStorage.setItem(REJECTED_ACTIONS_KEY, JSON.stringify(list));
+}
+
+// Rejections are written to disk by the flush itself, not handed to the
+// caller to deal with. The caller used to be handed them and threw them away:
+// auth.tsx awaited flushOfflineQueue and ignored the result, so a refused
+// delivery photo left no trace anywhere. Worse, the pending count then *fell*,
+// which reads as success. A failure the driver cannot see is the thing this
+// whole module exists to prevent.
+export async function getRejectedActions(): Promise<RejectedDriverAction[]> {
+  return await readRejected();
+}
+
+export async function getRejectedCount() {
+  return (await readRejected()).length;
+}
+
+// Puts a rejected item back on the queue to be tried again. The photo is
+// still on disk precisely so this can work.
+//
+// It may well be refused a second time — a 409 on a status the server has
+// genuinely moved past will never succeed. That is the driver's call to make
+// and it costs one request; being unable to try at all is what we are fixing.
+export async function retryRejectedAction(id: string): Promise<boolean> {
+  const list = await readRejected();
+  const entry = list.find((r) => r.id === id);
+  if (!entry) return false;
+
+  const queue = await readQueue();
+  queue.push(entry.item);
+  await writeQueue(queue);
+  await writeRejected(list.filter((r) => r.id !== id));
+  return true;
+}
+
+// The one moment deleting a photo is right: a person looked at it and said
+// so. Everything else keeps the file.
+export async function discardRejectedAction(id: string): Promise<boolean> {
+  const list = await readRejected();
+  const entry = list.find((r) => r.id === id);
+  if (!entry) return false;
+
+  deleteFileQuietly(localFileFor(entry.item));
+  await writeRejected(list.filter((r) => r.id !== id));
+  return true;
+}
+
+// Age-out, rather than deletion at the moment of rejection. A phone cannot
+// carry refused delivery photos for ever, but two weeks is long enough for a
+// driver to have seen the notice and for dispatch to have chased it.
+//
+// `now` is injectable so this is testable without waiting a fortnight.
+export async function sweepAgedRejections(now: number = Date.now()): Promise<number> {
+  const list = await readRejected();
+  if (list.length === 0) return 0;
+
+  const kept: RejectedDriverAction[] = [];
+  let swept = 0;
+  for (const entry of list) {
+    const age = now - new Date(entry.rejectedAt).getTime();
+    // An unparseable date gives NaN, and NaN > x is false, so a corrupt
+    // record is kept rather than swept. Keeping rubbish is recoverable.
+    if (age > REJECTION_RETENTION_MS) {
+      deleteFileQuietly(localFileFor(entry.item));
+      swept += 1;
+    } else {
+      kept.push(entry);
+    }
+  }
+  if (swept > 0) await writeRejected(kept);
+  return swept;
+}
+
 let isFlushing = false;
 
 export async function flushOfflineQueue(token: string): Promise<FlushResult> {
@@ -191,15 +315,17 @@ export async function flushOfflineQueue(token: string): Promise<FlushResult> {
           const status = (error as { status?: number } | null)?.status;
           const code = (error as { code?: string } | null)?.code;
           rejected.push({
+            id: `${Date.now().toString(36)}-${index}-${Math.random().toString(36).slice(2, 8)}`,
             item,
             reason: code ?? `HTTP ${status ?? 'unknown'}`,
             message: error instanceof Error ? error.message : String(error),
+            rejectedAt: new Date().toISOString(),
           });
-          if (item.type === 'incident-report' && item.localPhotoUri) {
-            new File(item.localPhotoUri).delete();
-          } else if (item.type === 'delivery-photo') {
-            new File(item.localFileUri).delete();
-          }
+          // The file stays. This is the line that used to delete it, and
+          // deleting it was worse than the jam this branch exists to fix:
+          // a refused delivery photo is the only copy of proof that a load
+          // arrived, and the driver is long gone from the site. It is kept
+          // until the driver discards it or sweepAgedRejections retires it.
           continue;
         }
         remaining.push(item);
@@ -209,6 +335,11 @@ export async function flushOfflineQueue(token: string): Promise<FlushResult> {
     }
 
     await writeQueue(remaining);
+    if (rejected.length > 0) {
+      // Appended, not replaced: an earlier rejection the driver has not dealt
+      // with yet must not be overwritten by a later flush.
+      await writeRejected([...(await readRejected()), ...rejected]);
+    }
     return { flushed, remaining: remaining.length, rejected };
   } finally {
     isFlushing = false;

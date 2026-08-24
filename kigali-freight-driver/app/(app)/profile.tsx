@@ -11,6 +11,7 @@ import { ImageViewerModal } from '../../components/ImageViewerModal';
 import { EmptyState } from '../../components/EmptyState';
 import { theme } from '../../lib/theme';
 import { useAuth } from '../../lib/auth';
+import { SyncRejectionsCard } from '../../components/SyncRejectionsCard';
 import { fetchMyProfile, fetchMyVehicle, fetchMyCompletedDeliveries, fetchMyDocuments, type MyProfile, type MyVehicle, type CompletedDelivery } from '../../lib/api';
 import { getTrackingDiagnostics, sendTestLocationPing } from '../../lib/locationTracking';
 import { useBiometricSupport } from '../../lib/biometrics';
@@ -145,7 +146,7 @@ const HISTORY_PREVIEW = 3;
 const DIAGNOSTIC_TAP_TARGET = 7;
 
 export default function ProfileScreen() {
-  const { token, pendingSyncCount, isOffline, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
+  const { token, pendingSyncCount, rejectedActions, isOffline, biometricEnabled, enableBiometric, disableBiometric, signOut } = useAuth();
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [sendingPing, setSendingPing] = useState(false);
@@ -392,6 +393,12 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      {/* Above the reference cards on purpose. This is the only thing on
+          this screen that asks the driver to act, and the item most likely
+          to be in it is a proof-of-delivery photo that never arrived. It
+          renders nothing at all when there is nothing to report. */}
+      <SyncRejectionsCard />
+
       <Card icon="car-outline" title="Vehicle">
         {vehicle === undefined ? (
           <ActivityIndicator color={theme.colors.primary} style={{ marginVertical: 8 }} />
@@ -439,10 +446,19 @@ export default function ProfileScreen() {
               value={isOffline ? 'Offline' : 'Connected'}
               tone={isOffline ? 'bad' : 'good'}
             />
+            {/* "Up to date" was a lie whenever something had been refused:
+                the count only ever tracked what was still queued, so an item
+                the server threw out made this number fall. */}
             <StatusRow
               label="Sync queue"
-              value={pendingSyncCount === 0 ? 'Up to date' : `${pendingSyncCount} pending`}
-              tone={pendingSyncCount === 0 ? 'good' : 'neutral'}
+              value={
+                rejectedActions.length > 0
+                  ? `${rejectedActions.length} did not send`
+                  : pendingSyncCount === 0
+                    ? 'Up to date'
+                    : `${pendingSyncCount} pending`
+              }
+              tone={rejectedActions.length > 0 ? 'bad' : pendingSyncCount === 0 ? 'good' : 'neutral'}
             />
           </View>
         ) : null}

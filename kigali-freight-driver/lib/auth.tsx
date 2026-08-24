@@ -2,7 +2,15 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { AppState, type AppStateStatus } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { setDriverPin, loginDriverPin, logoutDriver, API_BASE, type DriverAuthTokens } from './api';
-import { flushOfflineQueue, getOfflineQueueCount } from './offlineQueue';
+import {
+  flushOfflineQueue,
+  getOfflineQueueCount,
+  getRejectedActions,
+  retryRejectedAction,
+  discardRejectedAction,
+  sweepAgedRejections,
+  type RejectedDriverAction,
+} from './offlineQueue';
 import { registerPushTokenWithBackend } from './pushNotifications';
 import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from './locationTracking';
 import { updateNativeLocationServiceToken } from './nativeLocationService';
@@ -29,6 +37,13 @@ type AuthState = {
   username: string | null;
   isReady: boolean;
   pendingSyncCount: number;
+  // Work the server refused outright, which will never send however long the
+  // driver waits. Kept apart from pendingSyncCount because the two mean
+  // opposite things to a driver: pending resolves itself, rejected needs them.
+  // It lives in the session rather than on one screen because the item most
+  // likely to be in here is a proof-of-delivery photo, and the driver has to
+  // find out wherever they happen to be looking.
+  rejectedActions: RejectedDriverAction[];
   // Proactive (NetInfo), not the reactive isNetworkFailure() check in
   // api.ts — that one only learns a request failed after actually
   // attempting it. This is known ahead of time, so the UI can show a
@@ -42,6 +57,8 @@ type AuthState = {
   loginWithPin: (otpSessionToken: string, pin: string, phone: string) => Promise<void>;
   enableBiometric: () => Promise<void>;
   disableBiometric: () => Promise<void>;
+  retryRejected: (id: string) => Promise<void>;
+  discardRejected: (id: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -104,12 +121,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [rejectedActions, setRejectedActions] = useState<RejectedDriverAction[]>([]);
   const [isOffline, setIsOffline] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
 
   const refreshPendingCount = async () => {
     const count = await getOfflineQueueCount();
     setPendingSyncCount(count);
+    setRejectedActions(await getRejectedActions());
+  };
+
+  const retryRejected = async (id: string) => {
+    await retryRejectedAction(id);
+    await refreshPendingCount();
+    // Straight back out to the server: the driver asked for this, and the
+    // most likely reason they did is that they can see it has not arrived.
+    if (token) await tryFlushOfflineQueue(token);
+  };
+
+  const discardRejected = async (id: string) => {
+    await discardRejectedAction(id);
+    await refreshPendingCount();
   };
 
   const tryFlushOfflineQueue = async (currentToken: string | null) => {
@@ -175,6 +207,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (refreshed) activeToken = refreshed;
         }
       }
+
+      // Retire rejections old enough that nobody is coming back for them,
+      // and release the photos they were holding. Deliberately a timer rather
+      // than a deletion at the moment of refusal.
+      await sweepAgedRejections();
 
       const current = getCachedTokens();
       setToken(activeToken);
@@ -277,6 +314,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRole(null);
     setUsername(null);
     setPendingSyncCount(0);
+    setRejectedActions([]);
   };
 
   const value = useMemo(
@@ -286,6 +324,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       username,
       isReady,
       pendingSyncCount,
+      rejectedActions,
+      retryRejected,
+      discardRejected,
       isOffline,
       biometricEnabled,
       completePinSetup,
@@ -294,7 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       disableBiometric,
       signOut,
     }),
-    [token, role, username, isReady, pendingSyncCount, isOffline, biometricEnabled]
+    [token, role, username, isReady, pendingSyncCount, rejectedActions, isOffline, biometricEnabled]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
