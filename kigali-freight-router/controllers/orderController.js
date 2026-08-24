@@ -1843,6 +1843,27 @@ export const OrderController = {
                     o.special_instructions,
                     o.customer_name,
                     o.customer_phone,
+                    -- What the customer owes, and whether it has been paid.
+                    --
+                    -- The driver app cannot offer to collect without these:
+                    -- it had driver_net, which is the driver's own cut, and
+                    -- nothing about what the customer is due to hand over —
+                    -- so the trip screen could not tell whether a job needed
+                    -- collecting at all.
+                    --
+                    -- price_total and currency ARE the customer's business
+                    -- and the driver is the person asking them for it. What
+                    -- stays hidden is the split: platform_fee is still not
+                    -- selected here, for the same reason it is withheld from
+                    -- public tracking. What the platform keeps is a term
+                    -- between this business and its drivers, not something to
+                    -- hand a driver mid-negotiation at a customer's gate.
+                    o.price_total,
+                    o.currency,
+                    o.price_is_estimate,
+                    o.payment_status,
+                    o.payment_method,
+                    o.paid_at,
                     -- Same rule as the assignments list: the driver's own net,
                     -- never the customer total or the platform's cut.
                     o.driver_net,
