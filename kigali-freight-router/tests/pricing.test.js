@@ -380,3 +380,65 @@ test('the dispatcher can still price above the public cap', () => {
     // into the dispatcher's screen.
     assert.equal(classForWeight(MAX_SELF_SERVICE_KG + 8000), 'Heavy Hauler');
 });
+
+// The empty-return charge used to be a switch: nothing at 25.00 km, the full
+// 70% share at 25.01. Two deliveries on opposite sides of one street differed
+// by 5,132 RWF, and a customer could save that by moving a pin ten metres.
+//
+// The switch modelled the wrong thing. Whether a driver comes back empty is
+// not a fact that changes at a line on the map — it is a likelihood that
+// falls away with distance from the market they load in.
+const TAPERED_VAN = { ...VAN, return_leg_beyond_km: 25, return_leg_share_pct: 70, return_leg_full_km: 75 };
+
+// A road kilometre, expressed as the straight-line distance quote() expects.
+const atRoadKm = (card, km) => quote(card, { weightKg: 400, distanceKm: km / card.road_distance_factor });
+
+test('crossing the point where the empty return starts costs almost nothing', () => {
+    const just_under = atRoadKm(TAPERED_VAN, 24.99);
+    const just_over = atRoadKm(TAPERED_VAN, 25.01);
+    const step = just_over.totalAmount - just_under.totalAmount;
+
+    assert.equal(just_under.returnLegAmount, 0, 'nothing is charged below the start point');
+    assert.ok(step >= 0, 'and going further never costs less');
+    // The old behaviour put 5,132 here. Anything of that order is a cliff,
+    // whatever the exact figure.
+    assert.ok(step < 100, `two metres of road should not cost ${step} — that is the cliff returning`);
+});
+
+test('the full share applies once the band is crossed, and not before', () => {
+    // Half way along the band, half the share.
+    const mid = atRoadKm(TAPERED_VAN, 50);
+    const full = atRoadKm(TAPERED_VAN, 75);
+    const beyond = atRoadKm(TAPERED_VAN, 120);
+
+    const shareAt = (q, km) => q.returnLegAmount / (q.fuelAmount - q.returnLegAmount);
+    assert.ok(Math.abs(shareAt(mid) - 0.35) < 0.02, `half way along the band should be half the share, got ${shareAt(mid)}`);
+    assert.ok(Math.abs(shareAt(full) - 0.70) < 0.02, `the full point should be the full share, got ${shareAt(full)}`);
+    // Past the full point the share stops growing — only the leg does.
+    assert.ok(Math.abs(shareAt(beyond) - 0.70) < 0.02, 'the share is capped, not extrapolated');
+    assert.ok(beyond.returnLegAmount > full.returnLegAmount, 'but a longer empty leg still costs more');
+});
+
+test('the price never falls as the journey grows', () => {
+    // The bug this catches is a taper applied the wrong way round, which
+    // would make a longer job cheaper somewhere in the band.
+    let previous = 0;
+    for (let km = 20; km <= 120; km += 0.5) {
+        const total = atRoadKm(TAPERED_VAN, km).totalAmount;
+        assert.ok(total >= previous, `going from just under ${km}km to ${km}km made the job cheaper`);
+        previous = total;
+    }
+});
+
+// A card written before this column existed must price exactly as it did, or
+// a customer who was already quoted sees the number change underneath them.
+test('a card with no upper point behaves as the old switch did', () => {
+    const legacy = { ...VAN, return_leg_beyond_km: 25, return_leg_share_pct: 70 };
+    const under = atRoadKm(legacy, 24.99);
+    const over = atRoadKm(legacy, 25.01);
+    assert.equal(under.returnLegAmount, 0);
+    // Full share immediately — the cliff, deliberately preserved for a card
+    // that has not been migrated.
+    const share = over.returnLegAmount / (over.fuelAmount - over.returnLegAmount);
+    assert.ok(Math.abs(share - 0.70) < 0.02, 'an un-migrated card still applies the whole share at once');
+});

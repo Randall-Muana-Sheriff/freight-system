@@ -72,6 +72,7 @@ const MIGRATIONS = [
     { id: 'add_one_pending_payment_per_order.sql', destructive: false },
     { id: 'add_settlement_adjustment.sql', destructive: false },
     { id: 'add_cash_collection.sql', destructive: false },
+    { id: 'add_return_leg_taper.sql', destructive: false },
 ];
 
 const LEGACY_DESTRUCTIVE_MIGRATION = 'init_spatial.sql';

@@ -163,13 +163,37 @@ export function quote(rate, { weightKg, distanceKm = null, terrainFactor = null 
     // fuel is as real as the fuel going out. Inside it they pick up the next
     // job where they finished, so there is nothing to charge for.
     const returnBeyond = optionalNumber(rate.return_leg_beyond_km, 'return_leg_beyond_km', Infinity);
+    // Where the share reaches its full value. Defaults to the start point,
+    // which reproduces the old switch exactly — so a card that predates this
+    // column prices identically rather than silently changing under a
+    // customer who was already quoted.
+    const returnFull = optionalNumber(rate.return_leg_full_km, 'return_leg_full_km', returnBeyond);
     const returnsEmpty = distance > returnBeyond;
     // Not the whole leg. The full cost works out at a ~50% uplift and the
     // market only carries 20-40%, so charging all of it would price above
     // every operator in Rwanda. What is left over is what a matched return
     // load covers -- and finding that load is the point of the platform.
     const returnShare = optionalNumber(rate.return_leg_share_pct, 'return_leg_share_pct', 100) / 100;
-    const fuelReturn = returnsEmpty ? fuelOut * returnShare : 0;
+
+    // Ramped in, not switched on.
+    //
+    // This used to be all-or-nothing at returnBeyond, which made two
+    // deliveries ten metres apart differ by over five thousand francs. The
+    // switch was modelling the wrong thing: whether a driver returns empty is
+    // not a fact that changes at a line on the map, it is a likelihood that
+    // falls away with distance from the market they load in.
+    //
+    // Between the two anchors the share grows linearly, so the charge grows
+    // twice over — the leg is longer AND the odds of filling it are worse —
+    // which is the shape the underlying cost actually has.
+    //
+    // The band collapses to the old behaviour when returnFull equals
+    // returnBeyond, which is what an un-migrated card does.
+    const band = returnFull - returnBeyond;
+    const rampedShare = band > 0
+        ? returnShare * Math.min(1, Math.max(0, (distance - returnBeyond) / band))
+        : returnShare;
+    const fuelReturn = returnsEmpty ? fuelOut * rampedShare : 0;
 
     const fuel = fuelOut + fuelReturn;
     const service = baseFare + cityKm * perKm + openRoadKm * perKmLong + weight * perKg;
