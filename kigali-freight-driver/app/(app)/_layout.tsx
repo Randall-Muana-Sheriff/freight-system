@@ -158,6 +158,10 @@ export default function AppLayout() {
         />
         <Tabs.Screen name="trip/[id]" options={{ href: null }} />
         <Tabs.Screen name="documents" options={{ href: null }} />
+        {/* Reached from Profile, not a tab. Five tabs is already the ceiling
+            for one-handed use, and this is a screen a driver checks
+            occasionally rather than while working. */}
+        <Tabs.Screen name="earnings" options={{ href: null }} />
       </Tabs>
     </View>
     </GestureDetector>

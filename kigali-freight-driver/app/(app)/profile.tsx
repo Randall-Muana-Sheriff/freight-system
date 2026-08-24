@@ -393,6 +393,19 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
+      {/* A driver paid by mobile money had no way to see it at all — the
+          money arrived in their wallet minutes after a job with nothing on
+          the phone acknowledging it. */}
+      <TouchableOpacity onPress={() => router.push('/(app)/earnings')} activeOpacity={0.7} style={styles.notice}>
+        <View style={[styles.noticeRail, { backgroundColor: theme.colors.primary }]} />
+        <Ionicons name="cash-outline" size={18} color={theme.colors.primary} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.noticeTitle}>Earnings</Text>
+          <Text style={styles.noticeDetail}>What mobile money has sent you, and what is still on the way.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+      </TouchableOpacity>
+
       {/* Above the reference cards on purpose. This is the only thing on
           this screen that asks the driver to act, and the item most likely
           to be in it is a proof-of-delivery photo that never arrived. It
