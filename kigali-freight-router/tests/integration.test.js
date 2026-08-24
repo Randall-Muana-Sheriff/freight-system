@@ -2097,6 +2097,75 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         await pool.query('DELETE FROM driver_payouts WHERE id = $1', [payoutId]);
     });
 
+    // The exposure limit, and where it deliberately does NOT sit.
+    //
+    // Recording cash is never refused — that would recreate the problem the
+    // cash path exists to solve, leaving a driver at a customer's gate with
+    // money in hand and nowhere to log it, and punishing the honest one
+    // hardest. What is limited is how much more the platform hands over on
+    // top of what a driver is already holding.
+    test('a driver holding too much collected commission stops being given work', async () => {
+        const order = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Cash limit probe', weight_kg: 90,
+                origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+            });
+        assert.equal(order.statusCode, 201, JSON.stringify(order.body));
+        const orderId = order.body.data.order.id;
+
+        const debt = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Big cash job', weight_kg: 90,
+                origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+            });
+        const debtId = debt.body.data.order.id;
+        await pool.query(
+            `UPDATE orders SET assigned_to = $2, payment_method = 'CASH', payment_status = 'PAID',
+                    price_total = 200000, platform_fee = 60000, currency = 'RWF',
+                    cash_collected_at = NOW(), cash_settled_at = NULL
+              WHERE id = $1`,
+            [debtId, driverPhone]
+        );
+
+        const refused = await request(app).post('/api/orders/assign')
+            .set('Authorization', `Bearer ${adminToken}`)
+            .send({ orderIds: [orderId], driverName: driverPhone });
+        assert.equal(refused.statusCode, 409, JSON.stringify(refused.body));
+        assert.equal(refused.body.error.code, 'ORDERS_ASSIGN_CASH_OWING');
+        // The refusal has to say what clears it, or a dispatcher is stuck
+        // with a driver they cannot use and no idea why.
+        assert.match(refused.body.error.message, /settle|handed in/i);
+
+        // Recording MORE cash is still allowed while over the limit. This is
+        // the half that matters: the driver may already be standing at a
+        // door, and refusing the record does not un-collect the money — it
+        // only loses the evidence that they collected it honestly.
+        await pool.query(`UPDATE orders SET status = 'ARRIVED', assigned_to = $2, price_total = 15000,
+                                 platform_fee = 1500, currency = 'RWF', price_is_estimate = FALSE
+                           WHERE id = $1`, [orderId, driverPhone]);
+        const stillRecordable = await request(app).post(`/api/payments/orders/${orderId}/cash`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(stillRecordable.statusCode, 200,
+            `recording cash must never be blocked by the debt limit: ${JSON.stringify(stillRecordable.body)}`);
+
+        // And once dispatch records the commission as handed in, the driver
+        // can be given work again.
+        await request(app).post(`/api/payments/orders/${debtId}/cash/settle`)
+            .set('Authorization', `Bearer ${adminToken}`).send({});
+        const owed = await pool.query(
+            `SELECT COALESCE(SUM(platform_fee), 0)::float AS owed FROM orders
+              WHERE assigned_to = $1 AND payment_method = 'CASH' AND cash_settled_at IS NULL`,
+            [driverPhone]
+        );
+        assert.ok(owed.rows[0].owed < 50000, 'settling the big job drops them back under the limit');
+
+        await pool.query(`UPDATE orders SET payment_method = NULL, payment_status = 'UNPAID',
+                                 cash_collected_at = NULL, cash_settled_at = NULL, platform_fee = NULL
+                           WHERE id = ANY($1::int[])`, [[orderId, debtId]]);
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');

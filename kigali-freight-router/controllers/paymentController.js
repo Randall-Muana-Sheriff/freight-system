@@ -4,7 +4,8 @@ import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
 import {
     PaymentError, requestPaymentForOrder, reconcilePaymentRequest, sweepPendingPayments,
-    recordCashPayment, settleCashForOrder,
+    recordCashPayment, settleCashForOrder, requestCashSettlement, reconcileCashSettlement,
+    cashOwedBy,
 } from '../services/paymentService.js';
 import { canReceiveMomoPrompt, mobileNetwork } from '../utils/phone.js';
 
@@ -211,6 +212,60 @@ export const PaymentController = {
         });
     },
 
+    // POST /api/payments/driver/cash/settle   { amount? }
+    //
+    // A driver paying their own commission from their own phone, rather than
+    // waiting for it to net off a payout they may not have coming, or
+    // carrying notes to whoever can mark it settled.
+    //
+    // Defaults to the whole outstanding amount; a partial payment is allowed
+    // because a driver may genuinely only have part of it today.
+    settleOwnCash: async (req, res) => {
+        try {
+            const result = await requestCashSettlement({
+                driverUsername: req.user.username,
+                amount: req.body?.amount,
+            });
+            return ok(res, {
+                ...result,
+                message: result.reused
+                    ? 'A prompt is already on your phone. Check it.'
+                    : 'Prompt sent. Enter your MoMo PIN to pay the commission.',
+            });
+        } catch (error) {
+            if (error instanceof PaymentError) {
+                return fail(res, { status: error.status, code: error.code, message: error.message });
+            }
+            logError(req, 'Cash settlement request failed', error);
+            return fail(res, { status: 500, code: 'CASH_SETTLE_FAILED',
+                message: 'Could not start that payment. Try again, or hand the commission to dispatch.' });
+        }
+    },
+
+    // GET /api/payments/driver/cash/settle/:reference — what the phone polls.
+    settleOwnCashStatus: async (req, res) => {
+        try {
+            const { reference } = req.params;
+            if (!UUID.test(reference || '')) {
+                return fail(res, { status: 400, code: 'CASH_SETTLE_BAD_REFERENCE', message: 'Unknown payment.' });
+            }
+            await reconcileCashSettlement(reference).catch(() => null);
+            const { rows } = await pool.query(
+                `SELECT reference, amount, currency, status, failure_reason, created_at
+                   FROM cash_settlements WHERE reference = $1 AND driver_username = $2`,
+                [reference, req.user.username]
+            );
+            if (rows.length === 0) {
+                return fail(res, { status: 404, code: 'CASH_SETTLE_NOT_FOUND', message: 'Unknown payment.' });
+            }
+            const owed = await cashOwedBy(pool, req.user.username);
+            return ok(res, { ...rows[0], amount: Number(rows[0].amount), stillOwed: owed.total });
+        } catch (error) {
+            logError(req, 'Cash settlement status failed', error);
+            return fail(res, { status: 500, code: 'CASH_SETTLE_STATUS_FAILED', message: 'Could not check that payment.' });
+        }
+    },
+
     // GET /api/payments/driver/cash
     //
     // The mirror of earnings, and the number that matters is the one the
@@ -310,7 +365,12 @@ export const PaymentController = {
         // retries, and there is nothing here for a retry to fix.
         if (!UUID.test(reference || '')) return ok(res, { received: true });
         try {
-            await reconcilePaymentRequest(reference);
+            // A reference is either a customer paying a fare or a driver
+            // paying their commission. The callback body cannot be trusted to
+            // say which, so both are asked and the one that owns the
+            // reference answers — an unknown reference is a no-op in each.
+            const fare = await reconcilePaymentRequest(reference);
+            if (!fare.known) await reconcileCashSettlement(reference);
         } catch (error) {
             logError(req, `MoMo callback reconciliation failed for ${reference}`, error);
         }

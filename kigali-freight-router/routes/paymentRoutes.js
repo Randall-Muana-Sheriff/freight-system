@@ -28,6 +28,10 @@ router.get('/driver/earnings', authMiddleware(['driver']), PaymentController.ear
 // The cash mirror. A driver holding a week of fares needs to know which part
 // of it is the platform's before they spend it.
 router.get('/driver/cash', authMiddleware(['driver']), PaymentController.cashSummary);
+// A driver settling their own commission by MoMo. Same limiter as asking a
+// customer to pay — it is the same prompt, pointed the other way.
+router.post('/driver/cash/settle', authMiddleware(['driver']), requestLimit, PaymentController.settleOwnCash);
+router.get('/driver/cash/settle/:reference', authMiddleware(['driver']), PaymentController.settleOwnCashStatus);
 
 // No auth: this is MTN calling us. Safe because the handler reads nothing
 // from the body — it treats the call as "ask MTN about this reference" and

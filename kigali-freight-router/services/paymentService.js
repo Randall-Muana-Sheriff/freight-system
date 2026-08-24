@@ -649,3 +649,201 @@ export async function settleCashForOrder({ orderId, settledBy }) {
     });
     return { orderId: Number(orderId), settled: true };
 }
+
+/**
+ * What a driver still owes the platform from cash fares, oldest first.
+ *
+ * Shared by everything that needs the figure — the settlement flow, the
+ * assignment gate, the driver's own screen — so there is one definition of
+ * "owing" rather than three queries that drift apart.
+ */
+export async function cashOwedBy(queryable, driverUsername) {
+    const { rows } = await queryable.query(
+        `SELECT id, platform_fee, currency, cash_collected_at
+           FROM orders
+          WHERE assigned_to = $1 AND payment_method = 'CASH'
+            AND cash_settled_at IS NULL AND platform_fee IS NOT NULL AND platform_fee > 0
+          ORDER BY cash_collected_at ASC`,
+        [driverUsername]
+    );
+    return {
+        total: rows.reduce((a, r) => a + Number(r.platform_fee), 0),
+        currency: rows[0]?.currency ?? null,
+        jobs: rows.map((r) => ({ id: r.id, fee: Number(r.platform_fee) })),
+    };
+}
+
+/**
+ * Ask a driver to pay their outstanding commission from their own phone.
+ *
+ * The same MTN prompt a customer gets, pointed the other way. Netting off a
+ * payout only helps a driver who has one coming; somebody working mostly in
+ * cash may not for days, and their alternative was carrying notes to an
+ * office.
+ */
+export async function requestCashSettlement({ driverUsername, amount }) {
+    if (!isMomoConfigured('collection')) {
+        throw new PaymentError('PAYMENTS_NOT_CONFIGURED', 503,
+            'Mobile money is not set up on this server. Hand the commission to dispatch instead.');
+    }
+
+    const owed = await cashOwedBy(pool, driverUsername);
+    if (owed.total <= 0) {
+        throw new PaymentError('CASH_NOTHING_OWED', 409, 'You have no commission outstanding.');
+    }
+
+    // Default to everything. A partial payment is allowed because a driver
+    // may genuinely only have part of it, but it must not exceed the debt --
+    // this endpoint settles commission, it is not a way to send the platform
+    // arbitrary money.
+    const requested = amount === undefined || amount === null ? owed.total : Number(amount);
+    if (!Number.isFinite(requested) || requested <= 0) {
+        throw new PaymentError('CASH_SETTLE_INVALID_AMOUNT', 400, 'Enter how much you are paying.');
+    }
+    if (requested > owed.total + 0.01) {
+        throw new PaymentError('CASH_SETTLE_OVER_OWED', 400,
+            `You owe ${owed.total}${owed.currency ? ` ${owed.currency}` : ''}. You cannot pay more than that here.`);
+    }
+
+    const msisdn = toMsisdn(driverUsername);
+    if (!msisdn) {
+        throw new PaymentError('PAYMENT_INVALID_NUMBER', 400, 'Your account has no valid mobile number.');
+    }
+    if (!canReceiveMomoPrompt(driverUsername)) {
+        throw new PaymentError('PAYMENT_WRONG_NETWORK', 400,
+            'Your number is not an MTN line, so it cannot receive a MoMo prompt. Hand the commission to dispatch instead.');
+    }
+
+    // Reuse an in-flight prompt rather than stacking a second. Same reason as
+    // a customer's fare, and worse here: nobody else is watching the money.
+    const existing = await pool.query(
+        `SELECT reference, amount FROM cash_settlements
+          WHERE driver_username = $1 AND status = 'PENDING' LIMIT 1`,
+        [driverUsername]
+    );
+    if (existing.rows[0]) {
+        return { reference: existing.rows[0].reference, amount: Number(existing.rows[0].amount), reused: true };
+    }
+
+    const reference = newReference();
+    const currency = owed.currency;
+    if (!currency) {
+        throw new PaymentError('PAYMENT_NO_CURRENCY', 409,
+            'Those jobs have no currency recorded, so the amount cannot be charged. Hand the commission to dispatch instead.');
+    }
+
+    // Written before the call, so a request that dies in flight is still on
+    // record rather than lost.
+    const inserted = await pool.query(
+        `INSERT INTO cash_settlements (driver_username, reference, payer_msisdn, amount, currency)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [driverUsername, reference, msisdn, requested, currency]
+    );
+
+    try {
+        await requestToPay({
+            reference,
+            msisdn,
+            amount: requested,
+            currency,
+            externalId: `COMMISSION-${inserted.rows[0].id}`,
+            payerMessage: 'Inzira commission on cash deliveries',
+            payeeNote: `Cash commission from ${driverUsername}`,
+        });
+    } catch (error) {
+        await pool.query(
+            `UPDATE cash_settlements SET status = 'FAILED', failure_reason = $2,
+                    resolved_at = NOW(), updated_at = NOW() WHERE id = $1`,
+            [inserted.rows[0].id, error.message.slice(0, 300)]
+        );
+        throw new PaymentError('PAYMENT_REQUEST_REFUSED', 502,
+            'Could not reach mobile money. Try again, or hand the commission to dispatch.');
+    }
+
+    return { reference, amount: requested, currency, reused: false };
+}
+
+/**
+ * Settle one commission payment against what MTN says actually happened.
+ *
+ * Whole jobs, oldest first, up to what was paid -- the same rule netting uses,
+ * so a driver sees one consistent story however the money reached us. A part
+ * payment that does not cover the oldest job clears nothing and stays on
+ * record as paid, which is visible rather than silently absorbed.
+ */
+export async function reconcileCashSettlement(reference) {
+    const { rows } = await pool.query(
+        `SELECT * FROM cash_settlements WHERE reference = $1`, [reference]
+    );
+    const settlement = rows[0];
+    if (!settlement) return { known: false };
+    if (settlement.status !== 'PENDING') return { known: true, status: settlement.status, changed: false };
+
+    let verdict;
+    try {
+        verdict = await getRequestToPayStatus(reference);
+    } catch (error) {
+        return { known: true, status: 'PENDING', changed: false, unreachable: true, error: error.message };
+    }
+    if (verdict.status === 'PENDING') return { known: true, status: 'PENDING', changed: false };
+
+    const settledAmount = Number(verdict.amount);
+    const amountMatches = Number.isFinite(settledAmount)
+        && Math.abs(settledAmount - Number(settlement.amount)) < 0.01;
+    const succeeded = verdict.status === 'SUCCESSFUL' && amountMatches;
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const claimed = await client.query(
+            `UPDATE cash_settlements
+                SET status = $2, provider_transaction_id = $3, failure_reason = $4,
+                    resolved_at = NOW(), updated_at = NOW()
+              WHERE id = $1 AND status = 'PENDING' RETURNING id`,
+            [settlement.id, succeeded ? 'SUCCESSFUL' : 'FAILED', verdict.financialTransactionId,
+             succeeded ? null
+               : amountMatches ? (verdict.reason || verdict.status)
+               : `Settled ${verdict.amount} against ${settlement.amount} requested`]
+        );
+        if (claimed.rows.length === 0) { await client.query('ROLLBACK'); return { known: true, changed: false }; }
+
+        const cleared = [];
+        if (succeeded) {
+            const owed = await cashOwedBy(client, settlement.driver_username);
+            let remaining = Number(settlement.amount);
+            for (const job of owed.jobs) {
+                if (job.fee > remaining) break;
+                remaining -= job.fee;
+                cleared.push(job.id);
+            }
+            if (cleared.length > 0) {
+                await client.query(
+                    `UPDATE orders SET cash_settled_at = NOW(), cash_settled_by_settlement_id = $2,
+                            updated_at = NOW() WHERE id = ANY($1::int[])`,
+                    [cleared, settlement.id]
+                );
+            }
+        }
+        await client.query('COMMIT');
+
+        if (succeeded) {
+            await appendAuditLog({
+                actionType: 'CASH_COMMISSION_SETTLED',
+                description: `${settlement.driver_username} paid ${settlement.amount} ${settlement.currency} `
+                    + `commission by mobile money, clearing ${cleared.length} job(s)`
+                    + (cleared.length ? `: #${cleared.join(', #')}` : ' (part payment, no whole job covered)')
+                    + `. MTN reference ${verdict.financialTransactionId || 'none'}.`,
+                username: settlement.driver_username,
+            });
+            toDispatchAndDriver(settlement.driver_username, 'cash:settled', {
+                amount: Number(settlement.amount), currency: settlement.currency, clearedJobs: cleared.length,
+            });
+        }
+        return { known: true, status: succeeded ? 'SUCCESSFUL' : 'FAILED', changed: true, cleared };
+    } catch (error) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw error;
+    } finally {
+        client.release();
+    }
+}

@@ -7,6 +7,7 @@ import { ok, fail } from '../utils/httpResponse.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { uploadDeliveryPhoto, toSignedUrl } from '../config/r2Client.js';
 import { isDriverVerified } from '../services/driverVerificationService.js';
+import { cashOwedBy } from '../services/paymentService.js';
 import { canTransition, refusalFor, DELIVERABLE_FROM, isTerminal } from '../utils/orderTransitions.js';
 import { appendAuditLog } from '../services/auditLogService.js';
 import * as Sentry from '@sentry/node';
@@ -98,6 +99,37 @@ function unplacedFailure(ids) {
         message: ids.length === 1
             ? `Order ${list} has no confirmed pickup and delivery point yet. Place it on the map before sending it to a driver.`
             : `These orders have no confirmed pickup and delivery point yet: ${list}. Place them on the map before sending them to a driver.`,
+    };
+}
+
+// How much of the platform's cash a driver may be holding before they stop
+// being given new work.
+//
+// Not a limit on recording cash — that would recreate the problem the cash
+// path exists to solve, leaving somebody at a customer's gate with money in
+// hand and nowhere to log it, and it punishes the honest driver hardest.
+// Recording is always allowed. What is limited is how much more the platform
+// hands over on top.
+//
+// A driver working all cash accrues commission at roughly a few thousand
+// francs a day, so this is about a week's worth: long enough that nobody is
+// stopped for owing yesterday's fare, short enough that the exposure to any
+// one driver stays a sum the business could absorb.
+//
+// The remedy is fast and in the driver's own hands — they can clear it from
+// their phone in one prompt — so this is friction rather than a wall.
+const MAX_DRIVER_CASH_OWED = Number(process.env.MAX_DRIVER_CASH_OWED || 50000);
+
+async function cashHoldFor(queryable, driverName) {
+    const owed = await cashOwedBy(queryable, driverName);
+    if (owed.total <= MAX_DRIVER_CASH_OWED) return null;
+    const unit = owed.currency ? ` ${owed.currency}` : '';
+    return {
+        status: 409,
+        code: 'ORDERS_ASSIGN_CASH_OWING',
+        message: `${driverName} is holding ${owed.total}${unit} of collected commission, over the `
+            + `${MAX_DRIVER_CASH_OWED}${unit} limit. They can settle it from their phone, or dispatch can `
+            + 'record it as handed in — then this job can go to them.',
     };
 }
 
@@ -692,6 +724,15 @@ export const OrderController = {
                     code: 'ORDERS_ASSIGN_DRIVER_UNVERIFIED',
                     message: `${driverName} has not completed document verification yet.`,
                 });
+            }
+
+            // Cash already collected and not yet handed back. Same placement
+            // as the verification gate, and for the same reason: both are
+            // facts about the driver rather than the load.
+            const cashHold = await cashHoldFor(client, driverName);
+            if (cashHold) {
+                await client.query('ROLLBACK');
+                return fail(res, cashHold);
             }
 
             // Select matching pending orders using a FOR UPDATE lock to freeze rows until transaction completes
