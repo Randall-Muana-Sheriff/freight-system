@@ -18,6 +18,12 @@ const staffOrDriver = authMiddleware(['admin', 'dispatcher', 'driver']);
 router.get('/can-charge', staffOrDriver, PaymentController.canCharge);
 router.post('/orders/:orderId/request', staffOrDriver, requestLimit, PaymentController.request);
 router.get('/orders/:orderId', staffOrDriver, PaymentController.status);
+// Cash taken at the door. Same limiter as a MoMo request — it is the same
+// action from the driver's side and should not be easier to spam.
+router.post('/orders/:orderId/cash', staffOrDriver, requestLimit, PaymentController.cash);
+// Confirming the commission came back is dispatch's job, never the driver's:
+// a driver clearing their own debt is what this record exists to prevent.
+router.post('/orders/:orderId/cash/settle', authMiddleware(['admin', 'dispatcher']), PaymentController.settleCash);
 router.get('/driver/earnings', authMiddleware(['driver']), PaymentController.earnings);
 
 // No auth: this is MTN calling us. Safe because the handler reads nothing

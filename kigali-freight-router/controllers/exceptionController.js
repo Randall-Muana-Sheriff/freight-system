@@ -1,7 +1,7 @@
 // What needs a human, gathered in one place.
 //
 // A dispatch board that opens on a queue asks the dispatcher to find the
-// problem. This is the other way round: fifteen sources of deviation, already
+// problem. This is the other way round: sixteen sources of deviation, already
 // computed elsewhere in the system, collected and ranked so the first thing
 // on screen is the thing that is wrong.
 //
@@ -184,6 +184,29 @@ const GROUPS = [
                 FROM payment_requests pr JOIN orders o ON o.id = pr.order_id
                WHERE pr.status = 'PENDING' AND pr.created_at < NOW() - INTERVAL '30 minutes'
                ORDER BY pr.created_at ASC`,
+    },
+    {
+        key: 'cash_not_handed_in',
+        label: 'Cash taken and not yet handed in',
+        severity: 'act',
+        // Cash runs the opposite way to mobile money. On a MoMo job the
+        // platform holds the fare and owes the driver their share; on a cash
+        // job the driver is holding the whole fare and owes the platform its
+        // commission. Nothing chases that on its own, and a debt nobody is
+        // tracking is one nobody collects.
+        //
+        // This is also the record that protects an honest driver. Without it
+        // a driver who collected and handed over and one who did not look
+        // identical, and the honest one has no way to prove which they were.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.assigned_to, 'a driver') AS title,
+                     'Holding ' || COALESCE(o.platform_fee::text, '?') ||
+                       COALESCE(' ' || o.currency, '') || ' commission on ' ||
+                       COALESCE(o.cargo_description, 'a delivery') AS subtitle,
+                     o.cash_collected_at AS since, o.assigned_to AS driver
+                FROM orders o
+               WHERE o.payment_method = 'CASH' AND o.cash_settled_at IS NULL
+               ORDER BY o.cash_collected_at ASC`,
     },
     {
         key: 'settlement_outstanding',

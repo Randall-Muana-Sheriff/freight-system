@@ -4,6 +4,7 @@ import { ok, fail } from '../utils/httpResponse.js';
 import { logError } from '../utils/logger.js';
 import {
     PaymentError, requestPaymentForOrder, reconcilePaymentRequest, sweepPendingPayments,
+    recordCashPayment, settleCashForOrder,
 } from '../services/paymentService.js';
 import { canReceiveMomoPrompt, mobileNetwork } from '../utils/phone.js';
 
@@ -50,6 +51,72 @@ export const PaymentController = {
             logError(req, 'Payment request failed', error);
             return fail(res, { status: 500, code: 'PAYMENT_REQUEST_FAILED',
                 message: 'Could not ask for payment. Take cash and tell dispatch.' });
+        }
+    },
+
+    // POST /api/payments/orders/:orderId/cash   { note? }
+    //
+    // The driver took the fare in cash and is saying so. This is the other
+    // half of a sentence the system has been printing at drivers with nowhere
+    // to act on it — "take cash and record it with dispatch" pointed at
+    // nothing, so a cash job and an unpaid job were the same row.
+    //
+    // That is a fairness problem before it is an accounting one. With no way
+    // to record it, a driver who collected honestly and one who pocketed the
+    // fare look identical, and the honest one has no way to show which they
+    // were.
+    cash: async (req, res) => {
+        try {
+            const requesterRole = String(req.user?.role || '').toLowerCase();
+            if (requesterRole === 'driver') {
+                const owns = await pool.query(
+                    'SELECT 1 FROM orders WHERE id = $1 AND assigned_to = $2',
+                    [req.params.orderId, req.user.username]
+                );
+                if (owns.rows.length === 0) {
+                    return fail(res, { status: 403, code: 'PAYMENT_NOT_YOUR_ORDER',
+                        message: 'You can only record payment for your own deliveries.' });
+                }
+            }
+            const result = await recordCashPayment({
+                orderId: req.params.orderId,
+                collectedBy: req.user?.username,
+                note: req.body?.note,
+            });
+            return ok(res, {
+                ...result,
+                message: result.platformFeeOwed === null
+                    ? 'Cash recorded.'
+                    : `Cash recorded. ${result.platformFeeOwed}${result.currency ? ` ${result.currency}` : ''} commission to hand in.`,
+            });
+        } catch (error) {
+            if (error instanceof PaymentError) {
+                return fail(res, { status: error.status, code: error.code, message: error.message });
+            }
+            logError(req, 'Recording cash failed', error);
+            return fail(res, { status: 500, code: 'PAYMENT_CASH_FAILED',
+                message: 'Could not record that cash payment. Tell dispatch before you leave.' });
+        }
+    },
+
+    // POST /api/payments/orders/:orderId/cash/settle
+    //
+    // Dispatch confirms the driver handed the platform's share over. Staff
+    // only: a driver marking their own debt settled is the one thing this
+    // whole record exists to prevent.
+    settleCash: async (req, res) => {
+        try {
+            return ok(res, await settleCashForOrder({
+                orderId: req.params.orderId,
+                settledBy: req.user?.username,
+            }));
+        } catch (error) {
+            if (error instanceof PaymentError) {
+                return fail(res, { status: error.status, code: error.code, message: error.message });
+            }
+            logError(req, 'Settling cash failed', error);
+            return fail(res, { status: 500, code: 'PAYMENT_CASH_SETTLE_FAILED',
+                message: 'Could not record that settlement.' });
         }
     },
 

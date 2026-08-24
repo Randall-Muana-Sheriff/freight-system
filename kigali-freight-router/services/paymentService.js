@@ -410,3 +410,122 @@ export function stopPaymentSweep() {
     if (sweepTimer) clearInterval(sweepTimer);
     sweepTimer = null;
 }
+
+/**
+ * A driver records taking the fare in cash at the door.
+ *
+ * This is the other half of "take cash and record it with dispatch" — until
+ * now that sentence pointed at nothing, so a cash job was indistinguishable
+ * from an unpaid one and an honest driver had no way to show which they were.
+ *
+ * The money runs the opposite way to mobile money and the code has to know
+ * that. On a MoMo job the customer pays the platform and the platform owes
+ * the driver their share; on a cash job the driver is already holding the
+ * whole fare, so nobody owes them anything — they owe the platform its
+ * commission. No payout is queued, deliberately: doing so would pay a driver
+ * a second time for money already in their pocket.
+ */
+export async function recordCashPayment({ orderId, collectedBy, note }) {
+    const { rows } = await pool.query(
+        `SELECT id, status, payment_status, price_total, platform_fee, currency,
+                price_is_estimate, assigned_to
+           FROM orders WHERE id = $1`,
+        [orderId]
+    );
+    const order = rows[0];
+    if (!order) throw new PaymentError('ORDERS_NOT_FOUND', 404, 'That order no longer exists.');
+
+    if (order.payment_status === 'PAID') {
+        throw new PaymentError('PAYMENT_ALREADY_PAID', 409, 'This delivery has already been paid for.');
+    }
+    // Same gate as the MoMo path: cash is collected at the door, not booked
+    // in advance, and an estimate is not a bill.
+    if (!['ARRIVED', 'IN_TRANSIT'].includes(order.status)) {
+        throw new PaymentError('PAYMENT_TOO_EARLY', 409,
+            'Mark the delivery as arrived before recording payment.');
+    }
+    if (order.price_total === null) {
+        throw new PaymentError('PAYMENT_NO_PRICE', 409,
+            'This order has no settled price, so there is no amount to record.');
+    }
+    if (order.price_is_estimate) {
+        throw new PaymentError('PAYMENT_PRICE_IS_ESTIMATE', 409,
+            'This delivery is still on an estimated price. Dispatch has to confirm the real price first.');
+    }
+    // A live MoMo prompt and a cash collection on the same job is how a
+    // customer pays twice.
+    const inFlight = await pool.query(
+        `SELECT 1 FROM payment_requests WHERE order_id = $1 AND status = 'PENDING'`, [orderId]
+    );
+    if (inFlight.rows.length > 0) {
+        throw new PaymentError('PAYMENT_PROMPT_IN_FLIGHT', 409,
+            'A mobile money prompt is already on the customer\'s phone. Wait for it to finish or fail before taking cash.');
+    }
+
+    const updated = await pool.query(
+        `UPDATE orders
+            SET payment_status = 'PAID', payment_method = 'CASH',
+                paid_at = NOW(), cash_collected_at = NOW(), updated_at = NOW()
+          WHERE id = $1 AND payment_status <> 'PAID'
+          RETURNING id, price_total, platform_fee, currency, assigned_to`,
+        [orderId]
+    );
+    if (updated.rows.length === 0) {
+        throw new PaymentError('PAYMENT_ALREADY_PAID', 409, 'This delivery has already been paid for.');
+    }
+    const row = updated.rows[0];
+
+    // The permanent record, because this is the one payment nobody else can
+    // corroborate. MoMo has MTN's own transaction id behind it; cash has only
+    // a driver's word and this line.
+    // An order can carry a price with no currency on it — eight do in this
+    // database — and the MoMo path refuses those outright. Cash is the
+    // fallback for exactly the jobs where something else is missing, so it
+    // still records them, but the amount is written without a unit rather
+    // than with the word "null" beside it.
+    const unit = row.currency ? ` ${row.currency}` : '';
+    await appendAuditLog({
+        actionType: 'PAYMENT_CASH_COLLECTED',
+        description: `Order #${orderId}: ${row.price_total}${unit} taken in cash by `
+            + `${row.assigned_to || 'unknown'}. Platform fee ${row.platform_fee ?? 'unknown'}${unit} owed back.`
+            + (row.currency ? '' : ' (no currency recorded on this order)')
+            + (note ? ` Note: ${String(note).slice(0, 200)}` : ''),
+        username: collectedBy || 'System',
+    });
+
+    toDispatchAndDriver(row.assigned_to, 'payment:received', {
+        orderId: Number(orderId),
+        amount: Number(row.price_total),
+        currency: row.currency,
+        method: 'CASH',
+    });
+
+    return {
+        orderId: Number(orderId),
+        amount: Number(row.price_total),
+        currency: row.currency,
+        platformFeeOwed: row.platform_fee === null ? null : Number(row.platform_fee),
+        method: 'CASH',
+    };
+}
+
+/** Dispatch confirms the driver has handed the platform's share over. */
+export async function settleCashForOrder({ orderId, settledBy }) {
+    const { rows } = await pool.query(
+        `UPDATE orders SET cash_settled_at = NOW(), updated_at = NOW()
+          WHERE id = $1 AND payment_method = 'CASH' AND cash_settled_at IS NULL
+          RETURNING id, platform_fee, currency, assigned_to`,
+        [orderId]
+    );
+    if (rows.length === 0) {
+        throw new PaymentError('CASH_NOT_OUTSTANDING', 409,
+            'That order has no cash commission outstanding.');
+    }
+    await appendAuditLog({
+        actionType: 'PAYMENT_CASH_SETTLED',
+        description: `Order #${orderId}: ${rows[0].platform_fee} ${rows[0].currency} commission `
+            + `received from ${rows[0].assigned_to || 'unknown'}.`,
+        username: settledBy || 'System',
+    });
+    return { orderId: Number(orderId), settled: true };
+}

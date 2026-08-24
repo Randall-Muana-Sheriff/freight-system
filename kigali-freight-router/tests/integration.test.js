@@ -1930,6 +1930,79 @@ if (!hasIntegrationEnv || !hasAdminBootstrap) {
         }
     });
 
+    // "Take cash and record it with dispatch" pointed at nothing until now, so
+    // a cash job and an unpaid job were the same row. That is a fairness
+    // problem before it is an accounting one: a driver who collected honestly
+    // and one who pocketed the fare looked identical, and the honest one had
+    // no way to show which they were.
+    test('cash taken at the door is recorded, and the commission is chased', async () => {
+        const create = await request(app).post('/api/orders')
+            .set('Authorization', `Bearer ${dispatcherToken}`)
+            .send({
+                cargo_description: 'Cash job cargo', weight_kg: 120,
+                origin_hub_id: hubId, delivery_lng: 30.0891, delivery_lat: -1.9706,
+            });
+        assert.equal(create.statusCode, 201, JSON.stringify(create.body));
+        const orderId = create.body.data.order.id;
+
+        await pool.query(
+            `UPDATE orders SET status = 'ARRIVED', price_is_estimate = FALSE,
+                    price_total = 20000, platform_fee = 2160, currency = 'RWF',
+                    assigned_to = $2 WHERE id = $1`,
+            [orderId, driverPhone]
+        );
+
+        const collected = await request(app).post(`/api/payments/orders/${orderId}/cash`)
+            .set('Authorization', `Bearer ${driverToken}`).send({ note: 'Paid in notes at the gate.' });
+        assert.equal(collected.statusCode, 200, JSON.stringify(collected.body));
+        assert.equal(collected.body.data.method, 'CASH');
+        assert.equal(collected.body.data.platformFeeOwed, 2160);
+
+        const row = await pool.query(
+            'SELECT payment_status, payment_method, cash_collected_at, cash_settled_at FROM orders WHERE id = $1',
+            [orderId]
+        );
+        assert.equal(row.rows[0].payment_status, 'PAID');
+        assert.equal(row.rows[0].payment_method, 'CASH');
+        assert.ok(row.rows[0].cash_collected_at, 'the moment of collection is recorded');
+        assert.equal(row.rows[0].cash_settled_at, null, 'the driver still holds the commission');
+
+        // NO PAYOUT. Cash runs the other way: the driver already holds the
+        // whole fare, so paying them again would pay twice for money already
+        // in their pocket.
+        const payouts = await pool.query('SELECT COUNT(*)::int AS n FROM driver_payouts WHERE order_id = $1', [orderId]);
+        assert.equal(payouts.rows[0].n, 0, 'a cash job must never queue a payout');
+
+        // Recording it twice is a double collection.
+        const again = await request(app).post(`/api/payments/orders/${orderId}/cash`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(again.statusCode, 409);
+        assert.equal(again.body.error.code, 'PAYMENT_ALREADY_PAID');
+
+        // The board chases the commission, because a debt nobody tracks is
+        // one nobody collects.
+        const board = await request(app).get('/api/exceptions')
+            .set('Authorization', `Bearer ${adminToken}`);
+        const owed = board.body.data.groups.find((g) => g.key === 'cash_not_handed_in');
+        assert.ok(owed, 'cash outstanding must appear on the board');
+        assert.ok(owed.count >= 1);
+
+        // A driver clearing their own debt is the one thing this record
+        // exists to prevent.
+        const selfSettle = await request(app).post(`/api/payments/orders/${orderId}/cash/settle`)
+            .set('Authorization', `Bearer ${driverToken}`).send({});
+        assert.equal(selfSettle.statusCode, 403, 'a driver must not settle their own commission');
+
+        const settled = await request(app).post(`/api/payments/orders/${orderId}/cash/settle`)
+            .set('Authorization', `Bearer ${adminToken}`).send({});
+        assert.equal(settled.statusCode, 200, JSON.stringify(settled.body));
+
+        const twice = await request(app).post(`/api/payments/orders/${orderId}/cash/settle`)
+            .set('Authorization', `Bearer ${adminToken}`).send({});
+        assert.equal(twice.statusCode, 409);
+        assert.equal(twice.body.error.code, 'CASH_NOT_OUTSTANDING');
+    });
+
     test('public: a contact enquiry is stored and raises an alert', async () => {
         await resetPublicRateLimits();
         const before = await pool.query('SELECT COUNT(*)::int AS n FROM contact_messages');
