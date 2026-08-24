@@ -60,6 +60,7 @@ import placeHintRoutes from './routes/placeHintRoutes.js';
 import savedViewRoutes from './routes/savedViewRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import { startPayoutWorker, stopPayoutWorker } from './services/payoutWorker.js';
+import { startPaymentSweep, stopPaymentSweep } from './services/paymentService.js';
 
 const app = express();
 const allowedOrigins = appConfig.corsOrigins;
@@ -318,6 +319,7 @@ function startServer(port = appConfig.port) {
       // the app in a test does not begin moving money. It is a no-op unless
       // the disbursement product is configured.
       startPayoutWorker();
+      startPaymentSweep();
       resolve(server);
     });
   });
@@ -349,6 +351,7 @@ if (isMainModule) {
 
 async function shutdownServices() {
   stopPayoutWorker();
+  stopPaymentSweep();
   await telemetryQueue.shutdown();
   // io.close(), not just server.close(). Socket.IO owns engine.io's
   // ping/timeout interval and any still-open client connections, and

@@ -25,7 +25,7 @@ import { appendAuditLog } from './auditLogService.js';
 import { sendPushToUser } from './pushNotificationService.js';
 import { canReceiveMomoPrompt, mobileNetwork, toMsisdn } from '../utils/phone.js';
 import {
-    MomoError, MOMO_CURRENCY, getRequestToPayStatus, isMomoConfigured,
+    MomoError, getRequestToPayStatus, isMomoConfigured,
     newReference, requestToPay,
 } from './momoClient.js';
 
@@ -126,12 +126,22 @@ export async function requestPaymentForOrder({ orderId, payFrom, requestedBy }) 
 
     // An in-flight prompt is reused rather than stacked. Two prompts on one
     // handset for one delivery is how a customer pays twice.
+    // ANY unresolved request, at any age.
+    //
+    // This used to reuse only a prompt raised in the last ten minutes, on the
+    // assumption that an older one had lapsed. An MTN prompt does not expire
+    // on our schedule, so at minute eleven a second live prompt went to the
+    // same handset for the same fare — and because the payout dedupe keys on
+    // payment_request_id, which now differed, both could settle and both
+    // could pay the driver. Two collections and two payouts on one job.
+    //
+    // A request stops being in flight when something resolves it, not when a
+    // clock we own says so.
     const existing = await pool.query(
         `SELECT id, reference, created_at FROM payment_requests
           WHERE order_id = $1 AND status = 'PENDING'
-            AND created_at > NOW() - make_interval(mins => $2)
           ORDER BY created_at DESC LIMIT 1`,
-        [orderId, REQUEST_EXPIRY_MINUTES]
+        [orderId]
     );
     if (existing.rows[0]) {
         return { reference: existing.rows[0].reference, reused: true, amount: Number(order.price_total) };
@@ -139,7 +149,14 @@ export async function requestPaymentForOrder({ orderId, payFrom, requestedBy }) 
 
     const reference = newReference();
     const amount = Number(order.price_total);
-    const currency = order.currency || MOMO_CURRENCY;
+    // The order's own currency, from the rate card its price was computed
+    // against. There is no fallback: an order with no currency cannot be
+    // charged, because there is no honest guess about what its number means.
+    const currency = order.currency;
+    if (!currency) {
+        throw new PaymentError('PAYMENT_NO_CURRENCY', 409,
+            'This order has no currency on it, so it cannot be charged. Dispatch has to reprice it.');
+    }
 
     // Written before the call, so a request that never returns is still a
     // row somebody can reconcile rather than money in an unknown state.
@@ -155,6 +172,7 @@ export async function requestPaymentForOrder({ orderId, payFrom, requestedBy }) 
             reference,
             msisdn,
             amount,
+            currency,
             externalId: order.tracking_token || `ORDER-${orderId}`,
             payerMessage: `Inzira delivery ${order.tracking_token || orderId}`,
             payeeNote: (order.cargo_description || 'Freight delivery').slice(0, 100),
@@ -207,6 +225,42 @@ export async function reconcilePaymentRequest(reference) {
     }
 
     if (verdict.status === 'PENDING') return { known: true, status: 'PENDING', changed: false };
+
+    // What MTN says was actually moved, against what we asked for.
+    //
+    // The status alone was being trusted and the amount and currency thrown
+    // away — so a request that went out in the wrong currency, or was settled
+    // for a different sum, would have been recorded as a clean payment. Three
+    // lines that turn a silent wrong number into a loud one, on the first
+    // transaction rather than at the first reconciliation.
+    const settledAmount = Number(verdict.amount);
+    const amountMatches = Number.isFinite(settledAmount)
+        && Math.abs(settledAmount - Number(request.amount)) < 0.01;
+    const currencyMatches = !verdict.currency
+        || String(verdict.currency).toUpperCase() === String(request.currency).toUpperCase();
+
+    if (verdict.status === 'SUCCESSFUL' && !(amountMatches && currencyMatches)) {
+        await pool.query(
+            `UPDATE payment_requests
+                SET status = 'FAILED', provider_transaction_id = $2, failure_reason = $3,
+                    resolved_at = NOW(), updated_at = NOW()
+              WHERE id = $1 AND status = 'PENDING'`,
+            [request.id, verdict.financialTransactionId,
+             `Settled ${verdict.amount} ${verdict.currency} against ${request.amount} ${request.currency} requested`]
+        );
+        await pool.query(
+            `UPDATE orders SET payment_status = 'FAILED', updated_at = NOW() WHERE id = $1`,
+            [request.order_id]
+        );
+        await appendAuditLog({
+            actionType: 'PAYMENT_AMOUNT_MISMATCH',
+            description: `Order #${request.order_id}: MTN settled ${verdict.amount} ${verdict.currency} `
+                + `but ${request.amount} ${request.currency} was requested. Not marked paid. `
+                + `MTN reference ${verdict.financialTransactionId || 'none'}.`,
+            username: 'MTN MoMo',
+        });
+        return { known: true, status: 'MISMATCH', changed: true };
+    }
 
     const succeeded = verdict.status === 'SUCCESSFUL';
     const settled = await pool.query(
@@ -296,20 +350,62 @@ export async function sweepPendingPayments() {
     );
     let settled = 0;
     for (const row of rows) {
+        // ASK MTN FIRST. Always, whatever the age.
+        //
+        // This used to stamp TIMED_OUT on anything older than the window
+        // without ever asking, and TIMED_OUT is terminal. A customer who
+        // entered their PIN at minute eleven had genuinely paid, and the row
+        // said permanently that nobody had — money collected, order unpaid,
+        // and the evidence overwritten by our own clock. An expiry we invented
+        // is not a fact about the transaction.
+        const result = await reconcilePaymentRequest(row.reference).catch(() => null);
+        if (result?.changed) { settled += 1; continue; }
+
+        // Only once MTN has confirmed it is still waiting does age matter,
+        // and even then it is our view of it rather than a verdict: the row
+        // records that the customer never answered, which is true.
         const ageMinutes = (Date.now() - new Date(row.created_at).getTime()) / 60000;
-        if (ageMinutes > REQUEST_EXPIRY_MINUTES) {
+        if (result && !result.unreachable && ageMinutes > REQUEST_EXPIRY_MINUTES) {
             await pool.query(
                 `UPDATE payment_requests SET status = 'TIMED_OUT', resolved_at = NOW(),
                         updated_at = NOW(), failure_reason = 'Customer did not respond'
                   WHERE reference = $1 AND status = 'PENDING'`,
                 [row.reference]
             );
-            continue;
         }
-        const result = await reconcilePaymentRequest(row.reference).catch(() => null);
-        if (result?.changed) settled += 1;
     }
     return { checked: rows.length, settled };
 }
 
 export const PAYOUT_DELAY_MINUTES_FOR_TEST = PAYOUT_DELAY_MINUTES;
+
+// The sweep, on a timer.
+//
+// MTN's callback is best-effort and unauthenticated, so a payment can succeed
+// and we never hear about it. Until now sweepPendingPayments had exactly one
+// caller — an admin endpoint nobody was going to remember to press — which
+// meant the safety net under the webhook existed but was never deployed.
+const SWEEP_INTERVAL_MS = Number(process.env.PAYMENT_SWEEP_INTERVAL_MS || 120_000);
+let sweepTimer = null;
+let sweeping = false;
+
+export function startPaymentSweep() {
+    if (sweepTimer || !isMomoConfigured('collection')) return;
+    sweepTimer = setInterval(async () => {
+        if (sweeping) return;
+        sweeping = true;
+        try {
+            await sweepPendingPayments();
+        } catch (error) {
+            console.error('❌ Payment sweep tick failed:', error.message);
+        } finally {
+            sweeping = false;
+        }
+    }, SWEEP_INTERVAL_MS);
+    if (sweepTimer.unref) sweepTimer.unref();
+}
+
+export function stopPaymentSweep() {
+    if (sweepTimer) clearInterval(sweepTimer);
+    sweepTimer = null;
+}

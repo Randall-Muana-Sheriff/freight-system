@@ -23,6 +23,30 @@ const MAX_ATTEMPTS = 5;
 let timer = null;
 let running = false;
 
+/**
+ * Did a previous attempt actually land?
+ *
+ * A transfer that MTN accepted and whose response we never saw looks
+ * identical to one that never left. Asking about the old reference is the
+ * only way to tell them apart, and getting it wrong pays a driver twice.
+ *
+ * A 404 from MTN means it never knew that reference, so nothing was sent and
+ * the attempt is safe to make again under a new one. Anything else
+ * unreadable is treated as "cannot tell", and not knowing is a reason to
+ * wait rather than to send money.
+ */
+async function alreadyLanded(payout) {
+    if (payout.attempts <= 1) return null;
+    try {
+        const verdict = await getTransferStatus(payout.reference);
+        if (verdict.status === 'SUCCESSFUL') return verdict.financialTransactionId || 'unknown';
+        return null;
+    } catch (error) {
+        if (error.status === 404) return null;
+        throw error;
+    }
+}
+
 export async function processDuePayouts() {
     if (!isMomoConfigured('disbursement')) return { skipped: 'not configured' };
 
@@ -42,10 +66,37 @@ export async function processDuePayouts() {
     let sent = 0;
     for (const payout of rows) {
         try {
+            // A FRESH reference for every attempt.
+            //
+            // MTN treats X-Reference-Id as an idempotency key: replaying one
+            // returns 409, which is not retryable, so a payout that failed
+            // once could never succeed — five attempts, five 409s, and a
+            // driver who can never be paid by the worker.
+            //
+            // The previous reference is not discarded. It is checked first,
+            // because the dangerous case is the mirror one: a transfer MTN
+            // accepted whose response we lost to a timeout. Reusing it would
+            // 409; abandoning it blind would pay the driver twice.
+            const priorLanded = await alreadyLanded(payout);
+            if (priorLanded) {
+                await pool.query(
+                    `UPDATE driver_payouts SET status = 'SUCCESSFUL', provider_transaction_id = $2,
+                            failure_reason = NULL, updated_at = NOW() WHERE id = $1`,
+                    [payout.id, priorLanded]
+                );
+                sent += 1;
+                continue;
+            }
+
+            const attemptReference = newReference();
+            await pool.query('UPDATE driver_payouts SET reference = $2 WHERE id = $1',
+                [payout.id, attemptReference]);
+
             await transfer({
-                reference: payout.reference,
+                reference: attemptReference,
                 msisdn: payout.payee_msisdn,
                 amount: Number(payout.amount),
+                currency: payout.currency,
                 externalId: `PAYOUT-${payout.id}`,
                 payeeNote: `Inzira job #${payout.order_id ?? payout.id}`,
             });

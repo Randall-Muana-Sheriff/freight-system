@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_payment_requests_one_live_per_order;

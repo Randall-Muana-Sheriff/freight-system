@@ -14,10 +14,21 @@ import crypto from 'crypto';
 
 const BASE_URL = process.env.MOMO_BASE_URL || 'https://sandbox.momodeveloper.mtn.com';
 const TARGET_ENV = process.env.MOMO_TARGET_ENVIRONMENT || 'sandbox';
-// Sandbox only settles in EUR. Production uses the market's own currency,
-// which for Rwanda is RWF and has no minor unit — 15000 means fifteen
-// thousand francs, not a hundred and fifty.
-const CURRENCY = process.env.MOMO_CURRENCY || 'EUR';
+// The currency is NOT defaulted here, and that is deliberate.
+//
+// This used to read `process.env.MOMO_CURRENCY || 'EUR'`. docker-compose
+// passes an empty string when the variable is unset, empty is falsy, so every
+// call would have gone out as EUR while the rate cards price in RWF and the
+// payment_requests row recorded RWF. A 15,000 RWF fare would have reached MTN
+// as 15,000 EUR — about 22 million francs. Either Rwanda refuses EUR and every
+// collection fails, or it does not and a customer is asked for a
+// life-changing sum. A silent default is the wrong shape for the field that
+// says what money this is.
+//
+// The caller passes the order's own currency instead. MOMO_CURRENCY remains
+// only as an explicit override for the sandbox, which settles in EUR alone,
+// and a mismatch between it and the order is refused rather than resolved.
+const CURRENCY_OVERRIDE = (process.env.MOMO_CURRENCY || '').trim();
 const CALLBACK_BASE = process.env.MOMO_CALLBACK_BASE_URL || '';
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -131,6 +142,30 @@ async function call(product, { method, path, reference, body }) {
     return response;
 }
 
+/**
+ * What currency to settle in, or a refusal.
+ *
+ * The order's currency is the truth: it came from the rate card the price was
+ * computed against. MOMO_CURRENCY exists only because the sandbox settles in
+ * EUR and nothing else, so it is an explicit override rather than a default —
+ * and when it disagrees with the order, that is a misconfiguration worth
+ * stopping for, not a conflict to silently resolve in either direction.
+ */
+function resolveCurrency(orderCurrency) {
+    const wanted = String(orderCurrency || '').trim().toUpperCase();
+    if (!wanted) {
+        throw new MomoError('No currency on the order to settle in.', { code: 'CURRENCY_MISSING' });
+    }
+    if (CURRENCY_OVERRIDE && CURRENCY_OVERRIDE.toUpperCase() !== wanted) {
+        throw new MomoError(
+            `MOMO_CURRENCY is ${CURRENCY_OVERRIDE} but this order is priced in ${wanted}. `
+            + 'Refusing rather than sending an amount in the wrong currency.',
+            { code: 'CURRENCY_MISMATCH' }
+        );
+    }
+    return CURRENCY_OVERRIDE ? CURRENCY_OVERRIDE.toUpperCase() : wanted;
+}
+
 export function newReference() {
     return crypto.randomUUID();
 }
@@ -140,7 +175,8 @@ export function newReference() {
  * long before the customer has done anything — 202 means "we will push a PIN
  * prompt to that handset", not "they paid".
  */
-export async function requestToPay({ reference, msisdn, amount, externalId, payerMessage, payeeNote }) {
+export async function requestToPay({ reference, msisdn, amount, currency, externalId, payerMessage, payeeNote }) {
+    const settlementCurrency = resolveCurrency(currency);
     const response = await call('collection', {
         method: 'POST',
         path: 'v1_0/requesttopay',
@@ -149,7 +185,7 @@ export async function requestToPay({ reference, msisdn, amount, externalId, paye
             // A string, and MTN is strict about it. For RWF there is no
             // decimal part to send.
             amount: String(amount),
-            currency: CURRENCY,
+            currency: settlementCurrency,
             externalId: String(externalId),
             // MSISDN without the leading +, which is the one formatting
             // detail MTN rejects silently-looking requests over.
@@ -192,14 +228,15 @@ export async function getRequestToPayStatus(reference) {
 }
 
 /** Push money to a driver. Same shape as collection, opposite direction. */
-export async function transfer({ reference, msisdn, amount, externalId, payeeNote }) {
+export async function transfer({ reference, msisdn, amount, currency, externalId, payeeNote }) {
+    const settlementCurrency = resolveCurrency(currency);
     const response = await call('disbursement', {
         method: 'POST',
         path: 'v1_0/transfer',
         reference,
         body: {
             amount: String(amount),
-            currency: CURRENCY,
+            currency: settlementCurrency,
             externalId: String(externalId),
             payee: { partyIdType: 'MSISDN', partyId: msisdn.replace(/^\+/, '') },
             payerMessage: 'Inzira driver earnings',
@@ -232,4 +269,4 @@ export async function getTransferStatus(reference) {
     };
 }
 
-export const MOMO_CURRENCY = CURRENCY;
+export const MOMO_CURRENCY_OVERRIDE = CURRENCY_OVERRIDE;
