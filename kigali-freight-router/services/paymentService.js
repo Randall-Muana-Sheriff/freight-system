@@ -24,6 +24,7 @@ import { logError } from '../utils/logger.js';
 import { appendAuditLog } from './auditLogService.js';
 import { sendPushToUser } from './pushNotificationService.js';
 import { canReceiveMomoPrompt, mobileNetwork, toMsisdn } from '../utils/phone.js';
+import { distinctCurrencies, soleCurrency } from '../utils/money.js';
 import { toDispatchAndDriver } from './realtime.js';
 import {
     MomoError, getRequestToPayStatus, isMomoConfigured,
@@ -666,9 +667,19 @@ export async function cashOwedBy(queryable, driverUsername) {
           ORDER BY cash_collected_at ASC`,
         [driverUsername]
     );
+    // Every distinct currency in the debt, not just the first row's.
+    //
+    // `total` is a bare sum, so across currencies it is a number with no
+    // honest unit -- 2000 RWF and 15 USD reduce to 2015, and reporting that
+    // against rows[0].currency would charge 2015 RWF and mark both jobs
+    // settled. The summary endpoint already treats mixed currency as real
+    // (it nulls the totals and returns byCurrency); this is the same fact,
+    // and callers that turn the total into a charge have to check it.
+    const currencies = distinctCurrencies(rows);
     return {
         total: rows.reduce((a, r) => a + Number(r.platform_fee), 0),
-        currency: rows[0]?.currency ?? null,
+        currency: soleCurrency(rows),
+        currencies,
         jobs: rows.map((r) => ({ id: r.id, fee: Number(r.platform_fee) })),
     };
 }
@@ -690,6 +701,21 @@ export async function requestCashSettlement({ driverUsername, amount }) {
     const owed = await cashOwedBy(pool, driverUsername);
     if (owed.total <= 0) {
         throw new PaymentError('CASH_NOTHING_OWED', 409, 'You have no commission outstanding.');
+    }
+
+    // A debt in two currencies cannot be paid with one prompt.
+    //
+    // owed.total sums the fees regardless of unit, so 2000 RWF plus 15 USD is
+    // 2015 -- and charging that against the first job's currency takes 2015
+    // RWF and marks the dollar job settled too. Refusing is the only correct
+    // answer here: the driver is sent to a person who can split it, rather
+    // than being quietly overcharged in one currency and undercharged in the
+    // other. Unreachable while every rate card is in francs, which is exactly
+    // why it would not have been noticed.
+    if (owed.currencies.length > 1) {
+        throw new PaymentError('CASH_SETTLE_MIXED_CURRENCY', 409,
+            `Your outstanding commission is in more than one currency (${owed.currencies.join(', ')}), `
+            + 'so it cannot be paid in one prompt. Hand it to dispatch instead.');
     }
 
     // Default to everything. A partial payment is allowed because a driver
