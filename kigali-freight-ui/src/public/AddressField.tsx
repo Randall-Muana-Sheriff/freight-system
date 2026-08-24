@@ -44,10 +44,26 @@ export function AddressField({ label, placeholder, value, onChange, className }:
         // Debounced because this is a keystroke away from a rate-limited
         // endpoint that sometimes reaches a third party.
         const timer = setTimeout(() => {
-            void searchPlaces(query, controller.signal).then((found) => {
-                setSuggestions(found);
-                setActive(-1);
-            });
+            void searchPlaces(query, controller.signal)
+                .then((found) => {
+                    setSuggestions(found);
+                    setActive(-1);
+                })
+                .catch(() => {
+                    // Suggestions are an enhancement — the customer can always
+                    // type the address out in full — so a failed lookup leaves
+                    // the field alone rather than throwing an error over
+                    // something they are in the middle of typing.
+                    //
+                    // searchPlaces swallows its own failures today, so this
+                    // catch is unreachable in production. It is here because
+                    // relying on a callee's internals to stop your promise
+                    // floating is how an unhandled rejection appears the
+                    // moment that callee changes — and this one fires on
+                    // every keystroke.
+                    if (controller.signal.aborted) return;
+                    setSuggestions([]);
+                });
         }, 300);
 
         return () => { controller.abort(); clearTimeout(timer); };

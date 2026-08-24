@@ -96,4 +96,26 @@ describe('AddressField', () => {
 
         expect(screen.getByRole('combobox')).toHaveValue('kimironko');
     });
+
+    // The existing test above covers a geocoder that fails politely. This one
+    // covers it failing rudely, which is the case the component used to have
+    // no answer for: the lookup was a floating promise, so a rejection became
+    // an unhandled one — on a timer, 300ms after a keystroke, with no bearing
+    // on where it would surface. searchPlaces catches its own errors today,
+    // so this guards the day it stops.
+    it('survives a geocoder that rejects rather than returning empty', async () => {
+        mockedSearch.mockRejectedValue(new Error('geocoder exploded'));
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<Harness onChange={onChange} />);
+
+        await user.type(screen.getByRole('combobox'), 'kimironko');
+        await waitFor(() => expect(mockedSearch).toHaveBeenCalled());
+
+        // Still typeable, no list, and the text the customer entered is intact
+        // — a failed suggestion must never cost them what they wrote.
+        expect(screen.getByRole('combobox')).toHaveValue('kimironko');
+        expect(screen.queryByRole('listbox')).toBeNull();
+        expect(onChange).toHaveBeenLastCalledWith('kimironko', null);
+    });
 });

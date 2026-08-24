@@ -19,6 +19,11 @@ vi.mock('./publicApi', () => ({
 const mockedFetchCargoTypes = vi.mocked(fetchCargoTypes);
 const mockedSubmitOrder = vi.mocked(submitOrder);
 const mockedFetchQuote = vi.mocked(fetchQuote);
+// Given a real default, not left as a bare vi.fn(). AddressField debounces a
+// lookup 300ms after a keystroke, so an undefined return became `.then` of
+// undefined inside a timer that fires once the test is already over — four
+// errors reported against this file for a component it only happens to host.
+const mockedSearchPlaces = vi.mocked(searchPlaces);
 
 // The bug this file exists for: "when do you need it" had a constant, a
 // row on the review step and a field on the API, but the control itself
@@ -45,6 +50,10 @@ describe('OrderFlow — when do you need it', () => {
         sessionStorage.clear();
         window.history.replaceState(null, '', '/order');
         mockedFetchCargoTypes.mockReset().mockResolvedValue(['General goods', 'Perishables']);
+        // The address fields in this flow debounce a lookup 300ms after a
+        // keystroke. Without a default the mock returns undefined and that
+        // timer calls `.then` on it long after the test has finished.
+        mockedSearchPlaces.mockReset().mockResolvedValue([]);
         mockedSubmitOrder.mockReset().mockResolvedValue('INZ-ABCD2345');
         mockedFetchQuote.mockReset().mockResolvedValue({
             currency: 'RWF', vehicleClass: 'Light Van', totalAmount: 11000,
