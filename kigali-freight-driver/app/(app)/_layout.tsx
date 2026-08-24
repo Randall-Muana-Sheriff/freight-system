@@ -162,6 +162,7 @@ export default function AppLayout() {
             for one-handed use, and this is a screen a driver checks
             occasionally rather than while working. */}
         <Tabs.Screen name="earnings" options={{ href: null }} />
+        <Tabs.Screen name="cash" options={{ href: null }} />
       </Tabs>
     </View>
     </GestureDetector>

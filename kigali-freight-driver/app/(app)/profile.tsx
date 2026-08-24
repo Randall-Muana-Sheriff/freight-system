@@ -406,6 +406,22 @@ export default function ProfileScreen() {
         <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
       </TouchableOpacity>
 
+      {/* Directly under Earnings, because the two are halves of one question
+          and this is the half a driver can be caught out by. Earnings is
+          money coming to them; this is money already in their pocket that
+          the platform will ask for back. */}
+      <TouchableOpacity onPress={() => router.push('/(app)/cash')} activeOpacity={0.7} style={styles.notice}>
+        <View style={[styles.noticeRail, { backgroundColor: theme.colors.warning }]} />
+        <Ionicons name="wallet-outline" size={18} color={theme.colors.warning} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.noticeTitle}>Cash you owe</Text>
+          <Text style={styles.noticeDetail}>
+            The platform&apos;s share of fares you took in cash, and how to pay it from your phone.
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={theme.colors.muted} />
+      </TouchableOpacity>
+
       {/* Above the reference cards on purpose. This is the only thing on
           this screen that asks the driver to act, and the item most likely
           to be in it is a proof-of-delivery photo that never arrived. It

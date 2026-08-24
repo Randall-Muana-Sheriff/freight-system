@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { ScreenShell } from '../../components/ScreenShell';
 import { SectionHeader } from '../../components/SectionHeader';
 import { theme } from '../../lib/theme';
@@ -96,13 +96,19 @@ export default function EarningsScreen() {
               the whole fare and owes the commission back instead — so this
               screen is deliberately not the whole picture, and says so rather
               than letting a week of cash work look like an empty week. */}
-          <View style={styles.cashNote}>
+          <TouchableOpacity
+            style={styles.cashNote}
+            activeOpacity={0.7}
+            onPress={() => router.push('/(app)/cash')}
+          >
             <Ionicons name="information-circle-outline" size={16} color={theme.colors.muted} />
             <Text style={styles.cashNoteText}>
               Fares you took in cash are not here — you already hold that money. This screen is
-              what comes to you by mobile money.
+              what comes to you by mobile money.{' '}
+              <Text style={styles.cashNoteLink}>See what you owe on those.</Text>
             </Text>
-          </View>
+            <Ionicons name="chevron-forward" size={14} color={theme.colors.muted} />
+          </TouchableOpacity>
 
           {payouts.length === 0 ? (
             <Text style={styles.empty}>
@@ -157,8 +163,9 @@ const styles = StyleSheet.create({
   totalFigure: { ...theme.type.title, marginTop: 6, fontFamily: theme.fonts.mono },
   totalHint: { color: theme.colors.muted, ...theme.type.micro, marginTop: 4, fontFamily: theme.fonts.body },
   warn: { color: theme.colors.warning, ...theme.type.label, marginTop: 12, fontFamily: theme.fonts.body },
-  cashNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 16 },
+  cashNote: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 16 },
   cashNoteText: { flex: 1, color: theme.colors.muted, ...theme.type.label, fontFamily: theme.fonts.body },
+  cashNoteLink: { color: theme.colors.primary, fontFamily: theme.fonts.bodySemiBold },
   empty: { color: theme.colors.muted, ...theme.type.bodySm, marginTop: 20, fontFamily: theme.fonts.body },
   rows: { marginTop: 18, gap: 14 },
   row: { flexDirection: 'row', gap: 10 },

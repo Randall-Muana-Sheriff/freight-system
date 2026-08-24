@@ -482,6 +482,77 @@ export async function fetchDriverEarnings(token: string) {
   };
 }
 
+// Cash a driver is holding, and the platform's share of it that they owe back.
+//
+// The mirror of earnings and deliberately a separate call: a cash fare is the
+// whole amount including the platform's cut, a payout is the driver's net.
+// One endpoint returning both would invite a screen that adds them, which
+// overstates what a driver has actually earned.
+export type DriverCashJob = {
+  orderId: number;
+  amount: number;
+  // Null means the commission has not been worked out, NOT that it is zero.
+  // The screen has to keep those apart — see lib/cash.ts.
+  platformFee: number | null;
+  currency: string | null;
+  collectedAt: string | null;
+  settledAt: string | null;
+};
+
+export type DriverCashSummary = {
+  // Null when the driver's cash jobs span more than one currency, in which
+  // case no single figure can be labelled honestly and byCurrency carries the
+  // breakdown instead.
+  collected: number | null;
+  commissionOwed: number | null;
+  commissionSettled: number | null;
+  // How many unsettled jobs could not be included in commissionOwed. Anything
+  // above zero means the owed total is a floor, not the whole debt.
+  commissionOwedUnknownJobs: number;
+  currency: string | null;
+  byCurrency: {
+    currency: string | null;
+    collected: number;
+    commissionOwed: number;
+    commissionSettled: number;
+    commissionOwedUnknownJobs: number;
+  }[];
+  jobs: DriverCashJob[];
+};
+
+export type CashSettlement = {
+  reference: string;
+  amount: number;
+  currency: string | null;
+  status: string;
+  failure_reason: string | null;
+  created_at: string;
+  // Recomputed server-side after reconciling, so a partial payment leaves an
+  // accurate remainder rather than the client subtracting and hoping.
+  stillOwed: number;
+};
+
+export async function fetchDriverCash(token: string) {
+  return (await apiFetch('/api/payments/driver/cash', { token })) as DriverCashSummary;
+}
+
+/** Send a MoMo prompt to the driver's own phone for the commission they owe.
+ *  Omit `amount` to settle the whole debt; the server refuses more than that. */
+export async function requestOwnCashSettlement(token: string, amount?: number) {
+  return (await apiFetch('/api/payments/driver/cash/settle', {
+    method: 'POST',
+    token,
+    body: amount === undefined ? {} : { amount },
+  })) as { reference: string; amount: number; reused?: boolean; message?: string };
+}
+
+export async function fetchCashSettlementStatus(token: string, reference: string) {
+  return (await apiFetch(
+    `/api/payments/driver/cash/settle/${encodeURIComponent(reference)}`,
+    { token }
+  )) as CashSettlement;
+}
+
 export async function acceptJobOffer(token: string, orderId: number) {
   return apiFetch(`/api/orders/${orderId}/accept`, { token, method: 'POST', body: {} });
 }
