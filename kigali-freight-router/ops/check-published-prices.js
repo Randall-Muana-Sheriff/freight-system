@@ -142,7 +142,20 @@ if (heaviestBand && Number.isFinite(heaviestBand.maxKg) && heaviestBand.maxKg !=
     fail('bands', `the heavy band ends at ${heaviestBand.maxKg} but the site may quote to ${MAX_SELF_SERVICE_KG}`);
 }
 for (const [cls, r] of card) {
-    if (r.currency !== 'RWF') fail('currency', `${cls} is priced in ${r.currency} but the site says "All figures in RWF"`);
+    // Folded, because everything that acts on this value folds it: momoClient
+    // uppercases before charging, the settlement guard compares folded, and
+    // both currency GROUP BYs fold. So 'rwf' and 'RWF' are one currency in
+    // every place it matters, and firing on the difference would be this
+    // script crying wolf about something with no consequence.
+    //
+    // A guard is only worth having while its verdict is trusted, and the
+    // cost of a false positive is that the next real one gets waved through.
+    // The case this must still catch is a genuinely different currency —
+    // which is not hypothetical: every MoMo call went out in EUR against
+    // prices quoted in RWF until that was found.
+    if (String(r.currency || '').trim().toUpperCase() !== 'RWF') {
+        fail('currency', `${cls} is priced in ${r.currency} but the site says "All figures in RWF"`);
+    }
 }
 
 await pool.end();
