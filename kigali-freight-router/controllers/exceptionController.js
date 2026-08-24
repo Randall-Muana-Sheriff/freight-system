@@ -1,7 +1,7 @@
 // What needs a human, gathered in one place.
 //
 // A dispatch board that opens on a queue asks the dispatcher to find the
-// problem. This is the other way round: sixteen sources of deviation, already
+// problem. This is the other way round: seventeen sources of deviation, already
 // computed elsewhere in the system, collected and ranked so the first thing
 // on screen is the thing that is wrong.
 //
@@ -146,27 +146,48 @@ const GROUPS = [
         key: 'payment_outstanding',
         label: 'Delivered, and nobody has paid',
         severity: 'act',
-        // The job is done and the money is not in. With collection at the
-        // door this should be rare and immediate — a driver handed the goods
-        // over without taking payment, and every hour that passes makes it
-        // harder to recover.
+        // The job is done, it has a price, and the money is not in. With
+        // collection at the door this should be rare and immediate — a driver
+        // handed the goods over without taking payment, and every hour that
+        // passes makes it harder to recover. Somebody rings someone.
         //
-        // Deliberately includes jobs that were never priced. An order
-        // delivered with price_total NULL is not merely unpaid, it is
-        // unbillable — nobody can be asked for a number that was never
-        // settled — and price_still_estimate excludes delivered orders, so
-        // until now those appeared on no board at all. The subtitle says
-        // which of the two it is, because they need different actions: one
-        // is a phone call, the other is a price somebody has to work out.
+        // Split from delivered_unpriced below, and the split matters more
+        // than it looks. The two used to share a group, which was defensible
+        // while every member was history — but the moment real orders flow
+        // through the payment path, a genuine unpaid delivery would inherit
+        // the backlog's low urgency and hide among a hundred rows nobody
+        // intends to act on this week. Two groups, because they need two
+        // different responses and one of them is time-critical.
         sql: `SELECT o.id AS order_id, o.id::text AS id,
                      COALESCE(o.cargo_description, 'Delivery') AS title,
-                     CASE WHEN o.price_total IS NULL
-                          THEN 'Delivered and never priced — nothing to bill'
-                          ELSE 'Delivered unpaid — ' || o.price_total || ' ' || COALESCE(o.currency, '') END
-                       AS subtitle,
+                     'Delivered unpaid — ' || o.price_total ||
+                       COALESCE(' ' || o.currency, '') AS subtitle,
                      o.updated_at AS since, o.assigned_to AS driver
                 FROM orders o
                WHERE o.status = 'DELIVERED' AND o.payment_status = 'UNPAID'
+                 AND o.price_total IS NOT NULL
+               ORDER BY o.updated_at ASC`,
+    },
+    {
+        key: 'delivered_unpriced',
+        label: 'Delivered, and never priced',
+        severity: 'watch',
+        // Not unpaid — unbillable. Nobody can be asked for a number that was
+        // never settled, so this is not a collections problem and no phone
+        // call fixes it. It is a pricing decision somebody has to make, or a
+        // decision to write the job off.
+        //
+        // `watch` rather than `act` deliberately. These are history: orders
+        // delivered before there was any way to charge for them. Ranking a
+        // hundred of them alongside a driver gone dark would bury the thing
+        // that needs someone in the next ten minutes, which is exactly how a
+        // board stops being read.
+        sql: `SELECT o.id AS order_id, o.id::text AS id,
+                     COALESCE(o.cargo_description, 'Delivery') AS title,
+                     'Delivered with no price ever settled' AS subtitle,
+                     o.updated_at AS since, o.assigned_to AS driver
+                FROM orders o
+               WHERE o.status = 'DELIVERED' AND o.price_total IS NULL
                ORDER BY o.updated_at ASC`,
     },
     {
