@@ -12,6 +12,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { updateOrderStatus, fetchOrderById, confirmDelivery, confirmDeliveryByCode, acceptJobOffer, declineJobOffer, isNetworkFailure, type OrderDetail } from '../../../lib/api';
 import { enqueueOfflineAction, persistDeliveryPhotoForQueue } from '../../../lib/offlineQueue';
 import { isRetryableFailure } from '../../../lib/retryable';
+import {
+  TIMELINE_STEPS,
+  stepIndexForStatus,
+  nextActionForStatus,
+  isCancelled as statusIsCancelled,
+  isOffer as statusIsOffer,
+  type ActionStatus,
+} from '../../../lib/tripProgress';
 import { isJobInProgress } from '../../../lib/assignments';
 import { useUpNavigation } from '../../../lib/navigation';
 import { captureException } from '../../../lib/crashReporting';
@@ -23,38 +31,7 @@ import { captureException } from '../../../lib/crashReporting';
 // current, not to match it exactly.
 const ROUTE_PROGRESS_POLL_MS = 25000;
 
-// Maps the real backend status onto the simplified 4-step visual timeline.
-const TIMELINE_STEPS = ['Accepted', 'Picked up', 'In transit', 'Delivered'];
-// Also doubles as the forward-progression order for deciding which single
-// action button is next — a driver can only ever be shown the one status
-// ahead of where they currently are, never a status they've already passed.
-const STATUS_ORDER = ['ASSIGNED', 'AT_PICKUP', 'PICKED_UP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
 
-function stepIndexForStatus(status?: string): number {
-  switch ((status || '').toUpperCase()) {
-    case 'ASSIGNED':
-    // Waiting at the pickup is still the pickup stage as far as the progress
-    // dots go -- it is a state within collecting the load, not a step past it.
-    case 'AT_PICKUP':
-      return 0;
-    case 'PICKED_UP':
-      return 1;
-    case 'IN_TRANSIT':
-    case 'ARRIVED':
-      return 2;
-    case 'DELIVERED':
-      return 3;
-    default:
-      return 0;
-  }
-}
-
-function statusOrderIndex(status?: string): number {
-  const index = STATUS_ORDER.indexOf((status || '').toUpperCase());
-  return index === -1 ? 0 : index;
-}
-
-type ActionStatus = 'AT_PICKUP' | 'IN_TRANSIT' | 'ARRIVED' | 'DELIVERED';
 
 const ACTION_STEPS: Record<ActionStatus, { icon: keyof typeof Ionicons.glyphMap; label: string; helper: string }> = {
   // The button that makes waiting at a pickup payable. Nothing else in the
@@ -337,7 +314,6 @@ export default function TripDetailScreen() {
   const contactLabel = order?.recipient_name || order?.recipient_phone ? 'Recipient' : 'Customer';
 
   const activeStep = stepIndexForStatus(order?.status);
-  const currentStatusIndex = statusOrderIndex(order?.status);
   // The one status ahead of where this job actually is right now — once
   // that action is taken, the job's status moves forward and this recomputes
   // to the next one, so a completed step's button can never show again.
@@ -345,10 +321,12 @@ export default function TripDetailScreen() {
   // have anything to transit with. PICKED_UP is deliberately not here: this
   // app has never sent it, and adding a step nobody asked for to a flow
   // drivers already know is a worse trade than leaving one status unused.
-  // Work the driver has not agreed to yet. Until they answer, none of the
-  // ordinary job controls belong on screen: "start transit" on a job you have
-  // not taken is an accept button wearing the wrong label.
-  const isOffer = (order?.status || '').toUpperCase() === 'OFFERED';
+  const isOffer = statusIsOffer(order?.status);
+  // A job that has been called off. It used to render as a brand new one —
+  // both progress helpers answered "step zero" for any status they did not
+  // recognise — so a cancelled order showed a lit first dot and a live
+  // "I'm at the pickup" button. Tapping it sent an update the server refuses.
+  const isCancelled = statusIsCancelled(order?.status);
 
   const answerOffer = async (accept: boolean) => {
     if (!order || !token) return;
@@ -371,9 +349,7 @@ export default function TripDetailScreen() {
     }
   };
 
-  const nextAction = (['AT_PICKUP', 'IN_TRANSIT', 'ARRIVED', 'DELIVERED'] as ActionStatus[]).find(
-    (status) => STATUS_ORDER.indexOf(status) > currentStatusIndex
-  );
+  const nextAction = nextActionForStatus(order?.status);
 
   return (
     <>
@@ -506,12 +482,32 @@ export default function TripDetailScreen() {
             </>
           ) : null}
 
-          {/* No ladder on a job that is not theirs. stepIndexForStatus has no
-              case for OFFERED and falls through to step zero, so this rendered
-              "Accepted — current job state" directly above a button asking the
-              driver whether to accept. A job they have not taken has no
-              progress to show. */}
-          {isOffer ? null : (
+          {/* A cancelled job gets a sentence, not a ladder and a button.
+              Hiding the controls is the correction; saying why is the part
+              the driver actually needs, because otherwise a job simply
+              loses its button and looks broken. */}
+          {isCancelled ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.cancelledNotice}>
+                <View style={[styles.noticeRail, { backgroundColor: theme.colors.danger }]} />
+                <Ionicons name="close-circle-outline" size={18} color={theme.colors.danger} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cancelledTitle}>This job was cancelled</Text>
+                  <Text style={styles.cancelledDetail}>
+                    There is nothing more to do on it. Call dispatch if you were already on your way.
+                  </Text>
+                </View>
+              </View>
+            </>
+          ) : null}
+
+          {/* No ladder on a job that is not theirs, or one that is over. Both
+              statuses used to fall through the progress helpers to step zero,
+              so an offer rendered "Accepted — current job state" above a
+              button asking whether to accept, and a cancelled job rendered as
+              a fresh one. Neither has any progress to show. */}
+          {isOffer || isCancelled ? null : (
           <>
           <View style={styles.divider} />
 
@@ -560,7 +556,7 @@ export default function TripDetailScreen() {
               one decision in front of them is whether to take it at all. The
               pay is repeated here because that is what the decision is made
               on. */}
-          {isOffer ? (
+          {isCancelled ? null : isOffer ? (
             <View style={styles.nextStep}>
               <Text style={styles.nextStepEyebrow}>Offered to you</Text>
               <Text style={styles.offerPrompt}>
@@ -717,6 +713,10 @@ export default function TripDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  cancelledNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
+  noticeRail: { width: 3, height: 28, borderRadius: 2 },
+  cancelledTitle: { color: theme.colors.text, ...theme.type.bodySm, fontFamily: theme.fonts.bodySemiBold },
+  cancelledDetail: { color: theme.colors.muted, ...theme.type.micro, marginTop: 2, fontFamily: theme.fonts.body },
   errorText: {
     color: theme.colors.danger,
     ...theme.type.bodySm,
