@@ -77,7 +77,7 @@ describe('SyncRejectionsCard', () => {
         mockRejectedActions = [photo];
         await render(<SyncRejectionsCard />);
 
-        fireEvent.press(screen.getByLabelText('Try sending Proof of delivery for trip #42 again'));
+        await fireEvent.press(screen.getByLabelText('Try sending Proof of delivery for trip #42 again'));
         expect(mockRetryRejected).toHaveBeenCalledWith('rej-photo');
     });
 
@@ -87,7 +87,7 @@ describe('SyncRejectionsCard', () => {
         mockRejectedActions = [photo];
         await render(<SyncRejectionsCard />);
 
-        fireEvent.press(screen.getByLabelText('Delete Proof of delivery for trip #42'));
+        await fireEvent.press(screen.getByLabelText('Delete Proof of delivery for trip #42'));
 
         expect(mockDiscardRejected).not.toHaveBeenCalled();
         expect(alert).toHaveBeenCalled();
@@ -103,7 +103,7 @@ describe('SyncRejectionsCard', () => {
         mockRejectedActions = [photo];
         await render(<SyncRejectionsCard />);
 
-        fireEvent.press(screen.getByLabelText('Delete Proof of delivery for trip #42'));
+        await fireEvent.press(screen.getByLabelText('Delete Proof of delivery for trip #42'));
         expect(mockDiscardRejected).toHaveBeenCalledWith('rej-photo');
     });
 
@@ -115,7 +115,7 @@ describe('SyncRejectionsCard', () => {
         mockRejectedActions = [duplicateStatus];
         await render(<SyncRejectionsCard />);
 
-        fireEvent.press(screen.getByLabelText('Dismiss Trip #7 marked arrived at pickup'));
+        await fireEvent.press(screen.getByLabelText('Dismiss Trip #7 marked arrived at pickup'));
 
         expect(alert).not.toHaveBeenCalled();
         expect(mockDiscardRejected).toHaveBeenCalledWith('rej-status');
