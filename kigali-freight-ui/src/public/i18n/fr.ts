@@ -134,9 +134,9 @@ export const fr: Strings = {
         unitNote: 'Montants en RWF. Le véhicule est choisi d’après le poids que vous indiquez, vous n’avez donc pas à savoir lequel il faut.',
         examplesTitle: 'Ce que cela donne',
         examples: [
-            { job: '400 kg, de Nyabugogo à Kimironko', detail: '15 km par la route', price: '25 700' },
-            { job: '3 tonnes, dix kilomètres en ville', detail: '16 km par la route', price: '57 900' },
-            { job: '4 tonnes, de Kigali à Rubavu', detail: '157 km par la route', price: '231 400' },
+            { job: '400 kg, de Nyabugogo à Kimironko', detail: '14,6 km par la route', price: '25 719' },
+            { job: '3 tonnes, de Nyabugogo à Gikondo', detail: '10 km par la route', price: '49 683' },
+            { job: '4 tonnes, de Gikondo à Rubavu', detail: '156 km par la route', price: '230 622' },
         ],
         notesTitle: 'Ce qui fait bouger le prix',
         notes: [

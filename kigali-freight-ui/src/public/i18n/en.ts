@@ -171,10 +171,17 @@ export const en = {
         ],
         unitNote: 'All figures in RWF. We choose the vehicle from the weight you give, so you do not need to know which one the job takes.',
         examplesTitle: 'What that comes to',
+        // Every one of these is a named route between real points, quoted
+        // through the live endpoint, and published to the franc rather than
+        // rounded. Rounding was the mistake the first version made: it hid
+        // drift. "3 tonnes, ten kilometres across the city" was worse still —
+        // no two points, so nothing could re-quote it, and it silently went
+        // 8,000 RWF stale when the engine changed. ops/check-published-prices.js
+        // re-quotes all three and fails the build when they move.
         examples: [
-            { job: '400 kg, Nyabugogo to Kimironko', detail: '15 km by road', price: '25,700' },
-            { job: '3 tonnes, ten kilometres across the city', detail: '16 km by road', price: '57,900' },
-            { job: '4 tonnes, Kigali to Rubavu', detail: '157 km by road', price: '231,400' },
+            { job: '400 kg, Nyabugogo to Kimironko', detail: '14.6 km by road', price: '25,719' },
+            { job: '3 tonnes, Nyabugogo to Gikondo', detail: '10 km by road', price: '49,683' },
+            { job: '4 tonnes, Gikondo to Rubavu', detail: '156 km by road', price: '230,622' },
         ],
         notesTitle: 'What moves the number',
         notes: [
