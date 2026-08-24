@@ -6,6 +6,7 @@ import { ScreenShell } from '../../../components/ScreenShell';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { ActionSheet } from '../../../components/ActionSheet';
 import { ToastOverlay, type Toast } from '../../../components/ToastOverlay';
+import { CollectPaymentCard } from '../../../components/CollectPaymentCard';
 import { theme } from '../../../lib/theme';
 import { useAuth } from '../../../lib/auth';
 import * as ImagePicker from 'expo-image-picker';
@@ -556,6 +557,16 @@ export default function TripDetailScreen() {
               one decision in front of them is whether to take it at all. The
               pay is repeated here because that is what the decision is made
               on. */}
+          {/* Above the delivery button on purpose. The fare is taken at the
+              door and the server will not record a payment once the job is
+              closed, so a driver who confirms delivery first can no longer
+              collect. Putting this in front of that button is the only
+              protection the app can offer against an order of operations
+              nobody warned them about. */}
+          {isCancelled || isOffer ? null : (
+            <CollectPaymentCard order={order} token={token ?? ''} onSettled={loadOrder} />
+          )}
+
           {isCancelled ? null : isOffer ? (
             <View style={styles.nextStep}>
               <Text style={styles.nextStepEyebrow}>Offered to you</Text>

@@ -381,7 +381,106 @@ export type OrderDetail = DriverAssignment & {
   progressPercent?: number | null;
   distanceRemainingKm?: number | null;
   etaMinutes?: number | null;
+  // What the customer owes and whether it has arrived. The app had driver_net
+  // — the driver's own cut — and nothing about what to actually ask for, so
+  // the trip screen could not tell whether a job needed collecting at all.
+  //
+  // Numeric columns arrive as strings over JSON, hence the union.
+  //
+  // currency is genuinely nullable: orders exist that carry a price and no
+  // unit. Never render it beside the amount without checking — see
+  // formatAmount in lib/paymentPolicy.ts.
+  price_total?: number | string | null;
+  currency?: string | null;
+  price_is_estimate?: boolean | null;
+  payment_status?: string | null;
+  payment_method?: string | null;
+  paid_at?: string | null;
+  // Deliberately absent from the server's response and so from here:
+  // platform_fee. What the platform keeps is a term between this business and
+  // its drivers, not a number to hand somebody mid-negotiation at a gate.
 };
+
+export type MomoRequestResult = {
+  reference: string;
+  reused: boolean;
+  amount: number;
+  currency?: string;
+  msisdn?: string;
+  network?: string;
+  message: string;
+};
+
+export type PaymentAttempt = {
+  reference: string;
+  status: 'PENDING' | 'SUCCESSFUL' | 'FAILED' | 'MISMATCH' | string;
+  amount: number;
+  currency: string | null;
+  payer: string | null;
+  failureReason: string | null;
+  requestedAt: string;
+};
+
+export type PaymentStatusResult = {
+  paymentStatus: string | null;
+  attempt: PaymentAttempt | null;
+};
+
+export type CashResult = {
+  orderId: number;
+  amount: number;
+  currency: string | null;
+  // The commission the driver now owes back. Null when the split was never
+  // computed. Shown only after collection — it is a debt to hand in, not a
+  // number to be holding while asking a customer for money.
+  platformFeeOwed: number | null;
+  method: 'CASH';
+  message: string;
+};
+
+// Asks the customer's handset for the money. payFrom covers the case the
+// server named: they booked on Airtel and offer an MTN number at the gate.
+export async function requestMomoPayment(token: string, orderId: number, payFrom?: string) {
+  return (await apiFetch(`/api/payments/orders/${orderId}/request`, {
+    token, method: 'POST', body: payFrom ? { payFrom } : {},
+  })) as MomoRequestResult;
+}
+
+// Polled while the customer holds their phone. Reconciles rather than merely
+// reading, so the answer is never staler than the call — the webhook may not
+// have arrived, and may never.
+export async function fetchPaymentStatus(token: string, orderId: number) {
+  return (await apiFetch(`/api/payments/orders/${orderId}`, { token })) as PaymentStatusResult;
+}
+
+// Whether a prompt can reach this number at all, asked before the driver taps
+// rather than after a minute of waiting on a number that was never MTN.
+export async function checkCanCharge(token: string, phone: string) {
+  return (await apiFetch(`/api/payments/can-charge?phone=${encodeURIComponent(phone)}`, { token })) as {
+    phone: string;
+    network: string;
+    canCharge: boolean;
+    reason: string | null;
+  };
+}
+
+export async function recordCashPayment(token: string, orderId: number, note?: string) {
+  return (await apiFetch(`/api/payments/orders/${orderId}/cash`, {
+    token, method: 'POST', body: note ? { note } : {},
+  })) as CashResult;
+}
+
+export async function fetchDriverEarnings(token: string) {
+  return (await apiFetch('/api/payments/driver/earnings', { token })) as {
+    paidOut: number;
+    onTheWay: number;
+    payouts: {
+      id: number; order_id: number; amount: number; currency: string | null;
+      status: string; release_at: string | null; sent_at: string | null;
+      created_at: string; failure_reason: string | null;
+    }[];
+  };
+}
 
 export async function acceptJobOffer(token: string, orderId: number) {
   return apiFetch(`/api/orders/${orderId}/accept`, { token, method: 'POST', body: {} });
