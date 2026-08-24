@@ -24,7 +24,12 @@ export const withKioskAccess = (allowedRoles = []) => {
         try {
             decoded = jwt.verify(token, process.env.JWT_SECRET);
         } catch {
-            return fail(res, { status: 403, code: 'AUTH_INVALID_TOKEN', message: 'Session expired or invalid token.' });
+            // 401, not 403. An unverifiable token is an identity problem, not
+            // a permission one — the same split authMiddleware now makes, so
+            // a client can follow one rule: refresh on 401, never on 403.
+            // Returning 403 for both meant a genuine refusal burned a
+            // single-use refresh rotation and then failed again identically.
+            return fail(res, { status: 401, code: 'AUTH_INVALID_TOKEN', message: 'Session expired or invalid token.' });
         }
 
         if (String(decoded.role || '').toLowerCase() === 'kiosk') {
@@ -33,7 +38,7 @@ export const withKioskAccess = (allowedRoles = []) => {
             }
             const kioskUser = await verifyKioskToken(token);
             if (!kioskUser) {
-                return fail(res, { status: 403, code: 'AUTH_INVALID_TOKEN', message: 'Session expired or invalid token.' });
+                return fail(res, { status: 401, code: 'AUTH_INVALID_TOKEN', message: 'Session expired or invalid token.' });
             }
             req.user = kioskUser;
             return next();

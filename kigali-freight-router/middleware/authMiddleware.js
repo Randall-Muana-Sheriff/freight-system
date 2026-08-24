@@ -34,8 +34,22 @@ export const authMiddleware = (allowedRoles = []) => {
 
             next(); // Everything looks good, pass control to the controller
         } catch (error) {
+            // 401, not 403. These are different answers and this endpoint was
+            // giving the same one to both.
+            //
+            // 401 means "I do not know who you are — authenticate and come
+            // back". 403 means "I know exactly who you are, and no". An
+            // expired token is the first; a driver reaching an admin route is
+            // the second. Returning 403 for both forced every client to
+            // discriminate on the error code to decide whether refreshing was
+            // worth trying, and both of ours simply retried on either — so a
+            // genuine refusal burned a single-use refresh-token rotation and
+            // then failed again identically.
+            //
+            // With this split a client can follow the plain rule: refresh on
+            // 401, never on 403.
             return fail(res, {
-                status: 403,
+                status: 401,
                 code: 'AUTH_INVALID_TOKEN',
                 message: 'Session expired or invalid token.',
             });
