@@ -81,7 +81,19 @@ export async function requestPaymentForOrder({ orderId, payFrom, requestedBy }) 
     }
     // Asking before arrival would push a PIN prompt at somebody whose goods
     // are still on the road.
-    if (!['ARRIVED', 'IN_TRANSIT'].includes(order.status)) {
+    //
+    // DELIVERED is allowed, and it was not. The natural order is arrive,
+    // collect, hand over, photograph — but a driver who photographs first has
+    // already given the goods away, and refusing the payment does not undo
+    // that. It only loses the money, and left the driver with
+    // PAYMENT_TOO_EARLY telling them to mark a delivery as arrived when the
+    // state machine has no path back from DELIVERED. An instruction that
+    // cannot be followed is worse than no instruction.
+    //
+    // Collecting after handover is worse discipline, not a worse outcome, and
+    // payment_outstanding already puts a delivered unpaid job in front of
+    // dispatch as something to chase.
+    if (!['ARRIVED', 'IN_TRANSIT', 'DELIVERED'].includes(order.status)) {
         throw new PaymentError('PAYMENT_TOO_EARLY', 409,
             'Mark the delivery as arrived before asking the customer to pay.');
     }
@@ -438,9 +450,14 @@ export async function recordCashPayment({ orderId, collectedBy, note }) {
     if (order.payment_status === 'PAID') {
         throw new PaymentError('PAYMENT_ALREADY_PAID', 409, 'This delivery has already been paid for.');
     }
-    // Same gate as the MoMo path: cash is collected at the door, not booked
-    // in advance, and an estimate is not a bill.
-    if (!['ARRIVED', 'IN_TRANSIT'].includes(order.status)) {
+    // Same gate as the MoMo path, including DELIVERED — and here it matters
+    // most. A driver who took notes at the door and photographed the handover
+    // before recording it had no way to say the fare was ever collected, and
+    // an unrecorded cash job is indistinguishable from a pocketed one. This
+    // record exists to protect the honest driver; refusing it because they
+    // did two correct things in the wrong order defeats the point of having
+    // it at all.
+    if (!['ARRIVED', 'IN_TRANSIT', 'DELIVERED'].includes(order.status)) {
         throw new PaymentError('PAYMENT_TOO_EARLY', 409,
             'Mark the delivery as arrived before recording payment.');
     }
