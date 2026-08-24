@@ -91,16 +91,27 @@ describe('paymentPolicy', () => {
         });
     });
 
-    // The gap worth warning a driver about rather than letting them discover:
-    // the server takes payment from IN_TRANSIT and ARRIVED only, so closing
-    // the job first makes the fare unrecordable.
-    it('warns rather than offering a button once the job is closed unpaid', () => {
+    // This used to assert the opposite, and the assertion was right at the
+    // time: both server paths refused a DELIVERED order. They no longer do,
+    // because refusing did not un-hand the goods, it only lost the money —
+    // and for cash it defeated the point of a record that exists so an honest
+    // driver can show they collected.
+    //
+    // Changed rather than left passing on the old behaviour: a test that
+    // survives the rule it was written for is testing nothing.
+    it('still lets the fare be recorded after the goods are handed over', () => {
         const p = paymentPolicy(order({ status: 'DELIVERED' }));
-        expect(p.momo.allowed).toBe(false);
-        expect(p.cash.allowed).toBe(false);
-        expect(p.note).toMatch(/closed before the fare was recorded/i);
-        // The amount stays visible — dispatch will need to know what is owed.
+        expect(p.momo.allowed).toBe(true);
+        expect(p.cash.allowed).toBe(true);
         expect(p.amount).toBe('12,000 RWF');
+    });
+
+    // A nudge about next time, not a block on this time. The pressure to
+    // collect at the door belongs on dispatch, who see the same job under
+    // payment_outstanding, rather than on a driver already in the street.
+    it('says collecting at the door would have been easier, without refusing', () => {
+        expect(paymentPolicy(order({ status: 'DELIVERED' })).note).toMatch(/easier to take it at the door/i);
+        expect(paymentPolicy(order({ status: 'ARRIVED' })).note).toBeNull();
     });
 
     it('says the fare comes later while the load is still being collected', () => {

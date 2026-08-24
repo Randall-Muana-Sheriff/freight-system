@@ -557,12 +557,12 @@ export default function TripDetailScreen() {
               one decision in front of them is whether to take it at all. The
               pay is repeated here because that is what the decision is made
               on. */}
-          {/* Above the delivery button on purpose. The fare is taken at the
-              door and the server will not record a payment once the job is
-              closed, so a driver who confirms delivery first can no longer
-              collect. Putting this in front of that button is the only
-              protection the app can offer against an order of operations
-              nobody warned them about. */}
+          {/* Above the delivery button on purpose, and it stays there now the
+              server accepts a late payment too. Collecting after handover
+              still works but is worse discipline — the customer may have gone,
+              and the job lands in front of dispatch as outstanding. Ordering
+              the screen the way the job should run is a cheaper cue than any
+              warning after the fact. */}
           {isCancelled || isOffer ? null : (
             <CollectPaymentCard order={order} token={token ?? ''} onSettled={loadOrder} />
           )}

@@ -170,12 +170,14 @@ describe('CollectPaymentCard', () => {
         });
     });
 
-    // The order-of-operations gap: the server takes payment from IN_TRANSIT
-    // and ARRIVED only, so closing the job first makes the fare unrecordable.
-    it('warns instead of offering a doomed button once the job is closed unpaid', async () => {
+    // Inverted along with the server, which no longer refuses a delivered
+    // order. A driver who photographed the handover first is late, not locked
+    // out — so they get the nudge and the buttons, not a dead end.
+    it('still offers both ways to collect after the goods are handed over', async () => {
         await render(<CollectPaymentCard order={order({ status: 'DELIVERED' })} token="t" onSettled={() => {}} />);
-        expect(screen.getByText(/closed before the fare was recorded/i)).toBeTruthy();
-        expect(screen.queryByLabelText('Record cash taken')).toBeNull();
+        expect(screen.getByText(/easier to take it at the door/i)).toBeTruthy();
+        expect(screen.getByLabelText('Record cash taken')).toBeTruthy();
+        expect(screen.getByLabelText('Ask for mobile money')).toBeTruthy();
     });
 
     it('stays off a job that has not been accepted', async () => {

@@ -41,9 +41,16 @@ export type PaymentPolicy = {
   note: string | null;
 };
 
-// The two states the server will take money from. Not DELIVERED: closing the
-// job first shuts the door on recording the fare.
-const COLLECTABLE_FROM = ['IN_TRANSIT', 'ARRIVED'];
+// The states the server will take money from.
+//
+// DELIVERED is on this list, and it took a server change to get here. Both
+// payment paths used to refuse a delivered order with "mark the delivery as
+// arrived first" — an instruction the state machine makes impossible, so a
+// driver who photographed the handover before recording the fare had no way
+// to record it at all. Refusing does not un-hand the goods, it only loses the
+// money; and for cash it defeats the point of the record, which exists so an
+// honest driver can show they collected.
+const COLLECTABLE_FROM = ['IN_TRANSIT', 'ARRIVED', 'DELIVERED'];
 
 function normalise(value?: string | null): string {
   return (value || '').toUpperCase();
@@ -124,19 +131,6 @@ export function paymentPolicy(order: PaymentFacts | null | undefined): PaymentPo
     };
   }
 
-  if (status === 'DELIVERED') {
-    return {
-      ...blank,
-      show: true,
-      amount,
-      currencyMissing,
-      // The one that catches people. The fare is collected at the door, and
-      // closing the job first shuts the door: the server will not record a
-      // payment on a delivered order.
-      note: 'This job was closed before the fare was recorded. Payment can no longer be taken here — tell dispatch.',
-    };
-  }
-
   if (!COLLECTABLE_FROM.includes(status)) {
     return {
       ...blank,
@@ -152,6 +146,14 @@ export function paymentPolicy(order: PaymentFacts | null | undefined): PaymentPo
     show: true,
     amount,
     currencyMissing,
+    // Said, not enforced. Collecting after handover is worse discipline, not
+    // a worse outcome, and the driver may no longer be standing with the
+    // customer — so this is a nudge about next time rather than a block on
+    // this time. Dispatch sees the same job under payment_outstanding, which
+    // is where the actual pressure belongs.
+    note: status === 'DELIVERED'
+      ? 'The goods are already handed over. You can still record the fare, but it is far easier to take it at the door.'
+      : null,
     momo: currencyMissing
       ? {
           allowed: false,
