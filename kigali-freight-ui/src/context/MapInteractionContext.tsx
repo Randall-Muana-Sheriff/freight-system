@@ -247,6 +247,22 @@ export function MapInteractionProvider({ children }: { children: ReactNode }) {
         clearNewOrderDeliveryCoords: () => setNewOrderDeliveryCoords(null),
         placingOrderId, placementStep, placementPickup, placementDelivery, batchPlacing,
         beginPlacement: (orderId: number, options?: { batch?: boolean }) => {
+            // Disarm every other map mode first. They are not mutually
+            // exclusive on their own, they all live at Dashboard level so they
+            // survive switching panel tabs, and applyPickedLocation checks
+            // placement LAST — so any one of them left armed silently ate the
+            // dispatcher's clicks.
+            //
+            // The bad case is draw mode, which never self-clears: with a
+            // geofence half-drawn in the Planning tab, every click meant for a
+            // pickup pin was appended to the polygon instead, while the row
+            // sat on "Click the pickup point on the map…" indefinitely and
+            // stray markers piled up. DispatchPanel and GeofenceDrawer already
+            // clear each other this way; placement was the one that did not.
+            setDrawModeActive(false);
+            setDispatchTargetMode(false);
+            setOrderDeliveryTargetMode(false);
+            setHubTargetMode(false);
             setPlacingOrderId(orderId);
             setPlacementStep('pickup');
             setPlacementPickup(null);

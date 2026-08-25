@@ -40,9 +40,19 @@ export default function LiveFleetStatusPanel() {
         }
     }, [jwtToken]);
 
+    // Polled on the same 60s cadence as ArrivalTimeline, which reads this
+    // exact endpoint. This panel fetched once and then froze: a dispatcher
+    // parked on Monitor for the afternoon was reading ETAs computed when they
+    // switched screens. Asked where a load was at 15:40, they would answer
+    // from a 15:05 snapshot — "#412 Cement · 8m" for something that arrived
+    // twenty minutes ago — while the arrivals band on the other screen had
+    // the right answer all along.
     useEffect(() => {
+        if (userRole !== 'admin' && userRole !== 'dispatcher') return;
         void load();
-    }, [load]);
+        const id = setInterval(() => void load(), 60_000);
+        return () => clearInterval(id);
+    }, [load, userRole]);
 
     if (userRole !== 'admin' && userRole !== 'dispatcher') {
         return null;

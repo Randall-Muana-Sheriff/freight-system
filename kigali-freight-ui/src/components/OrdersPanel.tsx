@@ -33,6 +33,7 @@ const EMPTY_ORDER = { cargoDescription: '', weightKg: '', hubId: '', recipientNa
 export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedDeliveryCoords, clearPickedDeliveryCoords, onOpenOrderChange }: OrdersPanelProps) {
     const { jwtToken, userRole, activeOrders, inFlightOrders, savedHubs, refreshFeeds } = useSocket();
     const [drivers, setDrivers] = useState<StaffUser[]>([]);
+    const [driversError, setDriversError] = useState<string | null>(null);
     const [form, setForm] = useState(EMPTY_ORDER);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     const [cursorId, setCursorId] = useState<number | null>(null);
 
     const loadDrivers = useCallback(async () => {
+        setDriversError(null);
         try {
             // Only drivers cleared for dispatch (documents approved + a
             // fleet vehicle assigned) are offered here — assigning to
@@ -65,7 +67,13 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             // point letting a dispatcher pick them only to hit an error.
             setDrivers((await fetchDrivers(jwtToken)).filter(isAssignableDriver));
         } catch (err) {
+            // Surfaced, not just logged. A failed driver load leaves the
+            // Assign dropdown holding only "Select driver" and both buttons
+            // permanently disabled, with nothing on screen saying why — the
+            // dispatcher concludes the board is broken rather than that one
+            // request failed.
             console.error('Failed to load drivers', err);
+            setDriversError('Could not load the driver list, so assignment is unavailable. Refresh to try again.');
         }
     }, [jwtToken]);
 
@@ -296,6 +304,9 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             </form>
             )}
 
+            {driversError ? (
+                <div className="text-micro font-mono text-rust">{driversError}</div>
+            ) : null}
             {filterIsAvailable && (
                 <div className="flex items-center gap-2">
                     <label htmlFor="queue-filter" className="sr-only">Filter the dispatch queue</label>

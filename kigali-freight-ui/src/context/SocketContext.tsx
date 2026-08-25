@@ -30,6 +30,8 @@ interface SocketContextValue {
   // True when the last refresh could not reach the router. The rows on
   // screen are the last ones known good, not current.
   feedsStale: boolean;
+  // The operator switched the stream off, as opposed to it dropping.
+  manuallyDisconnected: boolean;
   toggleNetworkStream: () => void;
   socket: Socket | null;
   trackedAssets: Record<string, TrackedAsset>;
@@ -93,6 +95,7 @@ async function fetchFeed<T>(
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const [feedsStale, setFeedsStale] = useState(false);
+  const [manuallyDisconnected, setManuallyDisconnected] = useState(false);
   const [jwtToken, setJwtToken] = useState(() => localStorage.getItem('fleet_token') || '');
   const [userRole, setUserRole] = useState(() => localStorage.getItem('fleet_role') || '');
   const [authError, setAuthError] = useState('');
@@ -277,8 +280,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   // is the escape hatch if the stream needs a manual nudge.
   const toggleNetworkStream = useCallback(() => {
     if (isConnected) {
+      // Remembered so the pill can say "Offline" rather than "Reconnecting".
+      // Nothing is reconnecting — the operator turned it off — and a red
+      // pulsing pill that never resolves reads as a fault in the system.
+      setManuallyDisconnected(true);
       disconnectSocket();
     } else if (jwtToken) {
+      setManuallyDisconnected(false);
       connectSocket(jwtToken);
     }
   }, [isConnected, jwtToken, connectSocket, disconnectSocket]);
@@ -400,7 +408,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     mfaPending: Boolean(mfaSessionToken), verifyMfa, cancelMfa,
     showAdminCenter, setShowAdminCenter,
     viewingImage, setViewingImage,
-    isConnected, feedsStale, toggleNetworkStream,
+    isConnected, feedsStale, manuallyDisconnected, toggleNetworkStream,
     socket,
     trackedAssets, violations, activeBreachedDrivers, routeHistories,
     savedGeofences, savedRoutesList, savedHubs, savedVehicleTypes, savedDrivers, resolveDriverName, refreshFeeds,

@@ -304,6 +304,46 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                         </div>
                     ) : null}
 
+
+                    {needsPlacing ? (
+                        isThisOrder && placementStep ? (
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                                <span className="text-micro text-hazard font-mono animate-pulse">
+                                    {placementStep === 'pickup'
+                                        ? 'Click the pickup point on the map…'
+                                        : 'Now click the delivery point…'}
+                                </span>
+                                <button type="button" onClick={cancelPlacement}
+                                    className="text-micro font-mono uppercase text-steel hover:text-paper">
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => beginPlacement(order.id)}
+                                disabled={placing}
+                                title="Pin this order's pickup and delivery on the map"
+                                className="w-full mt-1 flex items-center justify-center gap-1.5 bg-panel border border-tarp/40 text-tarp rounded px-2 py-1.5 text-micro font-bold disabled:opacity-50"
+                            >
+                                <MapPin size={11} />
+                                {placing ? 'Saving…' : 'Place on map'}
+                            </button>
+                        )
+                    ) : null}
+                </div>
+            ) : null}
+            {/* Outside the customer-request card on purpose.
+
+                This whole block used to sit inside `order.source ===
+                'public'`, so a dispatcher who logged a phone-in order and
+                opened it to decide whether a 40 km run was worth a truck saw
+                cargo, weight and status and no price at all — while the
+                customer-web order directly above it showed the total, the
+                fee and the driver net. Dispatcher-created orders are fully
+                priced: orderController inserts price_total, platform_fee and
+                driver_net and returns them. A provenance check was gating a
+                pricing display. */}
                     {/* The money, which only this side of the app sees. The
                         fee is the figure that decides whether the work is
                         worth running, so it is shown next to the total rather
@@ -314,7 +354,7 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-micro">
                             <span className="text-steel">Price</span>
                             <span className="font-mono tabular-nums text-carbon">
-                                {Number(order.price_total).toLocaleString()} RWF
+                                {Number(order.price_total).toLocaleString()}{order.currency ? ` ${order.currency}` : ''}
                             </span>
                             {order.platform_fee != null ? (
                                 <>
@@ -358,35 +398,6 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                             ) : null}
                         </div>
                     ) : null}
-
-                    {needsPlacing ? (
-                        isThisOrder && placementStep ? (
-                            <div className="flex items-center justify-between gap-2 pt-1">
-                                <span className="text-micro text-hazard font-mono animate-pulse">
-                                    {placementStep === 'pickup'
-                                        ? 'Click the pickup point on the map…'
-                                        : 'Now click the delivery point…'}
-                                </span>
-                                <button type="button" onClick={cancelPlacement}
-                                    className="text-micro font-mono uppercase text-steel hover:text-paper">
-                                    Cancel
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => beginPlacement(order.id)}
-                                disabled={placing}
-                                title="Pin this order's pickup and delivery on the map"
-                                className="w-full mt-1 flex items-center justify-center gap-1.5 bg-panel border border-tarp/40 text-tarp rounded px-2 py-1.5 text-micro font-bold disabled:opacity-50"
-                            >
-                                <MapPin size={11} />
-                                {placing ? 'Saving…' : 'Place on map'}
-                            </button>
-                        )
-                    ) : null}
-                </div>
-            ) : null}
             {returnLoadsError ? (
                 <div className="text-micro font-mono text-rust">
                     Could not check for a return load. This does not mean there is none — try again.

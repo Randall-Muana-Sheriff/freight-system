@@ -426,7 +426,7 @@ export default function TopCommandBar({ workspace, onSwitchWorkspace }: {
     workspace: 'dispatch' | 'monitor';
     onSwitchWorkspace: (w: 'dispatch' | 'monitor') => void;
 }) {
-    const { userRole, jwtToken, isConnected, feedsStale, toggleNetworkStream, logout, trackedAssets, incidentReports, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
+    const { userRole, jwtToken, isConnected, feedsStale, manuallyDisconnected, toggleNetworkStream, logout, trackedAssets, incidentReports, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
     // Anything a dispatcher has not finished with. RESOLVED is the only
     // terminal state; a missing status is treated as OPEN, matching how
     // IncidentReportsPanel reads the same rows.
@@ -530,11 +530,16 @@ export default function TopCommandBar({ workspace, onSwitchWorkspace }: {
                     onClick={toggleNetworkStream}
                     title={isConnected ? 'Click to disconnect' : 'Click to reconnect'}
                     className={`focus-ring flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-micro font-semibold uppercase tracking-wide border transition-colors ${
-                        isConnected ? 'bg-tarp/10 border-tarp/30 text-tarp' : 'bg-rust/10 border-rust/30 text-rust animate-pulse'
+                        isConnected
+                            ? 'bg-tarp/10 border-tarp/30 text-tarp'
+                            : manuallyDisconnected
+                                // Not pulsing: nothing is in progress.
+                                ? 'bg-panel border-line/20 text-steel'
+                                : 'bg-rust/10 border-rust/30 text-rust animate-pulse'
                     }`}
                 >
                     {isConnected ? <PlugZap size={12} strokeWidth={2.5} /> : <Unplug size={12} strokeWidth={2.5} />}
-                    {isConnected ? 'Live' : 'Reconnecting'}
+                    {isConnected ? 'Live' : manuallyDisconnected ? 'Offline' : 'Reconnecting'}
                 </button>
 
                 {userRole && (

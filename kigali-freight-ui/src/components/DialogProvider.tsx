@@ -99,6 +99,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     // box did — Enter to proceed, Escape to back out.
     useEffect(() => {
         if (!dialog) return;
+        // Remembered so it can be given back on close. Focus was moved into
+        // the dialog and never returned, which on a board that ships
+        // deliberate j/k keyboard navigation meant every confirm dropped a
+        // keyboard user onto document.body — they had to Tab from the top of
+        // the page again to get back to the row they were working.
+        const returnFocusTo = document.activeElement as HTMLElement | null;
         // A prompt wants the cursor in the box; everything else wants the
         // primary action, so Enter still means "yes".
         if (dialog.kind === 'prompt') inputRef.current?.focus();
@@ -107,7 +113,12 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             if (event.key === 'Escape') close(dialog.kind === 'prompt' ? null : false);
         };
         window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            // Only if it is still on the page — the row that opened the
+            // dialog may have been removed by the very action it confirmed.
+            if (returnFocusTo && document.contains(returnFocusTo)) returnFocusTo.focus();
+        };
     }, [dialog, close]);
 
     const danger = dialog?.tone === 'danger';

@@ -109,6 +109,9 @@ export interface Order {
     // deliberately given the total alone, so these have no equivalent there.
     priced_vehicle_class?: string | null;
     price_total?: string | number | null;
+    // The unit price_total is in. Rendered rather than assumed — the
+    // board used to print "RWF" as a literal beside every figure.
+    currency?: string | null;
     platform_fee?: string | number | null;
     driver_net?: string | number | null;
     price_distance_km?: string | number | null;

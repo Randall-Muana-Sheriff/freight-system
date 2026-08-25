@@ -106,7 +106,12 @@ export default function RoutesPanel({
           const isSelected = selectedPlaybackRoute?.id === rt.id;
           const vId = rt.vehicleId || rt.vehicle_id || rt.id;
           const dName = resolveDriverName(rt.driverName || rt.driver_name || '') || 'Operator';
-          const dist = rt.aggregateDistanceKm || rt.aggregate_distance_km || rt.distanceKm || 0;
+          // null, not 0. An unknown distance rendered as "0 km" is the same
+          // zero-because-unknown mistake the driver app's commission screen
+          // makes a point of avoiding — and a route that reads 0 km looks
+          // like a route with nothing in it.
+          const rawDist = rt.aggregateDistanceKm ?? rt.aggregate_distance_km ?? rt.distanceKm ?? null;
+          const dist = rawDist === null || rawDist === undefined ? null : Number(rawDist);
           return (
             <button
               key={rt.id}
@@ -120,7 +125,7 @@ export default function RoutesPanel({
                 Vehicle #{vId} - {dName}
               </span>
               <span className="text-micro text-tarp bg-tarp/15 px-1 py-0.5 rounded border border-tarp/30 shrink-0">
-                {dist} km
+                {dist === null || Number.isNaN(dist) ? 'distance unknown' : `${dist} km`}
               </span>
             </button>
           );

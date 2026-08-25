@@ -434,6 +434,12 @@ export const OrderController = {
                     -- what the work actually earns them.
                     priced_vehicle_class,
                     price_total,
+                    -- The unit the total is in. Without it the board could
+                    -- only assert a currency, and it asserted RWF: correct
+                    -- today, and a lie the first time a rate card is priced
+                    -- in anything else. Reporting beats assuming for the
+                    -- same reason the driver app refuses to sum across two.
+                    currency,
                     price_is_estimate,
                     platform_fee,
                     driver_net,

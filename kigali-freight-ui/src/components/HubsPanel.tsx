@@ -38,8 +38,11 @@ export default function HubsPanel({ hubTargetMode, setHubTargetMode, newHubCoord
         setEditingId(hub.id);
         setForm({ name: hub.name, code: hub.code });
         setHubTargetMode(false);
-        // Pre-fill the picker with the hub's current location so "just
-        // change the name" doesn't require re-picking a point on the map.
+        // Clear the picker rather than pre-fill it. The behaviour is right —
+        // editingHub's own coordinates are used as the fallback further down,
+        // so "just change the name" still works without re-picking — but the
+        // comment said the opposite of the line under it and would have
+        // misled the next edit.
         clearNewHubCoords();
     };
 
