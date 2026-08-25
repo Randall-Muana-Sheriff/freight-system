@@ -108,6 +108,41 @@ jobs:
         run: npm run test
         working-directory: kigali-freight-driver
 
+  # The router's unit tests had no job at all until now.
+  #
+  # ci.yml ran `npm run test` in kigali-freight-ui and kigali-freight-driver
+  # and nowhere else, so the router's 92 tests gated nothing — including
+  # money.test.js and orderTransitions.test.js, both written in response to
+  # real bugs that reached production. They could go red on main with every
+  # check still green. A test that cannot fail a build is a local courtesy,
+  # not a gate.
+  #
+  # Deliberately separate from test-integration: these need no database, so
+  # they still run and still block when Postgres or the integration env is
+  # unavailable for any reason.
+  test-router-unit:
+    name: Tests (Router)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm run test
+        working-directory: kigali-freight-router
+
   # Job id can't contain a colon — GitHub Actions job ids must match
   # ^[a-zA-Z_][a-zA-Z0-9_-]*$. The previous "test:integration" id made this
   # entire workflow file invalid, meaning NOTHING in it — lint, test,
@@ -299,7 +334,7 @@ jobs:
   deploy-staging:
     name: Deploy Staging
     runs-on: ubuntu-latest
-    needs: [build, test-integration, security-audit, test-driver, security-audit-ui, security-audit-driver]
+    needs: [build, test-router-unit, test-integration, security-audit, test-driver, security-audit-ui, security-audit-driver]
     if: github.ref == 'refs/heads/develop'
     environment: staging
     steps:
@@ -317,7 +352,7 @@ jobs:
   deploy-production:
     name: Deploy Production
     runs-on: ubuntu-latest
-    needs: [build, test-integration, security-audit, test-driver, security-audit-ui, security-audit-driver]
+    needs: [build, test-router-unit, test-integration, security-audit, test-driver, security-audit-ui, security-audit-driver]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
     env:

@@ -34,13 +34,24 @@ function hashCode(code) {
 //
 // Miss R2_* and thirteen tests fail on "Document storage is not configured",
 // which looks like a broken upload path rather than a missing variable.
-const requiredEnv = ['DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'JWT_SECRET'];
-const hasIntegrationEnv = requiredEnv.every((key) => Boolean(process.env[key]));
+//
+// ADMIN_* belong in this list, not in a separate boolean beside it. They were
+// checked apart from it, so their absence did not count as "missing
+// prerequisites" and did not appear in the message naming what was missing --
+// it just quietly selected the skip branch below.
+const requiredEnv = [
+    'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'JWT_SECRET',
+    'ADMIN_USERNAME', 'ADMIN_PASSWORD',
+];
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+const hasIntegrationEnv = missingEnv.length === 0;
 // The admin/dispatcher auth model requires an existing admin to create
 // every other account (see bin/migrate.js's seedAdmin) — self-signup was
 // removed. Rather than hardcoding a password here, this reuses whatever
 // bootstrap admin the environment running this suite already has (the
 // same ADMIN_USERNAME/ADMIN_PASSWORD docker-compose.yml and CI both set).
+// Kept as a name because the setup below reads it, but it is no longer a
+// second gate -- requiredEnv covers it.
 const hasAdminBootstrap = Boolean(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD);
 
 const uniqueId = Date.now();
@@ -100,8 +111,28 @@ async function plantKnownOtp(phone, code) {
     );
 }
 
-if (!hasIntegrationEnv || !hasAdminBootstrap) {
-    test('integration prerequisites', { skip: true }, () => {});
+if (!hasIntegrationEnv) {
+    // Skipping locally is right: a developer without a database should not
+    // see a wall of red. Skipping in CI is not, and that is what used to
+    // happen -- ADMIN_PASSWORD was checked outside requiredEnv, so dropping
+    // it from the job env sent this whole suite down the skip path, and a
+    // skipped test is not a failure in node:test. The run exited 0 having
+    // asserted nothing, and deploy-production lists this job in its `needs`.
+    //
+    // Every tenancy and IDOR assertion in the system lives in this file and
+    // nowhere else, so "green because it did not run" is the most expensive
+    // shape of green available here.
+    if (process.env.CI) {
+        test('integration prerequisites', () => {
+            assert.fail(
+                `Integration suite cannot run: missing ${missingEnv.join(', ')}.\n`
+                + 'Failing rather than skipping because this job gates deployment, '
+                + 'and a silent skip would let it pass having tested nothing.'
+            );
+        });
+    } else {
+        test('integration prerequisites', { skip: `missing ${missingEnv.join(', ')}` }, () => {});
+    }
 } else {
     test.before(async () => {
         await startServer(0);
