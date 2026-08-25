@@ -495,7 +495,12 @@ export async function updateDriverDocumentStatus(
     status: string,
     rejectionReason: string | null,
     token: string,
-    options: { holderKind?: 'driver' | 'vehicle'; expiresAt?: string | null } = {}
+    // Not optional, and no default. The comment above said "required" while
+    // the code quietly filled in 'driver' for anyone who forgot — which is
+    // exactly what the revoke and reject-with-AI-reason paths did, sending a
+    // vehicle document's id at the driver table. The server now refuses a
+    // request without it; this makes the compiler refuse one first.
+    options: { holderKind: 'driver' | 'vehicle'; expiresAt?: string | null }
 ) {
     return apiFetch(`/api/driver-documents/${id}/status`, {
         method: 'PATCH',
@@ -503,7 +508,7 @@ export async function updateDriverDocumentStatus(
         body: {
             status,
             rejectionReason,
-            holderKind: options.holderKind ?? 'driver',
+            holderKind: options.holderKind,
             expiresAt: options.expiresAt ?? null,
         },
     });

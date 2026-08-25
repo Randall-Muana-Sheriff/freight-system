@@ -5,7 +5,7 @@ import { uploadDriverDocument, toSignedUrl, assertRealFileType } from '../config
 import { appendAuditLog, describeDriver } from '../services/auditLogService.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { analyzeDriverDocument } from '../services/documentAnalysisService.js';
-import { REQUIRED_DOCUMENT_TYPES, ACCEPTED_DOCUMENT_TYPES, DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
+import { REQUIRED_DOCUMENT_TYPES, ACCEPTED_DOCUMENT_TYPES, DRIVER_DOCUMENT_TYPES, VEHICLE_DOCUMENT_TYPES, OPERATOR_DOCUMENT_TYPES } from '../services/driverVerificationService.js';
 import { ok, fail, errorMessage } from '../utils/httpResponse.js';
 import { toDispatchAndDriver } from '../services/realtime.js';
 
@@ -442,9 +442,32 @@ export const DriverDocumentController = {
             });
         }
 
-        // Defaults to the driver table so an older client that does not send
-        // holderKind keeps working exactly as it did.
-        const table = holderKind === 'vehicle' ? 'vehicle_documents' : 'driver_documents';
+        // Required, with no default, because the default was the bug.
+        //
+        // This used to fall back to the driver table when holderKind was
+        // absent, so that an older client kept working. What it actually did
+        // was turn a client that FORGOT the field into a write against the
+        // wrong table: the dashboard's revoke and reject-with-AI-reason paths
+        // both omitted it, so revoking a vehicle's insurance certificate sent
+        // `UPDATE driver_documents WHERE id = 14`. The two tables have
+        // independent id sequences, so that either found nothing — leaving
+        // lapsed insurance approved and the driver still assignable — or hit
+        // an unrelated driver's national ID and rejected it with the
+        // insurance's reason, dropping that driver out of every picker.
+        //
+        // A missing field is now a 400. There is no older client to protect:
+        // the dashboard is the only caller and is served fresh on every load.
+        const HOLDER_KINDS = ['driver', 'vehicle'];
+        if (!HOLDER_KINDS.includes(holderKind)) {
+            return fail(res, {
+                status: 400,
+                code: 'DRIVER_DOCUMENT_HOLDER_KIND_INVALID',
+                message: `holderKind must be one of: ${HOLDER_KINDS.join(', ')}. `
+                    + 'It decides which table this writes to, so it is never assumed.',
+            });
+        }
+        const isVehicleTable = holderKind === 'vehicle';
+        const table = isVehicleTable ? 'vehicle_documents' : 'driver_documents';
 
         // The expiry is read off the document in the reviewer's hand — it is
         // the one moment somebody is actually looking at the certificate, so
@@ -475,10 +498,24 @@ export const DriverDocumentController = {
                 `UPDATE ${table}
                  SET status = $1, rejection_reason = $2, reviewed_by = $3, reviewed_at = NOW(),
                      expires_at = $5
-                 WHERE id = $4
-                 RETURNING id, ${table === 'vehicle_documents' ? 'uploaded_by AS username' : 'username'},
+                 WHERE id = $4 AND document_type = ANY($6)
+                 RETURNING id, ${isVehicleTable ? 'uploaded_by AS username' : 'username'},
                            document_type AS "documentType", status;`,
-                [status, status === 'rejected' ? (rejectionReason || null) : null, req.user?.username || 'System', id, expiry]
+                // The document_type constraint is belt and braces behind the
+                // holderKind check above. Requiring the field stops the caller
+                // that forgets it; this stops the caller that gets it wrong,
+                // by making the row's own type agree with the table it was
+                // looked for in. Costs nothing — document_type is already
+                // indexed for the checklist queries — and turns a silent write
+                // against the wrong record into a 404.
+                [
+                    status,
+                    status === 'rejected' ? (rejectionReason || null) : null,
+                    req.user?.username || 'System',
+                    id,
+                    expiry,
+                    isVehicleTable ? VEHICLE_DOCUMENT_TYPES : [...DRIVER_DOCUMENT_TYPES, ...OPERATOR_DOCUMENT_TYPES],
+                ]
             );
 
             if (result.rows.length === 0) {

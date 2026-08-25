@@ -42,7 +42,11 @@ interface DriverDocument {
     aiAnalysis?: DocumentAiAnalysis | null;
     // Which table this row came from — the two have independent id
     // sequences, so the review PATCH has to say which one it means.
-    holderKind?: 'driver' | 'vehicle';
+    // Not optional. The server sets it on every document it returns — from
+    // isVehicleDoc() on one path and a literal 'driver' on the other — so
+    // declaring it optional here only bought a silent undefined that the api
+    // helper then filled in as 'driver', writing to the wrong table.
+    holderKind: 'driver' | 'vehicle';
     expiresAt?: string | null;
     plateNumber?: string | null;
 }
@@ -120,8 +124,10 @@ export default function DriverDocumentReview() {
     const handleDecision = async (
         id: number,
         status: 'approved' | 'rejected',
-        documentType?: string,
-        holderKind?: 'driver' | 'vehicle'
+        // Both required. Every call site already passes them, and holderKind
+        // in particular decides which table the write lands in.
+        documentType: string,
+        holderKind: 'driver' | 'vehicle'
     ) => {
         const rejectionReason = status === 'rejected'
             ? await prompt({
@@ -175,7 +181,9 @@ export default function DriverDocumentReview() {
     // every document's current status, so the effect is immediate. The
     // confirmation step exists specifically so that's a deliberate choice,
     // not a misclick.
-    const handleRevoke = async (id: number, driverLabel: string, docLabel: string) => {
+    const handleRevoke = async (
+        id: number, driverLabel: string, docLabel: string, holderKind: 'driver' | 'vehicle'
+    ) => {
         const confirmed = await confirm({
             title: 'Revoke this approval?',
             body: `${docLabel} for ${driverLabel} is already approved. Revoking it will mark them unverified again until they resubmit and it's re-approved. Continue?`,
@@ -197,7 +205,12 @@ export default function DriverDocumentReview() {
         setError(null);
         setDecidingId(id);
         try {
-            await updateDriverDocumentStatus(id, 'rejected', rejectionReason, jwtToken);
+            // holderKind decides which TABLE the server writes to. Omitting it
+            // sent a vehicle document's id at driver_documents, which either
+            // 404'd (leaving lapsed insurance approved) or rejected an
+            // unrelated driver's national ID. The server now refuses a
+            // request without it rather than assuming 'driver'.
+            await updateDriverDocumentStatus(id, 'rejected', rejectionReason, jwtToken, { holderKind });
             void load();
         } catch (err) {
             setError((err as Error).message);
@@ -211,7 +224,9 @@ export default function DriverDocumentReview() {
     // admin agreeing with it shouldn't have to retype what's already on
     // screen into a free-text box. Still one explicit confirm, since
     // rejecting is still a real decision the AI doesn't get to make alone.
-    const handleRejectWithAiReason = async (id: number, reason: string) => {
+    const handleRejectWithAiReason = async (
+        id: number, reason: string, holderKind: 'driver' | 'vehicle'
+    ) => {
         if (!(await confirm({
             title: "Reject using the AI's finding as the reason?",
             body: reason,
@@ -221,7 +236,8 @@ export default function DriverDocumentReview() {
         setError(null);
         setDecidingId(id);
         try {
-            await updateDriverDocumentStatus(id, 'rejected', reason, jwtToken);
+            // Same omission as handleRevoke — see the note there.
+            await updateDriverDocumentStatus(id, 'rejected', reason, jwtToken, { holderKind });
             void load();
         } catch (err) {
             setError((err as Error).message);
@@ -309,7 +325,7 @@ export default function DriverDocumentReview() {
                                                             <button
                                                                 type="button"
                                                                 disabled={decidingId === doc!.id}
-                                                                onClick={() => void handleRejectWithAiReason(doc!.id, analysis.summary)}
+                                                                onClick={() => void handleRejectWithAiReason(doc!.id, analysis.summary, doc!.holderKind)}
                                                                 className="text-micro text-rust underline decoration-dotted hover:text-hazard disabled:opacity-50"
                                                             >
                                                                 Reject with this reason
@@ -374,7 +390,7 @@ export default function DriverDocumentReview() {
                                                 <button
                                                     type="button"
                                                     disabled={decidingId === doc.id}
-                                                    onClick={() => void handleRevoke(doc.id, resolveDriverName(username), LABELS[type])}
+                                                    onClick={() => void handleRevoke(doc.id, resolveDriverName(username), LABELS[type], doc.holderKind)}
                                                     className="bg-rust/15 hover:bg-rust/25 text-rust rounded p-1 disabled:opacity-50"
                                                     title="Revoke approval and send it back for re-verification"
                                                 >
