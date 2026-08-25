@@ -119,7 +119,17 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
     // Matches what a dispatcher actually has in front of them when someone
     // rings: a cargo description, a hub, a name, or the tracking code off a
     // confirmation text.
-    const needle = filter.trim().toLowerCase();
+    // Gated on the same condition as the input that sets it (below), because
+    // the filter box only renders when the queue is longer than six.
+    //
+    // Type "sugar" against twenty loads, work the queue down to six, and the
+    // input unmounts while `filter` survives — OrdersPanel never unmounts. The
+    // header then read "6 pending", the list showed nothing, and the empty
+    // state said "Nothing matches 'sugar'. Clear the filter to see all 6",
+    // instructing the dispatcher to clear a control that was no longer on
+    // screen. Six real loads, invisible, with no way out short of a reload.
+    const filterIsAvailable = activeOrders.length > 6;
+    const needle = filterIsAvailable ? filter.trim().toLowerCase() : '';
     const visibleOrders = needle
         ? activeOrders.filter((o) => [
             o.cargo_description, o.origin_hub_name, o.customer_name,
@@ -286,7 +296,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
             </form>
             )}
 
-            {activeOrders.length > 6 && (
+            {filterIsAvailable && (
                 <div className="flex items-center gap-2">
                     <label htmlFor="queue-filter" className="sr-only">Filter the dispatch queue</label>
                     <input
@@ -304,7 +314,7 @@ export default function OrdersPanel({ pickTargetMode, setPickTargetMode, pickedD
                 </div>
             )}
 
-            {activeOrders.length > 6 && <SavedViews filter={filter} onApply={setFilter} />}
+            {filterIsAvailable && <SavedViews filter={filter} onApply={setFilter} />}
 
             {placingBatch ? (
                 <BulkPlaceFlow

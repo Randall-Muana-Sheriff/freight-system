@@ -54,9 +54,11 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
     const [changingPriority, setChangingPriority] = useState(false);
     const [selectedDriver, setSelectedDriver] = useState('');
     const [suggestions, setSuggestions] = useState<DriverSuggestion[] | null>(null);
+    const [suggestionsError, setSuggestionsError] = useState(false);
     const [assigning, setAssigning] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
     const [returnLoads, setReturnLoads] = useState<ReturnLoadCandidate[] | null>(null);
+    const [returnLoadsError, setReturnLoadsError] = useState(false);
     const [findingReturn, setFindingReturn] = useState(false);
     const [offering, setOffering] = useState(false);
     // The detail variant is always open; a queue row never is. The row's job
@@ -89,11 +91,18 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
 
     const handleFindReturn = async () => {
         setFindingReturn(true);
+        setReturnLoadsError(false);
         try {
             const data = await fetchReturnLoads(order.id, jwtToken);
             setReturnLoads(data.candidates || []);
         } catch {
-            setReturnLoads([]);
+            // NOT setReturnLoads([]). An empty array renders "Nothing to
+            // collect near the drop, so this one runs home empty" — a
+            // statement about the world, made on the strength of a 500. The
+            // dispatcher stops looking for a backfill and the customer wears
+            // an empty-return charge that a pairing would have removed. That
+            // is a money decision taken on a failed request.
+            setReturnLoadsError(true);
         } finally {
             setFindingReturn(false);
         }
@@ -101,11 +110,15 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
 
     const handleSuggest = async () => {
         setSuggesting(true);
+        setSuggestionsError(false);
         try {
             const data = await fetchNearestDrivers(order.id, jwtToken);
             setSuggestions(data.recommendedDrivers || []);
         } catch {
-            setSuggestions([]);
+            // Same shape: [] renders "No drivers currently reporting a live
+            // position", and a dispatcher who believes the fleet is dark
+            // starts phoning around.
+            setSuggestionsError(true);
         } finally {
             setSuggesting(false);
         }
@@ -374,6 +387,11 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                     ) : null}
                 </div>
             ) : null}
+            {returnLoadsError ? (
+                <div className="text-micro font-mono text-rust">
+                    Could not check for a return load. This does not mean there is none — try again.
+                </div>
+            ) : null}
             {returnLoads ? (
                 <div className="text-micro font-mono">
                     {returnLoads.length === 0 ? (
@@ -386,6 +404,11 @@ export default function OrderRow({ order, drivers, jwtToken, onAssigned, selecte
                                 .join(' · ')}
                         </span>
                     )}
+                </div>
+            ) : null}
+            {suggestionsError ? (
+                <div className="text-micro font-mono text-rust">
+                    Could not reach the driver-location service. This does not mean no drivers are reporting — try again.
                 </div>
             ) : null}
             {suggestions ? (

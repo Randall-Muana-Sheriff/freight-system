@@ -16,16 +16,24 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
     const [open, setOpen] = useState(false);
     const [history, setHistory] = useState<OrderHistoryEntry[] | null>(null);
     const [loading, setLoading] = useState(false);
+    const [failed, setFailed] = useState(false);
 
     const handleToggle = async () => {
         const next = !open;
         setOpen(next);
         if (next && history === null) {
             setLoading(true);
+            setFailed(false);
             try {
                 setHistory(await fetchOrderHistory(orderId, jwtToken));
             } catch {
-                setHistory([]);
+                // Not setHistory([]). That rendered "No status changes logged
+                // yet" over a 502 — so an order that had been reassigned three
+                // times looked untouched. Worse, it left history as [] rather
+                // than null, and the `history === null` guard above meant
+                // closing and reopening never retried: the order stayed
+                // permanently blank for the rest of the session.
+                setFailed(true);
             } finally {
                 setLoading(false);
             }
@@ -63,6 +71,10 @@ export default function OrderHistoryToggle({ orderId, jwtToken }: OrderHistoryTo
                                 <div className="text-steel/70 break-words">{new Date(h.changed_at).toLocaleString()}</div>
                             </div>
                         ))
+                    ) : failed ? (
+                        <div className="text-rust text-micro font-mono">
+                            Could not load the history. Close and reopen to try again.
+                        </div>
                     ) : (
                         <div className="text-steel text-micro font-mono">No status changes logged yet.</div>
                     )}

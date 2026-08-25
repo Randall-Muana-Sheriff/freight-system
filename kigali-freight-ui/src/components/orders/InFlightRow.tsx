@@ -21,6 +21,18 @@ export default function InFlightRow({ order, drivers, jwtToken, onChanged }: InF
 
     const handleReassign = async () => {
         if (!selectedDriver) return;
+        // Confirmed, like unassigning directly below it. This order is already
+        // in flight and the driver holding it may be on the road to the
+        // pickup; moving it is at least as consequential as returning it to
+        // the queue, and it was the one of the pair with no confirm at all —
+        // a dropdown pick and one click on a repeat icon.
+        if (!(await confirm({
+            title: `Move order #${order.id} to ${resolveDriverName(selectedDriver)}?`,
+            body: `It is in flight with ${resolveDriverName(order.assigned_to || '')}, who may already be on the way. `
+                + 'They will lose the job and the new driver will be offered it.',
+            confirmLabel: 'Reassign',
+            tone: 'danger',
+        }))) return;
         setBusy(true);
         try {
             await reassignOrder(order.id, selectedDriver, jwtToken);

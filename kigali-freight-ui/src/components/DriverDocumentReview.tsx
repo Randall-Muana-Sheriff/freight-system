@@ -158,7 +158,37 @@ export default function DriverDocumentReview() {
                 required: needsExpiry,
             });
             if (answer === null) return; // cancelled
-            expiresAt = answer.trim() ? new Date(`${answer.trim()}T23:59:59`).toISOString() : null;
+
+            // Validated rather than trusted, because .toISOString() throws a
+            // RangeError on an Invalid Date and this line sits ABOVE the try
+            // below — and the caller invokes handleDecision with `void`, so
+            // the rejection went nowhere. Typing "2027-6-30" or "30/06/2027"
+            // closed the dialog and did absolutely nothing: no request, no
+            // banner, no spinner, nothing in the console a reviewer would
+            // see. The document stayed pending, the driver stayed unassignable
+            // and the admin believed they had approved it. The server has a
+            // perfectly good DRIVER_DOCUMENT_EXPIRY_INVALID for this; it was
+            // simply never reached.
+            const typed = answer.trim();
+            if (typed) {
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(typed)) {
+                    setError(`"${typed}" is not a date this understands. Use YYYY-MM-DD, for example 2027-06-30.`);
+                    return;
+                }
+                const parsed = new Date(`${typed}T23:59:59`);
+                // Round-trip, because Date rolls overflow silently: 2027-02-31
+                // parses cleanly and comes back as 3 March. An expiry a
+                // reviewer did not type is worse than one they have to retype,
+                // since it is the date the driver stops being assignable on.
+                const roundTrip = Number.isNaN(parsed.getTime())
+                    ? null
+                    : `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+                if (roundTrip !== typed) {
+                    setError(`"${typed}" is not a real date. Check the day and month.`);
+                    return;
+                }
+                expiresAt = parsed.toISOString();
+            }
         }
 
         setError(null);

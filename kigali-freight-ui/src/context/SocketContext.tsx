@@ -27,6 +27,9 @@ interface SocketContextValue {
   viewingImage: string | null;
   setViewingImage: (value: string | null) => void;
   isConnected: boolean;
+  // True when the last refresh could not reach the router. The rows on
+  // screen are the last ones known good, not current.
+  feedsStale: boolean;
   toggleNetworkStream: () => void;
   socket: Socket | null;
   trackedAssets: Record<string, TrackedAsset>;
@@ -57,24 +60,39 @@ const SocketContext = createContext<SocketContextValue | null>(null);
 // exact same shape: fetch, default to [] on non-array/error, and clear the
 // session on a 401/403 specifically (not just any error). Extracted once
 // rather than repeated per feed.
+// Returns whether the feed actually refreshed, so refreshFeeds can tell the
+// board that what it is showing may be out of date.
+//
+// A failed fetch used to call setState([]), which turned "we could not reach
+// the router" into "there is nothing there". Mid-deploy, a dispatcher saw
+// "No pending orders. The dispatch queue is clear." over a full queue — and
+// since refreshFeeds only runs on mount, on login and after a mutation, with
+// no poll and no retry, the board stayed confidently empty until someone
+// reloaded. Keeping the last known rows is worse than fresh ones and far
+// better than a fabricated empty state.
 async function fetchFeed<T>(
   fetchFn: (token: string) => Promise<T[]>,
   token: string,
   setState: (value: T[]) => void,
   clearCachedAuth: () => void
-): Promise<void> {
+): Promise<boolean> {
   try {
     const data = await fetchFn(token);
     setState(Array.isArray(data) ? data : []);
+    return true;
   } catch (error) {
     if (error instanceof HttpError && (error.status === 401 || error.status === 403)) {
+      // The exception: the session is gone, so clearing is right. Leaving a
+      // logged-out operator looking at live fleet data would be worse.
       clearCachedAuth();
+      setState([]);
     }
-    setState([]);
+    return false;
   }
 }
 
 export function SocketProvider({ children }: { children: ReactNode }) {
+  const [feedsStale, setFeedsStale] = useState(false);
   const [jwtToken, setJwtToken] = useState(() => localStorage.getItem('fleet_token') || '');
   const [userRole, setUserRole] = useState(() => localStorage.getItem('fleet_role') || '');
   const [authError, setAuthError] = useState('');
@@ -160,18 +178,23 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const refreshFeeds = useCallback(async (tokenToUse?: string) => {
     const token = tokenToUse ?? jwtToken;
+    const results: boolean[] = [];
     // Sequential, not Promise.all — preserves the exact fetch order this
     // already ran in; parallelizing these would be a genuine behavior
     // change (timing, concurrent request count), not just deduplication.
-    await fetchFeed(fetchRoutes, token, setSavedRoutesList, clearCachedAuth);
-    await fetchFeed(fetchGeofences, token, setSavedGeofences, clearCachedAuth);
-    await fetchFeed(fetchHubs, token, setSavedHubs, clearCachedAuth);
-    await fetchFeed(fetchVehicleTypes, token, setSavedVehicleTypes, clearCachedAuth);
-    await fetchFeed(fetchActiveOrders, token, setActiveOrders, clearCachedAuth);
-    await fetchFeed(fetchIncidents, token, setIncidentReports, clearCachedAuth);
-    await fetchFeed(fetchRecentDeliveries, token, setRecentDeliveries, clearCachedAuth);
-    await fetchFeed(fetchInFlightOrders, token, setInFlightOrders, clearCachedAuth);
-    await fetchFeed(fetchDrivers, token, setSavedDrivers, clearCachedAuth);
+    results.push(await fetchFeed(fetchRoutes, token, setSavedRoutesList, clearCachedAuth));
+    results.push(await fetchFeed(fetchGeofences, token, setSavedGeofences, clearCachedAuth));
+    results.push(await fetchFeed(fetchHubs, token, setSavedHubs, clearCachedAuth));
+    results.push(await fetchFeed(fetchVehicleTypes, token, setSavedVehicleTypes, clearCachedAuth));
+    results.push(await fetchFeed(fetchActiveOrders, token, setActiveOrders, clearCachedAuth));
+    results.push(await fetchFeed(fetchIncidents, token, setIncidentReports, clearCachedAuth));
+    results.push(await fetchFeed(fetchRecentDeliveries, token, setRecentDeliveries, clearCachedAuth));
+    results.push(await fetchFeed(fetchInFlightOrders, token, setInFlightOrders, clearCachedAuth));
+    results.push(await fetchFeed(fetchDrivers, token, setSavedDrivers, clearCachedAuth));
+    // Any feed failing means the board is showing something older than it
+    // claims. Said once, rather than per-panel, because the dispatcher needs
+    // to distrust the whole screen, not one card on it.
+    setFeedsStale(results.some((ok) => !ok));
   }, [clearCachedAuth, jwtToken]);
 
   const driverDirectory = useMemo(() => {
@@ -377,7 +400,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     mfaPending: Boolean(mfaSessionToken), verifyMfa, cancelMfa,
     showAdminCenter, setShowAdminCenter,
     viewingImage, setViewingImage,
-    isConnected, toggleNetworkStream,
+    isConnected, feedsStale, toggleNetworkStream,
     socket,
     trackedAssets, violations, activeBreachedDrivers, routeHistories,
     savedGeofences, savedRoutesList, savedHubs, savedVehicleTypes, savedDrivers, resolveDriverName, refreshFeeds,

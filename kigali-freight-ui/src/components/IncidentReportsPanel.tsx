@@ -39,7 +39,7 @@ function stagePhrase(status?: string | null) {
 
 export default function IncidentReportsPanel() {
     const { alert } = useDialog();
-    const { incidentReports, jwtToken, resolveDriverName, setViewingImage } = useSocket();
+    const { incidentReports, jwtToken, resolveDriverName, setViewingImage, refreshFeeds } = useSocket();
     const [busyId, setBusyId] = useState<number | null>(null);
 
     // The initial GET already excludes long-resolved reports, but a report
@@ -63,6 +63,21 @@ export default function IncidentReportsPanel() {
         setBusyId(id);
         try {
             await updateIncidentStatus(id, status, jwtToken);
+            // Refresh rather than waiting for incident:status-updated.
+            //
+            // The socket event was the ONLY thing that redrew the card, so
+            // with the WebSocket down but REST still working — the
+            // "Reconnecting" state, which happens on every deploy — a
+            // dispatcher clicked Resolve on an accident report, the PATCH
+            // succeeded, the driver was notified, the audit log recorded it,
+            // and the card still read "Awaiting review" with the button still
+            // there. They clicked again, and again, and then reported the
+            // board as broken.
+            //
+            // The socket path still works and is still the fast one for other
+            // people's changes; this just stops the actor being the last to
+            // know about their own.
+            await refreshFeeds();
         } catch (err) {
             void alert({ title: 'Could not update the incident', body: (err as Error).message || 'Failed to update incident status.', tone: 'danger' });
         } finally {

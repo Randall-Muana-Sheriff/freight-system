@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PenLine, ShieldCheck, Trash2 } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { useAsyncAction, useKeyedAsyncAction } from '../hooks/useAsyncAction';
+import { useDialog } from './DialogProvider';
 import type { LatLng } from '../types';
 
 interface GeofenceDrawerProps {
@@ -14,6 +15,7 @@ interface GeofenceDrawerProps {
 
 export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, drawnPoints, setDrawnPoints, setDispatchTargetMode }: GeofenceDrawerProps) {
   const { userRole, savedGeofences, saveGeofence, deleteGeofence } = useSocket();
+  const { confirm } = useDialog();
   const [newFenceName, setNewFenceName] = useState('');
   const [newFenceSpeedLimit, setNewFenceSpeedLimit] = useState('60');
   const { busy: saving, error: saveError, run: runSave } = useAsyncAction();
@@ -37,6 +39,16 @@ export default function GeofenceDrawer({ drawModeActive, setDrawModeActive, draw
   };
 
   const handleDelete = async (fenceId: number) => {
+    // Confirmed, matching HubsPanel, which already asks before the equivalent
+    // action. One click deleted a speed-limit fence with no undo — and a fence
+    // that quietly stops existing takes its alerts with it, so nobody notices
+    // until a breach goes unreported.
+    if (!(await confirm({
+      title: 'Delete this geofence?',
+      body: 'Speed and boundary alerts for this area stop immediately. This cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    }))) return;
     await runDelete(fenceId, () => deleteGeofence(fenceId));
   };
 

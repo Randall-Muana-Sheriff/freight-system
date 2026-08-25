@@ -102,6 +102,16 @@ export default function AdminControlPanel() {
     };
 
     const handleUnassignVehicle = async (vehicle: Vehicle) => {
+        // Confirmed because the consequence is invisible from here. A driver
+        // without a vehicle fails isAssignableDriver, so they vanish from
+        // every driver picker on the board immediately — and whoever is
+        // assigning loads gets no explanation for why someone disappeared.
+        if (!(await confirm({
+            title: `Unassign ${vehicle.plateNumber}?`,
+            body: 'The driver will drop out of every assignment picker on the board until a vehicle is assigned again.',
+            confirmLabel: 'Unassign',
+            tone: 'danger',
+        }))) return;
         setUnassigningId(vehicle.id);
         setError(null);
         setSuccessMsg(null);
@@ -137,6 +147,13 @@ export default function AdminControlPanel() {
     };
 
     const handleDeleteType = async (type: VehicleType) => {
+        // One X click, no undo, and rate cards are written against these.
+        if (!(await confirm({
+            title: `Delete the ${type.name} vehicle type?`,
+            body: 'This cannot be undone.',
+            confirmLabel: 'Delete',
+            tone: 'danger',
+        }))) return;
         setTypeBusy(true);
         setError(null);
         try {

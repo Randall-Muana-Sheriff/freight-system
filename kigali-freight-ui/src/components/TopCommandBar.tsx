@@ -426,7 +426,11 @@ export default function TopCommandBar({ workspace, onSwitchWorkspace }: {
     workspace: 'dispatch' | 'monitor';
     onSwitchWorkspace: (w: 'dispatch' | 'monitor') => void;
 }) {
-    const { userRole, jwtToken, isConnected, toggleNetworkStream, logout, trackedAssets, violations, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
+    const { userRole, jwtToken, isConnected, feedsStale, toggleNetworkStream, logout, trackedAssets, incidentReports, activeOrders, inFlightOrders, setShowAdminCenter } = useSocket();
+    // Anything a dispatcher has not finished with. RESOLVED is the only
+    // terminal state; a missing status is treated as OPEN, matching how
+    // IncidentReportsPanel reads the same rows.
+    const openIncidentCount = incidentReports.filter((i) => (i.status || 'OPEN') !== 'RESOLVED').length;
     const [menuOpen, setMenuOpen] = useState(false);
     const now = useNow();
     // Matches the map/fleet-list definition of "active" — a driver whose
@@ -479,10 +483,39 @@ export default function TopCommandBar({ workspace, onSwitchWorkspace }: {
                 <StatChip icon={Package} label="Dispatch queue" value={activeOrders.length} />
                 <StatChip icon={Radio} label="In flight" value={inFlightOrders.length} />
                 <StatChip icon={Truck} label="Reporting now" value={activeAssetCount} />
-                <StatChip icon={AlertTriangle} label="Incidents" value={violations.length} alert={violations.length > 0} />
+                {/* Counts unresolved driver incidents, not geofence breaches.
+                    It read `violations.length`, which is populated ONLY by the
+                    live geofence:violation socket handler — nothing fetches it.
+                    So a dispatcher opening the board at 06:00 with three
+                    incidents filed overnight saw "0 Incidents" in neutral
+                    grey, and the figure only ever moved for a breach that
+                    happened while this exact tab was open. It also never
+                    decremented, since geofence:exit clears
+                    activeBreachedDrivers rather than violations, so by
+                    afternoon it over-reported instead. The label said
+                    Incidents; the number was session-local breaches.
+
+                    incidentReports was in the same context all along, is
+                    fetched by refreshFeeds, and is what the Monitor screen
+                    already shows. */}
+                <StatChip icon={AlertTriangle} label="Incidents" value={openIncidentCount} alert={openIncidentCount > 0} />
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
+                {/* Said next to the connection pill because it is the same
+                    kind of fact: what you are looking at may not be current.
+                    A failed refresh no longer blanks the feeds, so without
+                    this the board would show stale rows with no way to tell.
+                    */}
+                {feedsStale && (
+                    <span
+                        title="The last refresh could not reach the server. These rows are the last ones known good."
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-micro font-semibold uppercase tracking-wide border border-rust/30 bg-rust/10 text-rust"
+                    >
+                        <AlertTriangle size={12} strokeWidth={2.5} />
+                        Not current
+                    </span>
+                )}
                 {userRole === 'admin' && (
                     <button
                         onClick={() => setShowAdminCenter(true)}
