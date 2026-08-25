@@ -164,6 +164,29 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # Object storage, without which sixteen integration tests fail on
+      # "Document storage is not configured" — driver document upload and
+      # review, delivery photos, operator licences, and everything downstream
+      # of them. The suite's own header warns about missing R2_*; this job
+      # never set them and had no bucket to point at, so those tests could
+      # only ever fail here. Since deploy-production lists this job in its
+      # `needs`, that alone was enough to block every CI deploy.
+      #
+      # MinIO is what docker-compose already uses locally for the same job, so
+      # this is the same S3 surface the code is developed against.
+      minio:
+        image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+        env:
+          MINIO_ROOT_USER: ciminio
+          MINIO_ROOT_PASSWORD: ciminiosecret
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "mc ready local"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
       redis:
         image: redis:7-alpine
         ports:
@@ -191,6 +214,14 @@ jobs:
       JWT_SECRET: test-secret-key-for-ci-only
       ADMIN_USERNAME: it_ci_admin
       ADMIN_PASSWORD: TestAdminPass123!
+      # Points the S3 client at the MinIO service above. Account id is unused
+      # by the MinIO path but appConfig reads it, and r2Client treats a blank
+      # one as "storage not configured".
+      R2_ENDPOINT: http://localhost:9000
+      R2_ACCOUNT_ID: ci
+      R2_ACCESS_KEY_ID: ciminio
+      R2_SECRET_ACCESS_KEY: ciminiosecret
+      R2_BUCKET_NAME: inzira-ci
       METRICS_TOKEN: test-metrics-token-for-ci-only
     steps:
       - name: Checkout repository
@@ -205,8 +236,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The bucket has to exist before anything uploads into it; MinIO does
+      # not create one on demand the way a misconfigured client might assume.
+      - name: Create the object storage bucket
+        run: |
+          until curl -fsS http://localhost:9000/minio/health/live >/dev/null 2>&1; do sleep 2; done
+          docker run --rm --network host --entrypoint sh minio/mc:latest -c "
+            mc alias set ci http://localhost:9000 ciminio ciminiosecret &&
+            mc mb --ignore-existing ci/inzira-ci"
+
       - name: Run database migrations
         run: npm run db:migrate
+
+      # Runs here because this job already has Postgres and has just
+      # migrated it — the guard needs live rate cards to compare against.
+      #
+      # Its own header claimed "run after any pricing change, and in CI"
+      # while appearing in no workflow at all, so the advertised price and
+      # the charged price were unguarded in practice. It compares the
+      # marketing site's published figures against pricing_rates and
+      # re-quotes the worked examples through the real engine — two
+      # genuinely independent sources, which is what makes it worth having.
+      #
+      # Verified green against a database built from migrations alone, which
+      # is what this job has. Its sibling check:fleet-capacity is NOT here:
+      # it needs seeded vehicles with capacities, which CI has none of, and
+      # it exits 1 on an empty fleet.
+      - name: Check published prices match the rate cards
+        run: npm run check:prices
+        working-directory: kigali-freight-router
 
       - name: Run integration tests
         run: npm run test:integration

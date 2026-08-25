@@ -16,7 +16,10 @@
 //                        figure. The old script read only en.ts while its own
 //                        failure message told you to update fr.ts as well.
 //
-// Run after any pricing change, and in CI:  npm run check:prices
+// Run after any pricing change:  npm run check:prices
+// Also runs in CI, in the integration job — that job already has a
+// migrated database, which this needs. It genuinely did not run
+// anywhere for a while despite this line claiming it did.
 
 import pool from '../config/db.js';
 import { readFile } from 'node:fs/promises';

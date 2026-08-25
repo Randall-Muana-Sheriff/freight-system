@@ -494,7 +494,7 @@ export async function sweepPendingPayments() {
     return { checked: rows.length, settled };
 }
 
-export const PAYOUT_DELAY_MINUTES_FOR_TEST = PAYOUT_DELAY_MINUTES;
+
 
 // The sweep, on a timer.
 //

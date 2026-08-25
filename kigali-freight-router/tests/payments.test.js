@@ -1,3 +1,16 @@
+// Reachability, not payments. This file covers ONE question — can this
+// number be sent a MoMo prompt at all — and nothing else in the payment path.
+//
+// The name oversold it. In a test listing it read as coverage of
+// paymentService and momoClient, 1,100-odd lines of money handling, when it
+// imports neither. What money logic is unit tested lives in money.test.js
+// (currency resolution and the mixed-currency refusal) and, for the driver's
+// side, kigali-freight-driver/lib/cash.test.ts. Everything else in
+// paymentService is covered only by integration.test.js, if at all.
+//
+// Worth stating plainly because MoMo has never been exercised against MTN:
+// no sandbox is available for Rwanda, so these suites are not a safety net
+// over that code, they are the only thing there is.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mobileNetwork, canReceiveMomoPrompt, toMsisdn } from '../utils/phone.js';

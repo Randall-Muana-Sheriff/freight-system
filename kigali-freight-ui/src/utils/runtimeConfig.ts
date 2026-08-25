@@ -41,7 +41,14 @@ function readRuntimeConfig(): RuntimeConfig {
 
 export function getApiBase(): string {
     const runtime = readRuntimeConfig();
-    return runtime.API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
+    const configured = runtime.API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
+    // Trailing slash stripped, because every caller appends a path that
+    // already starts with one. "https://api.inzira.systems/" — a natural
+    // thing to type into a container's runtime config — produced
+    // "https://api.inzira.systems//api/orders", and the only test covering
+    // this compared the built URL against the same API_BASE constant it was
+    // built from, so both sides moved together and it could never catch it.
+    return typeof configured === 'string' ? configured.replace(/\/+$/, '') : configured;
 }
 
 // Empty string when no staff host is configured, which is the normal case

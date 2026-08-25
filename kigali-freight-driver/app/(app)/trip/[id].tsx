@@ -681,7 +681,7 @@ export default function TripDetailScreen() {
                   </View>
                 ) : (
                   <TouchableOpacity onPress={() => setCodeEntryOpen(true)} accessibilityRole="button">
-                    <Text style={styles.codeLink}>No camera? Use the recipient's code instead</Text>
+                    <Text style={styles.codeLink}>No camera? Use the recipient&apos;s code instead</Text>
                   </TouchableOpacity>
                 )
               ) : null}

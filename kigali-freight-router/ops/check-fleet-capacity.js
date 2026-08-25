@@ -8,7 +8,15 @@
 // That is the bug this existed to fix in the first place: the site quoted
 // 30 tonnes against a fleet whose largest vehicle takes 12.
 //
-// Run after any fleet change, and in CI:  npm run check:fleet-capacity
+// Run after any fleet change:  npm run check:fleet-capacity
+//
+// NOT in CI, and the claim that it was has been removed rather than
+// made true. This needs seeded vehicles carrying max_weight_kg; a CI
+// database has migrations and nothing else, so it exits 1 on an empty
+// fleet — verified. Wiring it in would fail every build for the
+// absence of data CI is never going to have. Its sibling
+// check-published-prices.js does run there, because rate cards are
+// seeded by migration and vehicles are not.
 
 import pool from '../config/db.js';
 import { MAX_SELF_SERVICE_KG } from '../services/pricingService.js';

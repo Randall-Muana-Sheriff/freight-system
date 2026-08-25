@@ -221,13 +221,6 @@ describe('pinning both addresses is what makes the price real', () => {
     const KIMIRONKO = { label: 'Kimironko Market', lat: -1.944800, lng: 30.125600, source: 'hint' as const };
     const NYABUGOGO = { label: 'Nyabugogo', lat: -1.939800, lng: 30.043500, source: 'hint' as const };
 
-    async function pinBothEnds(user: ReturnType<typeof userEvent.setup>) {
-        await user.type(screen.getByPlaceholderText('Gikondo Industrial Zone, gate 3'), 'nyabugogo');
-        await user.click(await screen.findByRole('option', { name: 'Nyabugogo' }));
-        await user.type(screen.getByPlaceholderText('Kimironko Market, shop 14'), 'kimironko');
-        await user.click(await screen.findByRole('option', { name: 'Kimironko Market' }));
-    }
-
     beforeEach(() => {
         // The form keeps its draft in sessionStorage so a refresh does not
         // lose a half-filled booking. jsdom keeps that between tests in a

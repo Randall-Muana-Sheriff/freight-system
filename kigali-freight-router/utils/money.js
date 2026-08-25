@@ -50,3 +50,46 @@ export function soleCurrency(rows) {
     const found = distinctCurrencies(rows);
     return found.length === 1 ? found[0] : null;
 }
+
+/**
+ * What currency to settle a payment in, or a refusal.
+ *
+ * Extracted from momoClient so it can be tested at all. It lived there as a
+ * closure over a module-level constant read from MOMO_CURRENCY at import
+ * time, which meant exercising it required a fresh process per case — so it
+ * was never exercised, despite being the guard that stops the single most
+ * expensive mistake this system can make.
+ *
+ * That mistake is not hypothetical. MOMO_CURRENCY defaulted to 'EUR' while
+ * docker-compose passed an empty string, so a 15,000 RWF fare would have gone
+ * to MTN as 15,000 EUR -- roughly 22 million francs, taken from a customer at
+ * a gate. The order's own currency is the truth here, because it came from
+ * the rate card the price was computed against.
+ *
+ * Returns a result rather than throwing so it stays free of MomoError and
+ * testable without it; momoClient turns a refusal back into one.
+ *
+ * @param {string|null|undefined} orderCurrency the currency the order is priced in
+ * @param {string|null|undefined} override the MOMO_CURRENCY escape hatch
+ * @returns {{ok: true, currency: string} | {ok: false, code: string, message: string}}
+ */
+export function resolveSettlementCurrency(orderCurrency, override) {
+    const wanted = String(orderCurrency || '').trim().toUpperCase();
+    if (!wanted) {
+        return { ok: false, code: 'CURRENCY_MISSING', message: 'No currency on the order to settle in.' };
+    }
+    const forced = String(override || '').trim().toUpperCase();
+    // A disagreement is a misconfiguration worth stopping for, not a conflict
+    // to resolve in either direction. Preferring the override would charge the
+    // wrong currency; preferring the order would silently ignore a deliberate
+    // operator setting.
+    if (forced && forced !== wanted) {
+        return {
+            ok: false,
+            code: 'CURRENCY_MISMATCH',
+            message: `MOMO_CURRENCY is ${forced} but this order is priced in ${wanted}. `
+                + 'Refusing rather than sending an amount in the wrong currency.',
+        };
+    }
+    return { ok: true, currency: forced || wanted };
+}

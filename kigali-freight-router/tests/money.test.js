@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { distinctCurrencies, soleCurrency } from '../utils/money.js';
+import { distinctCurrencies, soleCurrency, resolveSettlementCurrency } from '../utils/money.js';
 
 // The bug this exists to stop: a driver's outstanding commission was summed
 // with a plain reduce and reported against rows[0].currency, so 2,000 RWF plus
@@ -60,4 +60,51 @@ test('a missing or malformed row set is survivable', () => {
     assert.deepEqual(distinctCurrencies(null), []);
     assert.deepEqual(distinctCurrencies(undefined), []);
     assert.deepEqual(distinctCurrencies([null, undefined]), []);
+});
+
+// resolveSettlementCurrency — the guard on the most expensive mistake here.
+//
+// MOMO_CURRENCY once defaulted to 'EUR' while docker-compose passed an empty
+// string, so a 15,000 RWF fare would have reached MTN as 15,000 EUR, about 22
+// million francs taken from a customer at a gate. Until now this had no test
+// at all: it was a closure over a module-level constant read from the
+// environment at import time, so covering it needed a fresh process per case.
+
+test('with no override, the order decides — that is where the price came from', () => {
+    assert.deepEqual(resolveSettlementCurrency('RWF', ''), { ok: true, currency: 'RWF' });
+    assert.deepEqual(resolveSettlementCurrency('RWF', undefined), { ok: true, currency: 'RWF' });
+    assert.deepEqual(resolveSettlementCurrency('RWF', null), { ok: true, currency: 'RWF' });
+});
+
+test('an override that agrees with the order is allowed through', () => {
+    assert.deepEqual(resolveSettlementCurrency('EUR', 'EUR'), { ok: true, currency: 'EUR' });
+    // Case and padding are not a disagreement.
+    assert.deepEqual(resolveSettlementCurrency('rwf', ' RWF '), { ok: true, currency: 'RWF' });
+});
+
+test('an override that disagrees refuses, in BOTH directions', () => {
+    // The 22-million-franc case: sandbox forced to EUR, order priced in RWF.
+    const a = resolveSettlementCurrency('RWF', 'EUR');
+    assert.equal(a.ok, false);
+    assert.equal(a.code, 'CURRENCY_MISMATCH');
+    assert.match(a.message, /priced in RWF/);
+
+    // And the reverse, so neither value is quietly preferred over the other.
+    const b = resolveSettlementCurrency('EUR', 'RWF');
+    assert.equal(b.ok, false);
+    assert.equal(b.code, 'CURRENCY_MISMATCH');
+});
+
+test('an order with no currency refuses rather than picking one', () => {
+    for (const missing of [null, undefined, '', '   ']) {
+        const r = resolveSettlementCurrency(missing, 'RWF');
+        assert.equal(r.ok, false, `${JSON.stringify(missing)} must not resolve`);
+        assert.equal(r.code, 'CURRENCY_MISSING');
+    }
+});
+
+test('a missing currency is refused even when an override could have filled it', () => {
+    // The tempting shortcut — "we know it is RWF, use the override" — is
+    // exactly how an unpriced order gets charged.
+    assert.equal(resolveSettlementCurrency(null, 'EUR').ok, false);
 });
