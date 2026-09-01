@@ -146,6 +146,7 @@ services:
       SENTRY_DSN: ${SENTRY_DSN_DASHBOARD:-}
       GIT_COMMIT: ${GIT_COMMIT:-}
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.production (e.g. dispatch.yourcompany.com)}
+      CARTO_API_KEY: ${CARTO_API_KEY:-}
 
   caddy:
     image: caddy:2.8-alpine
