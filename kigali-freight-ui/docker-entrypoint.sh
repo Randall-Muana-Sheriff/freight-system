@@ -20,9 +20,14 @@ APP_DOMAIN="${APP_DOMAIN:-}"
 SENTRY_DSN="${SENTRY_DSN:-}"
 # Stamped by the deploy, same value the router reports from /health.
 GIT_COMMIT="${GIT_COMMIT:-}"
+# CARTO dark_all raster tiles. Leaflet fetches them from the browser, so
+# the key is in page JS on purpose. Restrict it by HTTP referrer at
+# carto.com if you need to. Strip anything that isn't a token character
+# so a malformed value cannot break the JS we write below.
+CARTO_API_KEY=$(printf '%s' "${CARTO_API_KEY:-}" | tr -cd 'A-Za-z0-9_-')
 
 cat > /usr/share/nginx/html/config.js <<EOF
-window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}", SENTRY_DSN: "${SENTRY_DSN}", GIT_COMMIT: "${GIT_COMMIT}" };
+window.__RUNTIME_CONFIG__ = { API_BASE_URL: "${API_BASE_URL}", APP_DOMAIN: "${APP_DOMAIN}", SENTRY_DSN: "${SENTRY_DSN}", GIT_COMMIT: "${GIT_COMMIT}", CARTO_API_KEY: "${CARTO_API_KEY}" };
 EOF
 
 if [ -n "$API_BASE_URL" ]; then
