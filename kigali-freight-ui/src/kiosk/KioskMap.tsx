@@ -14,6 +14,15 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { hubIcon, getVehicleIcon } from '../utils/mapIcons';
 import { classifyFreshness, formatLastSeen, useNow } from '../utils/telemetryFreshness';
 import MapSizeFix from '../components/map/MapSizeFix';
+import { getCartoApiKey } from '../utils/runtimeConfig';
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_MAX_ZOOM,
+  cartoTileUrl,
+  ESRI_DARK_ATTRIBUTION,
+  ESRI_DARK_BASE_URL,
+  ESRI_DARK_MAX_ZOOM,
+} from '../utils/mapTiles';
 import type { TrackedAsset, Hub } from '../types';
 
 const KIGALI_CENTER: [number, number] = [-1.9441, 30.0619];
@@ -77,17 +86,16 @@ interface KioskMapProps {
 export default function KioskMap({ trackedAssets, routeHistories, savedHubs, resolveDriverName }: KioskMapProps) {
     const now = useNow();
     const visibleAssets = Object.values(trackedAssets).filter((asset) => classifyFreshness(asset.lastSeen, now) !== 'offline');
+    const cartoKey = getCartoApiKey();
 
     return (
         <MapContainer center={KIGALI_CENTER} zoom={12} className="h-full w-full" zoomControl={false} attributionControl={false}>
             <MapSizeFix />
-            {/* dark_nolabels, not dark_all (used elsewhere in this codebase's
-                own FleetMap): at a glance-from-across-the-room viewing
-                distance, dozens of small neighborhood-name labels are pure
-                noise competing with the fleet/hub markers that actually
-                matter here — a dispatcher working up close benefits from
-                those labels, an unattended wall display doesn't. */}
-            <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png" />
+            {cartoKey ? (
+              <TileLayer url={cartoTileUrl('dark_nolabels', cartoKey)} attribution={CARTO_ATTRIBUTION} maxZoom={CARTO_MAX_ZOOM} />
+            ) : (
+              <TileLayer url={ESRI_DARK_BASE_URL} attribution={ESRI_DARK_ATTRIBUTION} maxZoom={ESRI_DARK_MAX_ZOOM} />
+            )}
 
             {savedHubs.map((hub) => (
                 <Marker key={`hub-${hub.id}`} position={[hub.lat, hub.lng]} icon={hubIcon}>
