@@ -24,6 +24,9 @@ interface RuntimeConfig {
     // attributable to an exact release rather than to "production". Comes
     // from the same GIT_COMMIT the router stamps into build-info.json.
     GIT_COMMIT?: string;
+    // CARTO raster basemap key, appended as `?key=` on dark_all tiles.
+    // Browser-visible by design (Leaflet fetches tiles from the page).
+    CARTO_API_KEY?: string;
 }
 
 declare global {
@@ -72,4 +75,11 @@ export function getSentryDsn(): string {
 export function getRelease(): string {
     const runtime = readRuntimeConfig();
     return runtime.GIT_COMMIT || '';
+}
+
+// Empty when unset, which keeps Streets on the Esri fallback so a clone
+// without a CARTO key still has a map rather than watermarked tiles.
+export function getCartoApiKey(): string {
+    const runtime = readRuntimeConfig();
+    return runtime.CARTO_API_KEY || import.meta.env.VITE_CARTO_API_KEY || '';
 }

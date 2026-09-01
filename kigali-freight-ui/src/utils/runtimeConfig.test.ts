@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { getApiBase } from './runtimeConfig';
+import { getApiBase, getCartoApiKey } from './runtimeConfig';
 
 describe('getApiBase', () => {
     afterEach(() => {
@@ -38,5 +38,21 @@ describe('getApiBase', () => {
     it('leaves a base with a path prefix intact apart from the slash', () => {
         window.__RUNTIME_CONFIG__ = { API_BASE_URL: 'https://example.com/gateway/' };
         expect(getApiBase()).toBe('https://example.com/gateway');
+    });
+});
+
+describe('getCartoApiKey', () => {
+    afterEach(() => {
+        delete window.__RUNTIME_CONFIG__;
+    });
+
+    it('reads the runtime config key used by the Docker entrypoint', () => {
+        window.__RUNTIME_CONFIG__ = { CARTO_API_KEY: 'cb1_test_key' };
+        expect(getCartoApiKey()).toBe('cb1_test_key');
+    });
+
+    it('is empty when unset, so Streets can fall back instead of watermarking', () => {
+        window.__RUNTIME_CONFIG__ = {};
+        expect(getCartoApiKey()).toBe('');
     });
 });
