@@ -19,3 +19,21 @@ export type CartoRasterStyle = 'dark_all' | 'dark_nolabels';
 export function cartoTileUrl(style: CartoRasterStyle, key: string): string {
   return `https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(key)}`;
 }
+
+export const ESRI_DARK_BASE_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+
+export const ESRI_DARK_LABELS_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
+
+export const ESRI_DARK_ATTRIBUTION =
+  'Tiles &copy; Esri &mdash; Esri, TomTom, Garmin, FAO, NOAA, USGS, &copy; OpenStreetMap contributors, and the GIS User Community';
+
+export const ESRI_IMAGERY_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+
+export const ESRI_IMAGERY_ATTRIBUTION =
+  'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community';
+
+export const ESRI_DARK_MAX_ZOOM = 16;
+export const ESRI_IMAGERY_MAX_ZOOM = 19;
