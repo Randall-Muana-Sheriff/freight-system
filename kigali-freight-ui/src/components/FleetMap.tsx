@@ -3,7 +3,7 @@
 // own state) were all defined inline here. Extracted into
 // src/components/map/ — pure code movement, no behavior changes.
 import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, LayersControl, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, LayersControl, LayerGroup, CircleMarker } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
@@ -12,6 +12,19 @@ import { useMapInteraction } from '../context/MapInteractionContext';
 import { truckIcon, flagIcon, hubIcon, stopIcon, getVehicleIcon, VEHICLE_TYPE_LEGEND } from '../utils/mapIcons';
 import { placedStops, tripPolyline, isStopSettled } from '../utils/tripMapLayer';
 import { classifyFreshness, formatLastSeen, useNow } from '../utils/telemetryFreshness';
+import { getCartoApiKey } from '../utils/runtimeConfig';
+import {
+  CARTO_ATTRIBUTION,
+  CARTO_MAX_ZOOM,
+  cartoTileUrl,
+  ESRI_DARK_ATTRIBUTION,
+  ESRI_DARK_BASE_URL,
+  ESRI_DARK_LABELS_URL,
+  ESRI_DARK_MAX_ZOOM,
+  ESRI_IMAGERY_ATTRIBUTION,
+  ESRI_IMAGERY_MAX_ZOOM,
+  ESRI_IMAGERY_URL,
+} from '../utils/mapTiles';
 import MapSizeFix from './map/MapSizeFix';
 import MapClickHandler from './map/MapClickHandler';
 import LocationSearchControl from './map/LocationSearchControl';
@@ -32,20 +45,10 @@ export default function FleetMap() {
     focusedTrip,
   } = useMapInteraction();
   const now = useNow();
-  // Trails are opt-in per vehicle rather than always-on for the whole
-  // fleet — with many vehicles moving at once, a permanent breadcrumb line
-  // behind every single one turns the map into an unreadable tangle.
-  // Clicking a vehicle reveals its trail; clicking it again (or clicking
-  // empty map space) hides it.
   const [selectedDriverName, setSelectedDriverName] = useState<string | null>(null);
-  // A driver's last-known position is cached indefinitely server-side —
-  // without checking lastSeen, a driver who went offline hours ago would
-  // still render as a live truck forever. "offline" ones are dropped
-  // entirely rather than showing hours/days-old ghosts on the map.
   const visibleAssets = Object.values(trackedAssets).filter((asset) => classifyFreshness(asset.lastSeen, now) !== 'offline');
+  const cartoKey = getCartoApiKey();
 
-  // Shared by the map's click handler and the address-search box so both
-  // ways of picking a location feed the same four target-mode flows.
   const pickHandlers: PickHandlers = {
     drawModeActive, setDrawnPoints,
     dispatchTargetMode, setDispatchLocation,
@@ -57,9 +60,6 @@ export default function FleetMap() {
 
   return (
     <div className="flex-1 h-full w-full relative z-[1] bg-ink">
-      {/* Shape-by-vehicle-type key. Positioned above Leaflet's own panes
-          (which top out around z-index 650) so it never gets buried under
-          tiles/markers/popups. */}
       <div className="absolute bottom-3 right-3 z-[1000] bg-panel/90 border border-line/15 rounded-md px-2.5 py-2 space-y-1 pointer-events-none">
         <div className="text-micro font-mono uppercase tracking-wider text-carbon font-bold mb-1">Vehicle type</div>
         {VEHICLE_TYPE_LEGEND.map(({ name, glyph }) => (
@@ -77,22 +77,36 @@ export default function FleetMap() {
         <LocationSearchControl jwtToken={jwtToken} pickHandlers={pickHandlers} />
         <LayersControl position="topright">
           <LayersControl.BaseLayer checked name="Streets">
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            />
+            {cartoKey ? (
+              <TileLayer
+                url={cartoTileUrl('dark_all', cartoKey)}
+                attribution={CARTO_ATTRIBUTION}
+                maxZoom={CARTO_MAX_ZOOM}
+              />
+            ) : (
+              <LayerGroup>
+                <TileLayer
+                  url={ESRI_DARK_BASE_URL}
+                  attribution={ESRI_DARK_ATTRIBUTION}
+                  maxZoom={ESRI_DARK_MAX_ZOOM}
+                />
+                <TileLayer
+                  url={ESRI_DARK_LABELS_URL}
+                  attribution={ESRI_DARK_ATTRIBUTION}
+                  maxZoom={ESRI_DARK_MAX_ZOOM}
+                />
+              </LayerGroup>
+            )}
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satellite">
             <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
-              maxZoom={19}
+              url={ESRI_IMAGERY_URL}
+              attribution={ESRI_IMAGERY_ATTRIBUTION}
+              maxZoom={ESRI_IMAGERY_MAX_ZOOM}
             />
           </LayersControl.BaseLayer>
         </LayersControl>
         <MapClickHandler {...pickHandlers} onBackgroundClick={() => setSelectedDriverName(null)} />
-
-        {/* Registered dispatch hubs — static infrastructure markers */}
         {savedHubs.map((hub) => (
           <Marker key={`hub-${hub.id}`} position={[hub.lat, hub.lng]} icon={hubIcon}>
             <Popup>
@@ -103,7 +117,6 @@ export default function FleetMap() {
             </Popup>
           </Marker>
         ))}
-
         {savedGeofences.map((fence) => {
           const positions = fence.geojson.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number]);
           return (
@@ -113,14 +126,12 @@ export default function FleetMap() {
             />
           );
         })}
-
         {drawModeActive && drawnPoints.length > 0 && (
           <>
             {drawnPoints.map((pt, idx) => <Marker key={idx} position={pt} />)}
             {drawnPoints.length > 1 && <Polygon positions={drawnPoints} pathOptions={{ color: '#C1442E', dashArray: '4,4' }} />}
           </>
         )}
-
         {selectedDriverName && (() => {
           const history = routeHistories[selectedDriverName];
           const slicedTrail = history ? history.slice(-trailLimit) : [];
@@ -128,10 +139,6 @@ export default function FleetMap() {
           const hasViolation = !!activeBreachedDrivers[selectedDriverName];
           return <Polyline positions={slicedTrail} pathOptions={{ color: hasViolation ? '#C1442E' : '#5B8C6E', weight: 2.5 }} />;
         })()}
-
-        {/* A soft ring under the selected vehicle so it's obvious which
-            one you're looking at even before its trail has enough points
-            to draw (e.g. it's been sitting still). */}
         {selectedDriverName && trackedAssets[selectedDriverName] && (
           <CircleMarker
             center={[trackedAssets[selectedDriverName].lat, trackedAssets[selectedDriverName].lng]}
@@ -140,10 +147,6 @@ export default function FleetMap() {
             interactive={false}
           />
         )}
-
-        {/* Clustered so a growing fleet doesn't turn into an unreadable
-            pile of overlapping markers at low zoom; expands automatically
-            as the dispatcher zooms in. */}
         <MarkerClusterGroup chunkedLoading maxClusterRadius={45} spiderfyOnMaxZoom showCoverageOnHover={false}>
           {visibleAssets.map((asset) => {
             const hasViolation = !!activeBreachedDrivers[asset.driverName];
@@ -178,14 +181,6 @@ export default function FleetMap() {
             );
           })}
         </MarkerClusterGroup>
-
-        {/* The run currently open in the dispatcher's panel. Drawn as a
-            dashed line through the stops in sequence, because it is a plan
-            over straight lines between points, not a road route — a solid
-            line would imply the driver follows exactly that path. Stops
-            with no coordinates are skipped rather than guessed at, and the
-            popup says so, so a dispatcher can see which ones still need
-            placing on the map. */}
         {focusedTrip && (() => {
           const placed = placedStops(focusedTrip);
           const positions = tripPolyline(focusedTrip);
@@ -216,8 +211,6 @@ export default function FleetMap() {
             </>
           );
         })()}
-
-        {/* Picked location for a hub being created/edited */}
         {newHubCoords && (
           <Marker position={newHubCoords} icon={flagIcon}>
             <Popup>
@@ -225,8 +218,6 @@ export default function FleetMap() {
             </Popup>
           </Marker>
         )}
-
-        {/* Picked delivery point for a new order being created */}
         {newOrderDeliveryCoords && (
           <Marker position={newOrderDeliveryCoords} icon={flagIcon}>
             <Popup>
@@ -234,8 +225,6 @@ export default function FleetMap() {
             </Popup>
           </Marker>
         )}
-
-        {/* Dispatch target: mark the clicked location with a flag */}
         {dispatchLocation && (
           <Marker position={dispatchLocation} icon={flagIcon}>
             <Popup>
@@ -243,8 +232,6 @@ export default function FleetMap() {
             </Popup>
           </Marker>
         )}
-
-        {/* Historical playback: full route shown as a dashed trail, with a flag marker at the current index */}
         {playbackCoords.length > 1 && (
           <Polyline positions={playbackCoords} pathOptions={{ color: '#E0A238', weight: 2, dashArray: '6,6' }} />
         )}
