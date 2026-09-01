@@ -217,6 +217,9 @@ services:
       SITE_URL: ${SITE_URL:-}
       PRE_LAUNCH: ${PRE_LAUNCH:-0}
       API_BASE_URL: http://localhost:5000
+      # CARTO dark_all tiles. Injected into /config.js at start, not baked
+      # into the image, so the same build works with or without a key.
+      CARTO_API_KEY: ${CARTO_API_KEY:-}
     ports:
       - "5173:80"
     depends_on:
