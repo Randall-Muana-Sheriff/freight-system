@@ -1,7 +1,24 @@
-# Inzira
+# Inzira — Freight Management and Tracking Platform
 
-A freight/logistics platform for Kigali: real-time fleet tracking, dispatch,
-and delivery confirmation across three applications sharing one backend.
+Inzira is an early-stage freight and logistics project for Kigali, started in July 2026. It brings dispatch, fleet tracking and delivery confirmation into a connected web, backend and mobile system.
+
+[Project website](https://inzira.systems) · [Architecture decisions](docs/adr/README.md) · [Local setup](#quick-start-local-dev) · [Deployment guide](docs/deployment/README.md) · [Contributing](CONTRIBUTING.md)
+
+## The problem
+
+Coordinating a delivery involves more than creating an order: dispatchers need to assign a driver, understand vehicle location, follow delivery progress and respond to incidents. Inzira brings those workflows together so that the people coordinating and carrying out deliveries can work from shared operational information.
+
+## Engineering highlights
+
+- **Full-stack system:** a React/TypeScript dispatch dashboard, Node.js/Express REST API and Expo/React Native driver app.
+- **Real-time communication:** Socket.IO updates connect fleet telemetry and operational state with the dispatch interface.
+- **Relational and geospatial data:** PostgreSQL/PostGIS supports orders, fleet data, location queries and geofences.
+- **Shared contracts:** Zod schemas in `packages/freight-types` sit alongside shared TypeScript and lint configuration.
+- **Engineering workflow:** npm workspaces and Turborepo coordinate builds and checks; the repository includes automated tests, database migrations, Docker configuration and architecture decision records.
+
+This is a project under active development, not a claim of commercial adoption or production readiness. The implemented system and forward-looking plans are documented separately below.
+
+## Applications and shared packages
 
 | App | What it is | Docs |
 |---|---|---|
@@ -26,6 +43,24 @@ own dev tooling. See that app's own README for device/simulator setup.
 Each subproject's README has the full picture: environment variables,
 available scripts, testing, and troubleshooting. This file is the map, not
 the manual.
+
+## Testing and quality checks
+
+From the repository root, after installing dependencies:
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+```
+
+Router integration tests also need their database and service dependencies. Follow the [backend testing instructions](kigali-freight-router/README.md) before running:
+
+```bash
+npm run test:integration --workspace=kigali-freight-router
+```
+
+The [CI workflow](.github/workflows/ci.yml) defines the automated checks. See the [Actions history](https://github.com/Randall-Muana-Sheriff/freight-system/actions) for actual run results; having a workflow does not by itself mean the latest checks passed.
 
 ## Deploying beyond your own machine
 
